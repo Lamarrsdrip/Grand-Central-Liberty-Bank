@@ -1,0 +1,547 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  FROZEN
+  SUSPENDED
+}
+
+enum KycStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  INFO_REQUESTED
+}
+
+enum DocumentType {
+  PASSPORT
+  DRIVER_LICENSE
+  NATIONAL_ID
+  SELFIE
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CRYPTO
+}
+
+enum AccountStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum RetirementAccountStatus {
+  ACTIVE
+  PENDING_REVIEW
+  RESTRICTED
+  CLOSED
+}
+
+enum RetirementWithdrawalStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  INFO_REQUESTED
+}
+
+enum TransactionStatus {
+  POSTED
+  PENDING
+  REVIEW
+  DECLINED
+}
+
+enum TransferType {
+  INTERNAL
+  DOMESTIC
+  INTERNATIONAL
+}
+
+enum TransferStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum CardType {
+  CLASSIC
+  GOLD
+  PLATINUM
+  SIGNATURE
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  INFO_REQUESTED
+}
+
+enum TicketStatus {
+  OPEN
+  ACTIVE
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum BroadcastTarget {
+  ALL_USERS
+  APPROVED_USERS
+  KYC_PENDING_USERS
+  SELECTED_USERS
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SENDING
+  SENT
+  FAILED
+}
+
+enum BannerTone {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
+}
+
+enum NotificationType {
+  KYC_APPROVED
+  KYC_REJECTED
+  KYC_INFO_REQUESTED
+  NEW_MESSAGE
+  TRANSFER_SUBMITTED
+  CARD_APPROVED
+  CARD_REJECTED
+  PASSWORD_CHANGED
+  EMAIL_VERIFICATION
+  SYSTEM
+}
+
+model User {
+  id                 String            @id @default(cuid())
+  firstName          String
+  lastName           String
+  email              String            @unique
+  phone              String
+  country            String
+  address            String
+  dateOfBirth        DateTime
+  passwordHash       String
+  role               Role              @default(USER)
+  status             UserStatus        @default(ACTIVE)
+  emailVerifiedAt    DateTime?
+  twoFactorSecret    String?
+  twoFactorEnabled   Boolean           @default(false)
+  preferredLocale    String            @default("en")
+  themePreference    String            @default("system")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  accounts           Account[]
+  sessions           Session[]
+  kycSubmissions     KycSubmission[]   @relation("UserKyc")
+  kycReviews         KycSubmission[]   @relation("KycReviewer")
+  cardApplications   CardApplication[] @relation("UserCards")
+  cardReviews        CardApplication[] @relation("CardReviewer")
+  supportTickets     SupportTicket[]   @relation("TicketOwner")
+  assignedTickets    SupportTicket[]   @relation("TicketAssignee")
+  supportMessages    SupportMessage[]
+  transferRequests   TransferRequest[]
+  notifications      Notification[]
+  broadcastEmails    BroadcastEmail[]
+  auditLogs          AuditLog[]
+  loginHistory       LoginHistory[]
+  kycNotes           KycNote[]         @relation("KycNoteAuthor")
+  freezeEvents       AccountFreezeEvent[] @relation("FreezeActor")
+  announcementBanners AnnouncementBanner[]
+  retirementAccounts RetirementAccount[]
+  retirementWithdrawalRequests RetirementWithdrawalRequest[] @relation("RetirementWithdrawalUser")
+  retirementWithdrawalReviews RetirementWithdrawalRequest[] @relation("RetirementWithdrawalReviewer")
+  retirementNotes RetirementWithdrawalNote[] @relation("RetirementNoteAuthor")
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  ip          String?
+  userAgent   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Account {
+  id               String              @id @default(cuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             AccountType
+  currency         String              @default("USD")
+  accountNumber    String              @unique
+  balance          Decimal             @db.Decimal(18, 2)
+  availableBalance Decimal             @db.Decimal(18, 2)
+  status           AccountStatus       @default(ACTIVE)
+  freezeReason     String?
+  frozenAt         DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  transactions     Transaction[]
+  transferRequests TransferRequest[]
+  freezeEvents     AccountFreezeEvent[]
+}
+
+model Transaction {
+  id          String            @id @default(cuid())
+  accountId   String
+  account     Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type        String
+  amount      Decimal           @db.Decimal(18, 2)
+  currency    String            @default("USD")
+  description String
+  reference   String            @unique
+  status      TransactionStatus @default(POSTED)
+  createdAt   DateTime          @default(now())
+}
+
+model KycSubmission {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation("UserKyc", fields: [userId], references: [id], onDelete: Cascade)
+  documentType    DocumentType
+  documentUrl     String
+  selfieUrl       String
+  status          KycStatus    @default(PENDING)
+  notes           String?
+  rejectionReason String?
+  reviewedById    String?
+  reviewedBy      User?        @relation("KycReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  notesHistory    KycNote[]
+}
+
+model KycNote {
+  id              String        @id @default(cuid())
+  kycSubmissionId String
+  kycSubmission   KycSubmission @relation(fields: [kycSubmissionId], references: [id], onDelete: Cascade)
+  authorId        String?
+  author          User?         @relation("KycNoteAuthor", fields: [authorId], references: [id])
+  body            String
+  visibleToUser   Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+}
+
+model AccountFreezeEvent {
+  id        String        @id @default(cuid())
+  accountId String
+  account   Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?         @relation("FreezeActor", fields: [actorId], references: [id])
+  action    AccountStatus
+  reason    String
+  createdAt DateTime      @default(now())
+}
+
+model RetirementAccount {
+  id                          String                  @id @default(cuid())
+  userId                      String
+  user                        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountNumber               String                  @unique
+  balance                     Decimal                 @db.Decimal(18, 2)
+  vestedBalance               Decimal                 @db.Decimal(18, 2)
+  contributionYtd             Decimal                 @db.Decimal(18, 2)
+  employerMatchYtd            Decimal                 @db.Decimal(18, 2)
+  investmentGrowthPlaceholder String
+  withdrawalEligibilityStatus String
+  status                      RetirementAccountStatus @default(ACTIVE)
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  contributions               RetirementContribution[]
+  withdrawalRequests          RetirementWithdrawalRequest[]
+}
+
+model RetirementContribution {
+  id                  String            @id @default(cuid())
+  retirementAccountId String
+  retirementAccount   RetirementAccount @relation(fields: [retirementAccountId], references: [id], onDelete: Cascade)
+  source              String
+  description         String
+  amount              Decimal           @db.Decimal(18, 2)
+  growthAmount        Decimal           @db.Decimal(18, 2)
+  currency            String            @default("USD")
+  contributionDate    DateTime
+  createdAt           DateTime          @default(now())
+}
+
+model RetirementFeeSetting {
+  id                Int      @id @default(1)
+  feeName           String
+  feePercentage     Decimal  @db.Decimal(5, 2)
+  feeReason         String
+  paymentMethod     String
+  enabled           Boolean  @default(true)
+  complianceMessage String
+  updatedAt         DateTime @updatedAt
+}
+
+model RetirementWithdrawalRequest {
+  id                  String                     @id @default(cuid())
+  retirementAccountId String
+  retirementAccount   RetirementAccount          @relation(fields: [retirementAccountId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User                       @relation("RetirementWithdrawalUser", fields: [userId], references: [id], onDelete: Cascade)
+  amount              Decimal                    @db.Decimal(18, 2)
+  currency            String                     @default("USD")
+  reason              String
+  status              RetirementWithdrawalStatus @default(SUBMITTED)
+  complianceMessage   String
+  feeName             String
+  feePercentage       Decimal                    @db.Decimal(5, 2)
+  feeAmount           Decimal                    @db.Decimal(18, 2)
+  feeReason           String
+  paymentMethod       String
+  feeEnabled          Boolean                    @default(true)
+  internalNote        String?
+  reviewedById        String?
+  reviewedBy          User?                      @relation("RetirementWithdrawalReviewer", fields: [reviewedById], references: [id])
+  reviewedAt          DateTime?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  notes               RetirementWithdrawalNote[]
+}
+
+model RetirementWithdrawalNote {
+  id                            String                      @id @default(cuid())
+  retirementWithdrawalRequestId String
+  retirementWithdrawalRequest   RetirementWithdrawalRequest @relation(fields: [retirementWithdrawalRequestId], references: [id], onDelete: Cascade)
+  authorId                      String?
+  author                        User?                       @relation("RetirementNoteAuthor", fields: [authorId], references: [id])
+  body                          String
+  visibleToUser                 Boolean                     @default(false)
+  createdAt                     DateTime                    @default(now())
+}
+
+model CryptoWallet {
+  id          String   @id @default(cuid())
+  coin        String
+  symbol      String
+  address     String
+  network     String
+  label       String
+  qrCodeUrl   String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([symbol, network])
+}
+
+model CardApplication {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation("UserCards", fields: [userId], references: [id], onDelete: Cascade)
+  type            CardType
+  occupation      String
+  annualIncome    Decimal           @db.Decimal(18, 2)
+  employer        String
+  address         String
+  governmentIdUrl String
+  status          ApplicationStatus @default(SUBMITTED)
+  adminNote       String?
+  reviewedById    String?
+  reviewedBy      User?             @relation("CardReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model SupportTicket {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation("TicketOwner", fields: [userId], references: [id], onDelete: Cascade)
+  assignedAdminId String?
+  assignedAdmin   User?            @relation("TicketAssignee", fields: [assignedAdminId], references: [id])
+  subject         String
+  status          TicketStatus      @default(OPEN)
+  priority        Priority          @default(NORMAL)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  messages        SupportMessage[]
+}
+
+model SupportMessage {
+  id            String        @id @default(cuid())
+  ticketId      String
+  ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId      String
+  sender        User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body          String
+  attachmentUrl String?
+  readAt        DateTime?
+  createdAt     DateTime      @default(now())
+}
+
+model TransferRequest {
+  id                 String         @id @default(cuid())
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccountId      String
+  fromAccount        Account        @relation(fields: [fromAccountId], references: [id])
+  type               TransferType
+  beneficiaryName    String
+  beneficiaryBank    String?
+  beneficiaryAccount String?
+  ibanSwift          String?
+  amount             Decimal        @db.Decimal(18, 2)
+  currency           String         @default("USD")
+  purpose            String
+  status             TransferStatus @default(SUBMITTED)
+  adminNote          String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model TransferSetting {
+  id                  Int      @id @default(1)
+  reviewMessage       String
+  buttonText          String
+  supportInstructions String
+  updatedAt           DateTime @updatedAt
+}
+
+model EmailSetting {
+  id                   Int      @id @default(1)
+  gmailAddress         String?
+  appPasswordEncrypted String?
+  smtpHost             String   @default("smtp.gmail.com")
+  smtpPort             Int      @default(465)
+  smtpSecure           Boolean  @default(true)
+  senderName           String   @default("Grand Central Liberty Bank")
+  updatedAt            DateTime @updatedAt
+}
+
+model BankSetting {
+  id            Int      @id @default(1)
+  bankName      String
+  bankAddress   String
+  supportEmail  String
+  supportPhone  String
+  websiteUrl    String
+  defaultLocale  String   @default("en")
+  supportedLocales String[]
+  terms         String
+  privacyPolicy String
+  updatedAt     DateTime @updatedAt
+}
+
+model AnnouncementBanner {
+  id          String     @id @default(cuid())
+  createdById String?
+  createdBy   User?      @relation(fields: [createdById], references: [id])
+  title       String
+  body        String
+  tone        BannerTone @default(INFO)
+  href        String?
+  audience    Role?
+  locale      String     @default("en")
+  active      Boolean    @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model BroadcastEmail {
+  id           String          @id @default(cuid())
+  createdById  String
+  createdBy    User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  subject      String
+  bodyHtml     String
+  target       BroadcastTarget
+  selectedUserIds String[]
+  status       BroadcastStatus @default(DRAFT)
+  sentCount    Int             @default(0)
+  failedCount  Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  email     String
+  ip        String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,186 @@
+import { redirect } from "next/navigation";
+import { Plus, ArrowDownToLine, FileText, ShieldCheck, Briefcase } from "lucide-react";
+import { ProtectedShell } from "@/components/layout/protected-shell";
+import { ProgressRail } from "@/components/banking/premium-ui";
+import { getCurrentUser } from "@/lib/auth";
+import { getUserDashboardData } from "@/lib/data";
+import { formatCurrency, formatDate } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
+
+const timeframes = ["1D", "1M", "6M", "YTD", "1Y", "All"];
+
+const allocation = [
+  { label: "US Stocks",   value: 54, className: "bg-emerald-400" },
+  { label: "Bonds",       value: 25, className: "bg-blue-400"    },
+  { label: "Intl Stocks", value: 13, className: "bg-amber-400"   },
+  { label: "Other",       value: 8,  className: "bg-slate-400"   },
+];
+
+export default async function RetirementPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const data = await getUserDashboardData(user.id);
+  const account = data.retirementAccounts[0];
+
+  const balance = Number(account?.balance ?? 286560);
+  const todayGain = balance * 0.0086;
+  const totalGain = balance * 0.3145;
+  const projected = 1245870;
+  const contributionYtd = Number(account?.contributionYtd ?? 9500);
+  const annualLimit = 23000;
+  const contributionPct = Math.round((contributionYtd / annualLimit) * 100);
+
+  return (
+    <ProtectedShell>
+      <div className="max-w-3xl mx-auto space-y-5 fade-up">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-black text-white">401(k) Retirement</h1>
+          <p className="text-sm text-white/50 mt-1">Invest today. Retire with confidence.</p>
+        </div>
+
+        {/* Portfolio value card */}
+        <div className="luxury-hero p-6">
+          <p className="text-xs text-white/40 font-semibold uppercase tracking-wider">Portfolio Value ◉</p>
+          <p className="text-4xl font-black text-white mt-2">{formatCurrency(balance)}</p>
+          <div className="flex gap-8 mt-4">
+            <div>
+              <p className="text-xs text-white/40">Today&apos;s Gain</p>
+              <p className="text-sm font-bold text-green mt-0.5">+{formatCurrency(todayGain)} (0.86%)</p>
+            </div>
+            <div>
+              <p className="text-xs text-white/40">Total Gain</p>
+              <p className="text-sm font-bold text-green mt-0.5">+{formatCurrency(totalGain)} (31.45%)</p>
+            </div>
+          </div>
+
+          {/* Timeframe tabs */}
+          <div className="flex gap-1 mt-5 bg-white/5 rounded-xl p-1 w-fit">
+            {timeframes.map((tf) => (
+              <button key={tf} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${tf === "YTD" ? "bg-green text-black" : "text-white/40 hover:text-white/70"}`}>
+                {tf}
+              </button>
+            ))}
+          </div>
+
+          {/* Growth chart */}
+          <div className="mt-5 h-32 relative">
+            <svg viewBox="0 0 400 120" className="w-full h-full" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d="M0 100 C40 92 70 88 100 78 C140 64 170 70 200 52 C250 30 290 44 320 28 C350 14 380 20 400 8 L400 120 L0 120 Z" fill="url(#retGrad)" />
+              <path d="M0 100 C40 92 70 88 100 78 C140 64 170 70 200 52 C250 30 290 44 320 28 C350 14 380 20 400 8" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" />
+              <circle cx="400" cy="8" r="4" fill="#22c55e" />
+            </svg>
+            <div className="absolute top-0 right-2 bg-white/10 backdrop-blur rounded-lg px-2.5 py-1.5">
+              <p className="text-[0.6rem] text-white/50">May 24, 2026</p>
+              <p className="text-xs font-black text-white">{formatCurrency(balance)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Projected retirement */}
+        <div className="card-dark p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-white/40 font-semibold uppercase tracking-wider">Projected Retirement Value ◉</p>
+              <p className="text-xs text-white/30 mt-1">At age 67</p>
+              <p className="text-2xl font-black text-white mt-1">{formatCurrency(projected)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-white/40">Probability of Success →</p>
+              <p className="text-2xl font-black text-green mt-1">92%</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { label: "Contribute", icon: Plus,           primary: true  },
+            { label: "Withdraw",   icon: ArrowDownToLine, primary: false },
+            { label: "Documents",  icon: FileText,        primary: false },
+            { label: "Compliance", icon: ShieldCheck,     primary: false },
+          ].map((a) => (
+            <button key={a.label} className="card-dark p-4 flex flex-col items-center gap-2 hover:bg-white/6 transition">
+              <div className={`size-11 rounded-full flex items-center justify-center ${a.primary ? "bg-green" : "bg-white/8 border border-white/10"}`}>
+                <a.icon className={`size-5 ${a.primary ? "text-black" : "text-white/60"}`} />
+              </div>
+              <span className="text-xs font-bold text-white/60">{a.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Contribution history + allocation */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="card-dark p-5">
+            <p className="font-black text-white text-sm mb-4">Contribution History</p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-white/40">2026 YTD</p>
+                <p className="text-xl font-black text-white">{formatCurrency(contributionYtd)}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg width="48" height="48" viewBox="0 0 48 48">
+                  <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
+                  <circle cx="24" cy="24" r="20" fill="none" stroke="#22c55e" strokeWidth="5"
+                    strokeDasharray={`${(contributionPct/100) * 125.6} 125.6`} strokeLinecap="round"
+                    transform="rotate(-90 24 24)" />
+                  <text x="24" y="28" textAnchor="middle" className="fill-white text-xs font-black">{contributionPct}%</text>
+                </svg>
+                <div>
+                  <p className="text-xs text-white/40">Annual Limit</p>
+                  <p className="text-sm font-bold text-white">{formatCurrency(annualLimit)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card-dark p-5">
+            <p className="font-black text-white text-sm mb-4">Asset Allocation</p>
+            <ProgressRail items={allocation} />
+          </div>
+        </div>
+
+        {/* Recent activity */}
+        <div className="card-dark p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="font-black text-white text-sm">Recent Activity</p>
+            <span className="text-xs font-bold text-green">See all</span>
+          </div>
+          <div className="space-y-1">
+            {(account?.contributions ?? []).slice(0, 4).map((c) => (
+              <div key={c.id} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
+                <div className="size-9 rounded-full bg-green/15 flex items-center justify-center">
+                  <Briefcase className="size-4 text-green" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-white">{c.description || c.source}</p>
+                  <p className="text-xs text-white/40">{formatDate(c.contributionDate)}</p>
+                </div>
+                <p className="text-sm font-black text-green">+{formatCurrency(Number(c.amount))}</p>
+              </div>
+            ))}
+            {(!account?.contributions || account.contributions.length === 0) && (
+              <div className="flex items-center gap-3 py-3">
+                <div className="size-9 rounded-full bg-green/15 flex items-center justify-center">
+                  <Briefcase className="size-4 text-green" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-white">Employee Contribution</p>
+                  <p className="text-xs text-white/40">May 23, 2026</p>
+                </div>
+                <p className="text-sm font-black text-green">+$500.00</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </ProtectedShell>
+  );
+}

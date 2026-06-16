@@ -1,0 +1,61 @@
+{
+  "name": "grand-central-liberty-bank",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "prisma generate && next build",
+    "start": "next dev -H 0.0.0.0",
+    "start:prod": "NODE_ENV=production node server.mjs",
+    "lint": "next lint",
+    "test": "vitest run",
+    "seed": "tsx prisma/seed.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:dev": "prisma migrate dev",
+    "check-env": "tsx scripts/check-env.ts",
+    "verify:ui": "node scripts/verify-ui.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "latest",
+    "@prisma/client": "6.19.3",
+    "@radix-ui/react-slot": "latest",
+    "bcryptjs": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "jose": "latest",
+    "lucide-react": "latest",
+    "next": "15.5.19",
+    "nodemailer": "latest",
+    "qrcode": "latest",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "socket.io": "4.8.3",
+    "socket.io-client": "latest",
+    "speakeasy": "latest",
+    "tailwind-merge": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@types/node": "latest",
+    "@types/nodemailer": "latest",
+    "@types/qrcode": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/speakeasy": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "15.5.19",
+    "playwright": "^1.61.0",
+    "prisma": "6.19.3",
+    "tailwindcss": "4.3.1",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "overrides": {
+    "ws": "8.21.0"
+  }
+}
