@@ -7,6 +7,7 @@ export async function GET() {
     await requireAdmin();
     const transfers = await prisma.transferRequest.findMany({
       orderBy: { createdAt: "desc" },
+      take: 100,
       include: { user: true, fromAccount: true }
     });
 
