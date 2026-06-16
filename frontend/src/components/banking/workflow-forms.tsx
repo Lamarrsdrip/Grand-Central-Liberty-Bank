@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy, Send, UploadCloud } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { Button } from "@/components/ui/button";
@@ -386,11 +387,30 @@ export function CardApplicationForm() {
 }
 
 export function SupportCenter({ initialTickets, userId }: { initialTickets: Ticket[]; userId: string }) {
+  const searchParams = useSearchParams();
+  const supportRequestMessage = searchParams.get("message") ?? "";
   const [tickets, setTickets] = useState(initialTickets);
   const [activeId, setActiveId] = useState(initialTickets[0]?.id ?? "");
   const [message, setMessage] = useState("");
+  const [draftSubject, setDraftSubject] = useState("Support request");
+  const [draftBody, setDraftBody] = useState("");
+  const [seededSupportRequest, setSeededSupportRequest] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
   const activeTicket = useMemo(() => tickets.find((ticket) => ticket.id === activeId), [tickets, activeId]);
+
+  useEffect(() => {
+    if (!supportRequestMessage || supportRequestMessage === seededSupportRequest) {
+      return;
+    }
+
+    if (activeTicket) {
+      setMessage(supportRequestMessage);
+    } else {
+      setDraftSubject("Transfer support request");
+      setDraftBody(supportRequestMessage);
+    }
+    setSeededSupportRequest(supportRequestMessage);
+  }, [activeTicket, seededSupportRequest, supportRequestMessage]);
 
   useEffect(() => {
     let socket: Socket | null = null;
@@ -436,18 +456,31 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
             onSubmit={async (event) => {
               event.preventDefault();
               const formElement = event.currentTarget;
-              const form = new FormData(formElement);
               const data = await secureFetch("/api/support/tickets", {
                 method: "POST",
-                body: JSON.stringify({ subject: form.get("subject"), body: form.get("body") })
+                body: JSON.stringify({ subject: draftSubject, body: draftBody })
               });
               setTickets((current) => [data.ticket, ...current]);
               setActiveId(data.ticket.id);
+              setDraftSubject("Support request");
+              setDraftBody("");
               formElement.reset();
             }}
           >
-            <Input name="subject" placeholder="New ticket subject" required />
-            <Textarea name="body" placeholder="How can support help?" required />
+            <Input
+              name="subject"
+              placeholder="New ticket subject"
+              required
+              value={draftSubject}
+              onChange={(event) => setDraftSubject(event.target.value)}
+            />
+            <Textarea
+              name="body"
+              placeholder="How can support help?"
+              required
+              value={draftBody}
+              onChange={(event) => setDraftBody(event.target.value)}
+            />
             <Button size="sm">Open ticket</Button>
           </form>
         </CardContent>

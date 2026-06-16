@@ -25,7 +25,7 @@ export default async function TransfersPage() {
           <h1 className="text-3xl font-black text-white">Transfer</h1>
           <p className="text-sm text-white/50 mt-1">Move money securely and instantly.</p>
         </div>
-        <TransferFlow accounts={accounts} />
+        <TransferFlow accounts={accounts} settings={data.transferSettings} />
       </div>
     </ProtectedShell>
   );
