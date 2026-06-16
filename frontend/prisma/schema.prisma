@@ -1,9 +1,21 @@
+// Grand Central Liberty Bank — MongoDB schema.
+// Migrated from PostgreSQL to MongoDB (Prisma's "mongodb" datasource provider)
+// so that the app deploys to Emergent's managed-MongoDB environment without
+// requiring an external Postgres instance.
+//
+// Conventions:
+//   * All ids are stored as MongoDB ObjectId and exposed as `String`.
+//   * Foreign-key fields are annotated `@db.ObjectId`.
+//   * `Decimal` is not a MongoDB-Prisma scalar — money columns use `Float`.
+//   * Singleton settings collections keep `Int` _id so `where: { id: 1 }` works.
+//   * `onDelete: Cascade` is not enforced by Mongo; cascades happen at the app layer.
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -144,7 +156,7 @@ enum NotificationType {
 }
 
 model User {
-  id                 String            @id @default(cuid())
+  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
   firstName          String
   lastName           String
   email              String            @unique
@@ -186,9 +198,9 @@ model User {
 }
 
 model Session {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String    @db.ObjectId
+  user        User      @relation(fields: [userId], references: [id])
   tokenHash   String    @unique
   ip          String?
   userAgent   String?
@@ -198,14 +210,14 @@ model Session {
 }
 
 model Account {
-  id               String              @id @default(cuid())
-  userId           String
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String              @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String              @db.ObjectId
+  user             User                @relation(fields: [userId], references: [id])
   type             AccountType
   currency         String              @default("USD")
   accountNumber    String              @unique
-  balance          Decimal             @db.Decimal(18, 2)
-  availableBalance Decimal             @db.Decimal(18, 2)
+  balance          Float
+  availableBalance Float
   status           AccountStatus       @default(ACTIVE)
   freezeReason     String?
   frozenAt         DateTime?
@@ -217,11 +229,11 @@ model Account {
 }
 
 model Transaction {
-  id          String            @id @default(cuid())
-  accountId   String
-  account     Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  accountId   String            @db.ObjectId
+  account     Account           @relation(fields: [accountId], references: [id])
   type        String
-  amount      Decimal           @db.Decimal(18, 2)
+  amount      Float
   currency    String            @default("USD")
   description String
   reference   String            @unique
@@ -230,16 +242,16 @@ model Transaction {
 }
 
 model KycSubmission {
-  id              String       @id @default(cuid())
-  userId          String
-  user            User         @relation("UserKyc", fields: [userId], references: [id], onDelete: Cascade)
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String       @db.ObjectId
+  user            User         @relation("UserKyc", fields: [userId], references: [id])
   documentType    DocumentType
   documentUrl     String
   selfieUrl       String
   status          KycStatus    @default(PENDING)
   notes           String?
   rejectionReason String?
-  reviewedById    String?
+  reviewedById    String?      @db.ObjectId
   reviewedBy      User?        @relation("KycReviewer", fields: [reviewedById], references: [id])
   reviewedAt      DateTime?
   createdAt       DateTime     @default(now())
@@ -248,10 +260,10 @@ model KycSubmission {
 }
 
 model KycNote {
-  id              String        @id @default(cuid())
-  kycSubmissionId String
-  kycSubmission   KycSubmission @relation(fields: [kycSubmissionId], references: [id], onDelete: Cascade)
-  authorId        String?
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  kycSubmissionId String        @db.ObjectId
+  kycSubmission   KycSubmission @relation(fields: [kycSubmissionId], references: [id])
+  authorId        String?       @db.ObjectId
   author          User?         @relation("KycNoteAuthor", fields: [authorId], references: [id])
   body            String
   visibleToUser   Boolean       @default(true)
@@ -259,10 +271,10 @@ model KycNote {
 }
 
 model AccountFreezeEvent {
-  id        String        @id @default(cuid())
-  accountId String
-  account   Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  actorId   String?
+  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+  accountId String        @db.ObjectId
+  account   Account       @relation(fields: [accountId], references: [id])
+  actorId   String?       @db.ObjectId
   actor     User?         @relation("FreezeActor", fields: [actorId], references: [id])
   action    AccountStatus
   reason    String
@@ -270,14 +282,14 @@ model AccountFreezeEvent {
 }
 
 model RetirementAccount {
-  id                          String                  @id @default(cuid())
-  userId                      String
-  user                        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                          String                  @id @default(auto()) @map("_id") @db.ObjectId
+  userId                      String                  @db.ObjectId
+  user                        User                    @relation(fields: [userId], references: [id])
   accountNumber               String                  @unique
-  balance                     Decimal                 @db.Decimal(18, 2)
-  vestedBalance               Decimal                 @db.Decimal(18, 2)
-  contributionYtd             Decimal                 @db.Decimal(18, 2)
-  employerMatchYtd            Decimal                 @db.Decimal(18, 2)
+  balance                     Float
+  vestedBalance               Float
+  contributionYtd             Float
+  employerMatchYtd            Float
   investmentGrowthPlaceholder String
   withdrawalEligibilityStatus String
   status                      RetirementAccountStatus @default(ACTIVE)
@@ -288,22 +300,22 @@ model RetirementAccount {
 }
 
 model RetirementContribution {
-  id                  String            @id @default(cuid())
-  retirementAccountId String
-  retirementAccount   RetirementAccount @relation(fields: [retirementAccountId], references: [id], onDelete: Cascade)
+  id                  String            @id @default(auto()) @map("_id") @db.ObjectId
+  retirementAccountId String            @db.ObjectId
+  retirementAccount   RetirementAccount @relation(fields: [retirementAccountId], references: [id])
   source              String
   description         String
-  amount              Decimal           @db.Decimal(18, 2)
-  growthAmount        Decimal           @db.Decimal(18, 2)
+  amount              Float
+  growthAmount        Float
   currency            String            @default("USD")
   contributionDate    DateTime
   createdAt           DateTime          @default(now())
 }
 
 model RetirementFeeSetting {
-  id                Int      @id @default(1)
+  id                Int      @id @map("_id") @default(1)
   feeName           String
-  feePercentage     Decimal  @db.Decimal(5, 2)
+  feePercentage     Float
   feeReason         String
   paymentMethod     String
   enabled           Boolean  @default(true)
@@ -312,24 +324,24 @@ model RetirementFeeSetting {
 }
 
 model RetirementWithdrawalRequest {
-  id                  String                     @id @default(cuid())
-  retirementAccountId String
-  retirementAccount   RetirementAccount          @relation(fields: [retirementAccountId], references: [id], onDelete: Cascade)
-  userId              String
-  user                User                       @relation("RetirementWithdrawalUser", fields: [userId], references: [id], onDelete: Cascade)
-  amount              Decimal                    @db.Decimal(18, 2)
+  id                  String                     @id @default(auto()) @map("_id") @db.ObjectId
+  retirementAccountId String                     @db.ObjectId
+  retirementAccount   RetirementAccount          @relation(fields: [retirementAccountId], references: [id])
+  userId              String                     @db.ObjectId
+  user                User                       @relation("RetirementWithdrawalUser", fields: [userId], references: [id])
+  amount              Float
   currency            String                     @default("USD")
   reason              String
   status              RetirementWithdrawalStatus @default(SUBMITTED)
   complianceMessage   String
   feeName             String
-  feePercentage       Decimal                    @db.Decimal(5, 2)
-  feeAmount           Decimal                    @db.Decimal(18, 2)
+  feePercentage       Float
+  feeAmount           Float
   feeReason           String
   paymentMethod       String
   feeEnabled          Boolean                    @default(true)
   internalNote        String?
-  reviewedById        String?
+  reviewedById        String?                    @db.ObjectId
   reviewedBy          User?                      @relation("RetirementWithdrawalReviewer", fields: [reviewedById], references: [id])
   reviewedAt          DateTime?
   createdAt           DateTime                   @default(now())
@@ -338,10 +350,10 @@ model RetirementWithdrawalRequest {
 }
 
 model RetirementWithdrawalNote {
-  id                            String                      @id @default(cuid())
-  retirementWithdrawalRequestId String
-  retirementWithdrawalRequest   RetirementWithdrawalRequest @relation(fields: [retirementWithdrawalRequestId], references: [id], onDelete: Cascade)
-  authorId                      String?
+  id                            String                      @id @default(auto()) @map("_id") @db.ObjectId
+  retirementWithdrawalRequestId String                      @db.ObjectId
+  retirementWithdrawalRequest   RetirementWithdrawalRequest @relation(fields: [retirementWithdrawalRequestId], references: [id])
+  authorId                      String?                     @db.ObjectId
   author                        User?                       @relation("RetirementNoteAuthor", fields: [authorId], references: [id])
   body                          String
   visibleToUser                 Boolean                     @default(false)
@@ -349,7 +361,7 @@ model RetirementWithdrawalNote {
 }
 
 model CryptoWallet {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   coin        String
   symbol      String
   address     String
@@ -364,18 +376,18 @@ model CryptoWallet {
 }
 
 model CardApplication {
-  id              String            @id @default(cuid())
-  userId          String
-  user            User              @relation("UserCards", fields: [userId], references: [id], onDelete: Cascade)
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String            @db.ObjectId
+  user            User              @relation("UserCards", fields: [userId], references: [id])
   type            CardType
   occupation      String
-  annualIncome    Decimal           @db.Decimal(18, 2)
+  annualIncome    Float
   employer        String
   address         String
   governmentIdUrl String
   status          ApplicationStatus @default(SUBMITTED)
   adminNote       String?
-  reviewedById    String?
+  reviewedById    String?           @db.ObjectId
   reviewedBy      User?             @relation("CardReviewer", fields: [reviewedById], references: [id])
   reviewedAt      DateTime?
   createdAt       DateTime          @default(now())
@@ -383,10 +395,10 @@ model CardApplication {
 }
 
 model SupportTicket {
-  id              String           @id @default(cuid())
-  userId          String
-  user            User             @relation("TicketOwner", fields: [userId], references: [id], onDelete: Cascade)
-  assignedAdminId String?
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String           @db.ObjectId
+  user            User             @relation("TicketOwner", fields: [userId], references: [id])
+  assignedAdminId String?          @db.ObjectId
   assignedAdmin   User?            @relation("TicketAssignee", fields: [assignedAdminId], references: [id])
   subject         String
   status          TicketStatus      @default(OPEN)
@@ -397,11 +409,11 @@ model SupportTicket {
 }
 
 model SupportMessage {
-  id            String        @id @default(cuid())
-  ticketId      String
-  ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  senderId      String
-  sender        User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId      String        @db.ObjectId
+  ticket        SupportTicket @relation(fields: [ticketId], references: [id])
+  senderId      String        @db.ObjectId
+  sender        User          @relation(fields: [senderId], references: [id])
   body          String
   attachmentUrl String?
   readAt        DateTime?
@@ -409,17 +421,17 @@ model SupportMessage {
 }
 
 model TransferRequest {
-  id                 String         @id @default(cuid())
-  userId             String
-  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fromAccountId      String
+  id                 String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String         @db.ObjectId
+  user               User           @relation(fields: [userId], references: [id])
+  fromAccountId      String         @db.ObjectId
   fromAccount        Account        @relation(fields: [fromAccountId], references: [id])
   type               TransferType
   beneficiaryName    String
   beneficiaryBank    String?
   beneficiaryAccount String?
   ibanSwift          String?
-  amount             Decimal        @db.Decimal(18, 2)
+  amount             Float
   currency           String         @default("USD")
   purpose            String
   status             TransferStatus @default(SUBMITTED)
@@ -429,7 +441,7 @@ model TransferRequest {
 }
 
 model TransferSetting {
-  id                  Int      @id @default(1)
+  id                  Int      @id @map("_id") @default(1)
   reviewMessage       String
   buttonText          String
   supportInstructions String
@@ -437,7 +449,7 @@ model TransferSetting {
 }
 
 model EmailSetting {
-  id                   Int      @id @default(1)
+  id                   Int      @id @map("_id") @default(1)
   gmailAddress         String?
   appPasswordEncrypted String?
   smtpHost             String   @default("smtp.gmail.com")
@@ -448,7 +460,7 @@ model EmailSetting {
 }
 
 model BankSetting {
-  id            Int      @id @default(1)
+  id            Int      @id @map("_id") @default(1)
   bankName      String
   bankAddress   String
   supportEmail  String
@@ -462,8 +474,8 @@ model BankSetting {
 }
 
 model AnnouncementBanner {
-  id          String     @id @default(cuid())
-  createdById String?
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  createdById String?    @db.ObjectId
   createdBy   User?      @relation(fields: [createdById], references: [id])
   title       String
   body        String
@@ -479,9 +491,9 @@ model AnnouncementBanner {
 }
 
 model BroadcastEmail {
-  id           String          @id @default(cuid())
-  createdById  String
-  createdBy    User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  id           String          @id @default(auto()) @map("_id") @db.ObjectId
+  createdById  String          @db.ObjectId
+  createdBy    User            @relation(fields: [createdById], references: [id])
   subject      String
   bodyHtml     String
   target       BroadcastTarget
@@ -494,9 +506,9 @@ model BroadcastEmail {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String           @db.ObjectId
+  user      User             @relation(fields: [userId], references: [id])
   type      NotificationType
   title     String
   body      String
@@ -505,8 +517,8 @@ model Notification {
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  actorId   String?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  actorId   String?  @db.ObjectId
   actor     User?    @relation(fields: [actorId], references: [id])
   action    String
   entity    String
@@ -518,8 +530,8 @@ model AuditLog {
 }
 
 model LoginHistory {
-  id        String   @id @default(cuid())
-  userId    String?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?  @db.ObjectId
   user      User?    @relation(fields: [userId], references: [id])
   email     String
   ip        String?
@@ -529,7 +541,7 @@ model LoginHistory {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   email     String
   tokenHash String   @unique
   expiresAt DateTime
@@ -538,8 +550,8 @@ model PasswordResetToken {
 }
 
 model EmailVerificationToken {
-  id        String   @id @default(cuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   tokenHash String   @unique
   expiresAt DateTime
   usedAt    DateTime?

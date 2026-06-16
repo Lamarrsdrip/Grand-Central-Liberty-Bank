@@ -18,6 +18,12 @@ app = FastAPI()
 client = httpx.AsyncClient(base_url=UPSTREAM, timeout=httpx.Timeout(60.0), follow_redirects=False)
 
 
+@app.get("/health")
+async def health():
+    """Emergent's backend health probe hits /health on port 8001."""
+    return {"status": "ok"}
+
+
 HOP_BY_HOP = {
     "connection",
     "keep-alive",

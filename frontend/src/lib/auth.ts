@@ -110,11 +110,15 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
   try {
     const payload = await verifySessionToken(token);
     const tokenHash = await sha256(token);
+    // Note: we intentionally omit `revokedAt: null` from the WHERE clause
+    // because Prisma's MongoDB connector treats `{ field: null }` filters
+    // as not matching documents where the field is *missing* (vs. set to
+    // null). Sessions are created without explicitly setting `revokedAt`,
+    // so we filter it post-fetch instead.
     const session = await prisma.session.findFirst({
       where: {
         id: payload.sessionId,
         tokenHash,
-        revokedAt: null,
         expiresAt: { gt: new Date() }
       },
       include: {
@@ -133,7 +137,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
       }
     });
 
-    if (!session || session.user.status === "SUSPENDED") {
+    if (!session || session.revokedAt || session.user.status === "SUSPENDED") {
       return null;
     }
 

@@ -142,18 +142,22 @@ async function main() {
     }
   });
 
-  await prisma.cryptoWallet.createMany({
-    data: [
-      { coin: "Bitcoin", symbol: "BTC", address: "bc1qgrandcentrallibertybankdeposit0001", network: "Bitcoin", label: "BTC Treasury", enabled: true },
-      { coin: "Ethereum", symbol: "ETH", address: "0xGrandCentralLibertyBankEthDeposit001", network: "Ethereum ERC20", label: "ETH Treasury", enabled: true },
-      { coin: "Tether", symbol: "USDT", address: "TGrandCentralLibertyBankTronDeposit001", network: "TRC20", label: "USDT Treasury", enabled: true },
-      { coin: "BNB", symbol: "BNB", address: "bnb1grandcentrallibertybankdeposit001", network: "BEP20", label: "BNB Treasury", enabled: true },
-      { coin: "Solana", symbol: "SOL", address: "GCLBSolanaDepositAddress111111111111111111", network: "Solana", label: "SOL Treasury", enabled: true },
-      { coin: "XRP", symbol: "XRP", address: "rGrandCentralLibertyBankXrpDeposit001", network: "XRP Ledger", label: "XRP Treasury", enabled: true },
-      { coin: "Dogecoin", symbol: "DOGE", address: "DGrandCentralLibertyBankDogeDeposit001", network: "Dogecoin", label: "DOGE Treasury", enabled: true }
-    ],
-    skipDuplicates: true
-  });
+  const wallets = [
+    { coin: "Bitcoin", symbol: "BTC", address: "bc1qgrandcentrallibertybankdeposit0001", network: "Bitcoin", label: "BTC Treasury", enabled: true },
+    { coin: "Ethereum", symbol: "ETH", address: "0xGrandCentralLibertyBankEthDeposit001", network: "Ethereum ERC20", label: "ETH Treasury", enabled: true },
+    { coin: "Tether", symbol: "USDT", address: "TGrandCentralLibertyBankTronDeposit001", network: "TRC20", label: "USDT Treasury", enabled: true },
+    { coin: "BNB", symbol: "BNB", address: "bnb1grandcentrallibertybankdeposit001", network: "BEP20", label: "BNB Treasury", enabled: true },
+    { coin: "Solana", symbol: "SOL", address: "GCLBSolanaDepositAddress111111111111111111", network: "Solana", label: "SOL Treasury", enabled: true },
+    { coin: "XRP", symbol: "XRP", address: "rGrandCentralLibertyBankXrpDeposit001", network: "XRP Ledger", label: "XRP Treasury", enabled: true },
+    { coin: "Dogecoin", symbol: "DOGE", address: "DGrandCentralLibertyBankDogeDeposit001", network: "Dogecoin", label: "DOGE Treasury", enabled: true }
+  ];
+  for (const w of wallets) {
+    await prisma.cryptoWallet.upsert({
+      where: { symbol_network: { symbol: w.symbol, network: w.network } },
+      update: {},
+      create: w
+    });
+  }
 
   const kyc = await prisma.kycSubmission.create({
     data: {

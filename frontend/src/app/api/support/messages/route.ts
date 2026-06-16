@@ -29,8 +29,10 @@ export async function POST(request: NextRequest) {
   return handleApi(async () => {
     const user = await requireUser();
     const input = messageSchema.parse(await request.json());
+    // `{ assignedAdminId: null }` doesn't match documents where the field
+    // is missing on Prisma+MongoDB; use the inverse to capture unassigned.
     const ticket = await prisma.supportTicket.findFirst({
-      where: { id: input.ticketId, OR: [{ userId: user.id }, { assignedAdminId: user.id }, { assignedAdminId: null }] },
+      where: { id: input.ticketId, OR: [{ userId: user.id }, { assignedAdminId: user.id }, { NOT: { assignedAdminId: { not: null } } }] },
       include: { user: true }
     });
     if (!ticket) {

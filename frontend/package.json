@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
     "build": "prisma generate && next build",
-    "start": "next dev -H 0.0.0.0",
+    "start": "node scripts/start.mjs",
     "start:prod": "NODE_ENV=production node server.mjs",
     "lint": "next lint",
     "test": "vitest run",

@@ -41,12 +41,11 @@ async function authenticateSocket(socket) {
       id: payload.jti,
       userId: payload.sub,
       tokenHash: sha256(token),
-      revokedAt: null,
       expiresAt: { gt: new Date() }
     },
     include: { user: true }
   });
-  if (!session || session.user.status === "SUSPENDED") {
+  if (!session || session.revokedAt || session.user.status === "SUSPENDED") {
     throw new Error("Invalid session.");
   }
 

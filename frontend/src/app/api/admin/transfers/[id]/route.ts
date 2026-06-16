@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 import { handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
@@ -21,75 +20,89 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
 
-    // Everything that mutates money happens inside a single serializable transaction
-    // so an approval can never run twice or debit a stale balance.
-    const transfer = await prisma.$transaction(
-      async (tx) => {
-        const existing = await tx.transferRequest.findUnique({
-          where: { id },
-          include: { fromAccount: true }
-        });
-        if (!existing) {
-          throw new Response("Transfer request not found.", { status: 404 });
-        }
+    // MongoDB doesn't support per-transaction isolation levels the way Postgres
+    // does, so we guard double-approval with an atomic conditional update on
+    // the transfer status *before* moving money. The conditional update is
+    // atomic at the document level and acts as the gate. The money move and
+    // the ledger insert then run inside an interactive transaction so a
+    // mid-flight crash can't leave a half-applied debit.
+    //
+    // Funds re-check at approval time stays the same as before.
+    const existing = await prisma.transferRequest.findUnique({
+      where: { id },
+      include: { fromAccount: true }
+    });
+    if (!existing) {
+      throw new Response("Transfer request not found.", { status: 404 });
+    }
+    if (TERMINAL_STATUSES.has(existing.status)) {
+      throw new Response(
+        `Transfer is already ${existing.status.toLowerCase()} and cannot be modified.`,
+        { status: 409 }
+      );
+    }
 
-        // Guard: prevent double-processing of an already-finalized transfer.
-        if (TERMINAL_STATUSES.has(existing.status)) {
-          throw new Response(
-            `Transfer is already ${existing.status.toLowerCase()} and cannot be modified.`,
-            { status: 409 }
-          );
-        }
+    if (input.status === "APPROVED") {
+      const account = existing.fromAccount;
+      if (!account || account.status !== "ACTIVE") {
+        throw new Response("Source account is not active; cannot approve.", { status: 400 });
+      }
+      const amount = Number(existing.amount);
+      const available = Number(account.availableBalance);
+      const balance = Number(account.balance);
+      if (amount > available) {
+        throw new Response("Insufficient available balance to approve this transfer.", { status: 400 });
+      }
 
-        // Only an APPROVAL moves money. Other transitions just update status.
-        if (input.status === "APPROVED") {
-          const account = existing.fromAccount;
-          if (!account || account.status !== "ACTIVE") {
-            throw new Response("Source account is not active; cannot approve.", { status: 400 });
+      // Atomic "claim" of the transfer — only succeeds if it is still in a
+      // non-terminal state. Anything else (e.g. another admin already
+      // approved) makes this `updateMany` modify 0 documents and we abort.
+      const claim = await prisma.transferRequest.updateMany({
+        where: {
+          id,
+          status: { notIn: ["APPROVED", "REJECTED", "CANCELLED"] }
+        },
+        data: { status: "UNDER_REVIEW" }
+      });
+      if (claim.count === 0) {
+        throw new Response("Transfer was already finalized by another reviewer.", { status: 409 });
+      }
+
+      // Now the money side, atomically with the final status flip.
+      await prisma.$transaction([
+        prisma.account.update({
+          where: { id: account.id },
+          data: {
+            availableBalance: available - amount,
+            balance: balance - amount
           }
-
-          const amount = new Prisma.Decimal(existing.amount);
-          const available = new Prisma.Decimal(account.availableBalance);
-          const balance = new Prisma.Decimal(account.balance);
-
-          // Re-check funds at approval time (balance may have changed since submission).
-          if (amount.greaterThan(available)) {
-            throw new Response("Insufficient available balance to approve this transfer.", { status: 400 });
+        }),
+        prisma.transaction.create({
+          data: {
+            accountId: account.id,
+            type: "TRANSFER_DEBIT",
+            amount: -amount,
+            currency: existing.currency,
+            description: `Transfer to ${existing.beneficiaryName}`,
+            reference: `TRF-${existing.id}`,
+            status: "POSTED"
           }
-
-          // Debit both balances atomically.
-          await tx.account.update({
-            where: { id: account.id },
-            data: {
-              availableBalance: available.minus(amount),
-              balance: balance.minus(amount)
-            }
-          });
-
-          // Create the immutable ledger Transaction record.
-          await tx.transaction.create({
-            data: {
-              accountId: account.id,
-              type: "TRANSFER_DEBIT",
-              amount: amount.negated(),
-              currency: existing.currency,
-              description: `Transfer to ${existing.beneficiaryName}`,
-              reference: `TRF-${existing.id}`,
-              status: "POSTED"
-            }
-          });
-        }
-
-        // Update the transfer status last, inside the same transaction.
-        return tx.transferRequest.update({
+        }),
+        prisma.transferRequest.update({
           where: { id },
-          data: { status: input.status, adminNote: input.adminNote }
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-    );
+          data: { status: "APPROVED", adminNote: input.adminNote }
+        })
+      ]);
+    } else {
+      await prisma.transferRequest.update({
+        where: { id },
+        data: { status: input.status, adminNote: input.adminNote }
+      });
+    }
 
-    await notifyUser(transfer.userId, {
+    const transfer = await prisma.transferRequest.findUnique({ where: { id } });
+
+    await notifyUser(existing.userId, {
       type: "SYSTEM",
       title: `Transfer ${input.status.replace("_", " ").toLowerCase()}`,
       body: input.adminNote
