@@ -31,7 +31,13 @@ export async function jsonBody<T extends z.ZodTypeAny>(request: Request, schema:
 
 export function apiError(error: unknown) {
   if (error instanceof Response) {
-    return error;
+    const status = error.status || 500;
+    return error.text().then((message) =>
+      NextResponse.json(
+        { error: message || (status === 401 ? "Unauthorized" : "Request could not be completed.") },
+        { status }
+      )
+    );
   }
 
   if (error instanceof z.ZodError) {

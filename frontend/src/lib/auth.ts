@@ -98,18 +98,62 @@ export async function createSession(user: { id: string; role: Role }, options?: 
   const token = await signSessionToken({ sessionId, userId: user.id, role: user.role });
   const tokenHash = await sha256(token);
 
-  const session = await prisma.session.create({
-    data: {
-      id: sessionId,
-      userId: user.id,
-      tokenHash,
-      ip: options?.ip,
-      userAgent: options?.userAgent,
-      expiresAt
-    }
+  const session = await createSessionRecord({
+    id: sessionId,
+    userId: user.id,
+    tokenHash,
+    ip: options?.ip,
+    userAgent: options?.userAgent,
+    expiresAt
   });
 
   return { token, expiresAt, sessionId: session.id };
+}
+
+function isMongoTransactionError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2031";
+}
+
+async function createSessionRecord(input: {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  ip?: string;
+  userAgent?: string;
+  expiresAt: Date;
+}) {
+  try {
+    return await prisma.session.create({
+      data: input
+    });
+  } catch (error) {
+    if (!isMongoTransactionError(error)) {
+      throw error;
+    }
+
+    const now = new Date();
+    await prisma.$runCommandRaw({
+      insert: "Session",
+      documents: [
+        {
+          _id: { $oid: input.id },
+          userId: { $oid: input.userId },
+          tokenHash: input.tokenHash,
+          ip: input.ip ?? null,
+          userAgent: input.userAgent ?? null,
+          expiresAt: { $date: input.expiresAt.toISOString() },
+          createdAt: { $date: now.toISOString() }
+        }
+      ],
+      writeConcern: { w: 1 }
+    });
+
+    const session = await prisma.session.findUnique({ where: { id: input.id } });
+    if (!session) {
+      throw new Error("Session creation failed.");
+    }
+    return session;
+  }
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
