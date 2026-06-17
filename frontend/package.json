@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "prisma generate && next build",
+    "build": "node scripts/safe-prisma-generate.mjs && next build",
     "start": "node scripts/start.mjs",
     "start:prod": "NODE_ENV=production node server.mjs",
     "lint": "next lint",

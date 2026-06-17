@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import {
   AnnouncementForm,
   BankSettingsForm,
+  BalanceAdjustmentForm,
   BroadcastForm,
   CardDecisionControl,
   EmailSettingsForm,
@@ -13,7 +14,8 @@ import {
   TransferDecisionControl,
   TransferSettingsForm,
   UserStatusControl,
-  WalletForm
+  WalletForm,
+  WalletManagementPanel
 } from "@/components/admin/admin-controls";
 import { StatusBadge } from "@/components/banking/status-badge";
 import { ProtectedShell } from "@/components/layout/protected-shell";
@@ -118,6 +120,10 @@ export default async function AdminPage() {
           </Card>
         </section>
 
+        <section id="accounts">
+          <BalanceAdjustmentForm users={data.users} />
+        </section>
+
         <section id="kyc">
           <Card>
             <CardHeader>
@@ -152,25 +158,7 @@ export default async function AdminPage() {
         </section>
 
         <section id="wallets" className="grid gap-5 xl:grid-cols-[1fr_28rem]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Crypto Wallet Infrastructure</CardTitle>
-              <CardDescription>Add, edit, enable, and disable global deposit wallet addresses.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {data.wallets.map((wallet) => (
-                <div key={wallet.id} className="rounded-md border p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-black">{wallet.coin} ({wallet.symbol})</p>
-                      <p className="break-all text-sm text-muted-foreground">{wallet.network} · {wallet.address}</p>
-                    </div>
-                    <Badge variant={wallet.enabled ? "success" : "secondary"}>{wallet.enabled ? "Enabled" : "Disabled"}</Badge>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <WalletManagementPanel wallets={data.wallets} />
           <WalletForm />
         </section>
 

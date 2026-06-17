@@ -4,6 +4,7 @@ import { handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { computeApprovalDebit } from "@/lib/domain";
 
 const schema = z.object({
   status: z.enum(["UNDER_REVIEW", "APPROVED", "REJECTED", "CANCELLED"]),
@@ -20,14 +21,6 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
 
-    // MongoDB doesn't support per-transaction isolation levels the way Postgres
-    // does, so we guard double-approval with an atomic conditional update on
-    // the transfer status *before* moving money. The conditional update is
-    // atomic at the document level and acts as the gate. The money move and
-    // the ledger insert then run inside an interactive transaction so a
-    // mid-flight crash can't leave a half-applied debit.
-    //
-    // Funds re-check at approval time stays the same as before.
     const existing = await prisma.transferRequest.findUnique({
       where: { id },
       include: { fromAccount: true }
@@ -43,20 +36,19 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     }
 
     if (input.status === "APPROVED") {
-      const account = existing.fromAccount;
-      if (!account || account.status !== "ACTIVE") {
-        throw new Response("Source account is not active; cannot approve.", { status: 400 });
-      }
-      const amount = Number(existing.amount);
-      const available = Number(account.availableBalance);
-      const balance = Number(account.balance);
-      if (amount > available) {
-        throw new Response("Insufficient available balance to approve this transfer.", { status: 400 });
+      const outcome = computeApprovalDebit({
+        currentStatus: existing.status,
+        amount: Number(existing.amount),
+        account: {
+          balance: Number(existing.fromAccount.balance),
+          availableBalance: Number(existing.fromAccount.availableBalance),
+          status: existing.fromAccount.status
+        }
+      });
+      if (!outcome.ok) {
+        throw new Response(outcome.reason, { status: 400 });
       }
 
-      // Atomic "claim" of the transfer — only succeeds if it is still in a
-      // non-terminal state. Anything else (e.g. another admin already
-      // approved) makes this `updateMany` modify 0 documents and we abort.
       const claim = await prisma.transferRequest.updateMany({
         where: {
           id,
@@ -68,31 +60,48 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         throw new Response("Transfer was already finalized by another reviewer.", { status: 409 });
       }
 
-      // Now the money side, atomically with the final status flip.
-      await prisma.$transaction([
-        prisma.account.update({
-          where: { id: account.id },
+      try {
+        await prisma.account.update({
+          where: { id: existing.fromAccount.id },
           data: {
-            availableBalance: available - amount,
-            balance: balance - amount
+            availableBalance: outcome.newAvailable,
+            balance: outcome.newBalance
           }
-        }),
-        prisma.transaction.create({
+        });
+        await prisma.transaction.create({
           data: {
-            accountId: account.id,
+            accountId: existing.fromAccount.id,
             type: "TRANSFER_DEBIT",
-            amount: -amount,
+            amount: -outcome.debit,
             currency: existing.currency,
             description: `Transfer to ${existing.beneficiaryName}`,
             reference: `TRF-${existing.id}`,
             status: "POSTED"
           }
-        }),
-        prisma.transferRequest.update({
+        });
+        await prisma.transferRequest.update({
           where: { id },
           data: { status: "APPROVED", adminNote: input.adminNote }
-        })
-      ]);
+        });
+      } catch (error) {
+        await prisma.transferRequest.update({
+          where: { id },
+          data: {
+            status: existing.status,
+            adminNote: `Approval failed during ledger update: ${input.adminNote}`
+          }
+        }).catch(() => undefined);
+        await auditLog({
+          actorId: admin.id,
+          action: "ADMIN_TRANSFER_APPROVAL_FAILED",
+          entity: "TransferRequest",
+          entityId: id,
+          metadata: { reason: error instanceof Error ? error.message : "Unknown ledger failure" },
+          ip,
+          userAgent
+        });
+        throw new Response("Transfer approval could not be completed. Please retry or contact technical operations.", { status: 500 });
+      }
     } else {
       await prisma.transferRequest.update({
         where: { id },

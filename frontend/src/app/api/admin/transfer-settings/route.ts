@@ -7,9 +7,14 @@ import { prisma } from "@/lib/db";
 import { defaultTransferSettings } from "@/lib/domain";
 
 const schema = z.object({
+  successMessage: z.string().min(4),
   reviewMessage: z.string().min(10),
+  failedMessage: z.string().min(10),
+  blockedMessage: z.string().min(10),
+  reasonText: z.string().min(10),
   buttonText: z.string().min(2),
-  supportInstructions: z.string().min(10)
+  supportInstructions: z.string().min(10),
+  referencePrefix: z.string().min(2).max(12)
 });
 
 export async function GET() {
@@ -25,11 +30,10 @@ export async function PUT(request: NextRequest) {
     const admin = await requireAdmin();
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
-    const settings = await prisma.transferSetting.upsert({
-      where: { id: 1 },
-      update: input,
-      create: { id: 1, ...input }
-    });
+    const existing = await prisma.transferSetting.findUnique({ where: { id: 1 } });
+    const settings = existing
+      ? await prisma.transferSetting.update({ where: { id: 1 }, data: input })
+      : await prisma.transferSetting.create({ data: { id: 1, ...input } });
     await auditLog({
       actorId: admin.id,
       action: "ADMIN_UPDATED_TRANSFER_SETTINGS",

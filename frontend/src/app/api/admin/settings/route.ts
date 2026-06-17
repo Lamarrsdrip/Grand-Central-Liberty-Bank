@@ -33,11 +33,10 @@ export async function PUT(request: NextRequest) {
     const admin = await requireAdmin();
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
-    const settings = await prisma.bankSetting.upsert({
-      where: { id: 1 },
-      update: input,
-      create: { id: 1, ...input }
-    });
+    const existing = await prisma.bankSetting.findUnique({ where: { id: 1 } });
+    const settings = existing
+      ? await prisma.bankSetting.update({ where: { id: 1 }, data: input })
+      : await prisma.bankSetting.create({ data: { id: 1, ...input } });
     await auditLog({
       actorId: admin.id,
       action: "ADMIN_UPDATED_BANK_SETTINGS",

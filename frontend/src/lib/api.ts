@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/security";
+import { safeSerialize } from "@/lib/serialize";
 
 export function ok<T>(data: T, init?: ResponseInit) {
-  return NextResponse.json(data, init);
+  return NextResponse.json(safeSerialize(data), init);
 }
 
 export function created<T>(data: T) {
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json(safeSerialize(data), { status: 201 });
 }
 
 export async function handleApi(handler: () => Promise<Response>) {

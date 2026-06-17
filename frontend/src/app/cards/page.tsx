@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Snowflake, Settings2, Eye, Plus, CreditCard } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { CardApplicationForm } from "@/components/banking/workflow-forms";
@@ -53,22 +54,22 @@ export default async function CardsPage() {
         {/* Card controls */}
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: "Freeze",   icon: Snowflake },
-            { label: "Settings", icon: Settings2 },
-            { label: "Details",  icon: Eye       },
-            { label: "Add Card", icon: Plus      },
+            { label: "Freeze",   icon: Snowflake, href: "/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20card." },
+            { label: "Settings", icon: Settings2, href: "/profile" },
+            { label: "Details",  icon: Eye,       href: "/cards#details" },
+            { label: "Add Card", icon: Plus,      href: "/cards#apply" },
           ].map((a) => (
-            <button key={a.label} className="card-dark p-4 flex flex-col items-center gap-2 hover:bg-white/6 transition">
+            <Link key={a.label} href={a.href} className="card-dark p-4 flex flex-col items-center gap-2 hover:bg-white/6 transition">
               <div className="size-11 rounded-full bg-white/8 border border-white/10 flex items-center justify-center">
                 <a.icon className="size-5 text-white/60" />
               </div>
               <span className="text-xs font-bold text-white/60">{a.label}</span>
-            </button>
+            </Link>
           ))}
         </div>
 
         {/* Card details */}
-        <div className="grid grid-cols-2 gap-4">
+        <div id="details" className="grid grid-cols-2 gap-4">
           <div className="card-dark p-5">
             <p className="text-xs text-white/40 uppercase tracking-wider">Available Credit</p>
             <p className="text-2xl font-black text-white mt-1">$18,750</p>
@@ -80,7 +81,7 @@ export default async function CardsPage() {
         </div>
 
         {/* Apply for new card */}
-        <div className="card-dark p-5">
+        <div id="apply" className="card-dark p-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="size-10 rounded-xl bg-green/15 flex items-center justify-center">
               <CreditCard className="size-5 text-green" />

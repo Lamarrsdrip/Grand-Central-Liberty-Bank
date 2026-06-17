@@ -40,11 +40,10 @@ export async function PUT(request: NextRequest) {
       smtpSecure: input.smtpSecure,
       senderName: input.senderName
     };
-    const settings = await prisma.emailSetting.upsert({
-      where: { id: 1 },
-      update: data,
-      create: { id: 1, ...data }
-    });
+    const existing = await prisma.emailSetting.findUnique({ where: { id: 1 } });
+    const settings = existing
+      ? await prisma.emailSetting.update({ where: { id: 1 }, data })
+      : await prisma.emailSetting.create({ data: { id: 1, ...data } });
     await auditLog({
       actorId: admin.id,
       action: "ADMIN_UPDATED_EMAIL_SETTINGS",

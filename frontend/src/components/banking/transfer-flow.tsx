@@ -8,7 +8,16 @@ import { formatCurrency, initials } from "@/lib/utils";
 import { accountLabel } from "@/components/banking/finance";
 
 type Account = { id: string; type: string; accountNumber: string; availableBalance: number; currency: string };
-type TransferSettings = { reviewMessage: string; buttonText: string; supportInstructions: string };
+type TransferSettings = {
+  successMessage?: string;
+  reviewMessage: string;
+  failedMessage?: string;
+  blockedMessage?: string;
+  reasonText?: string;
+  buttonText: string;
+  supportInstructions: string;
+  referencePrefix?: string;
+};
 type TransferResult = {
   state: "review" | "failed";
   message: string;
@@ -95,24 +104,28 @@ export function TransferFlow({ accounts, settings }: { accounts: Account[]; sett
         }),
       });
       const reviewMessage = data.message?.reviewMessage ?? settings.reviewMessage;
+      const reasonText = data.message?.reasonText ?? settings.reasonText ?? reviewMessage;
       setResult({
         state: "review",
         message: reviewMessage,
         amount: numericAmount,
         beneficiary,
-        reference: data.transfer?.id ?? "Pending reference",
-        reason: reviewMessage
+        reference: data.message?.reference ?? data.transfer?.id ?? "Pending reference",
+        reason: reasonText
       });
       setStep("success");
     } catch (error) {
-      const reason = error instanceof Error ? error.message : settings.reviewMessage;
+      const reason = error instanceof Error ? error.message : (settings.failedMessage ?? settings.reviewMessage);
+      const cleanReason = /prisma|mongodb|stack|database|server|file:/i.test(reason)
+        ? (settings.reasonText ?? "Additional verification is required before this transaction can be completed.")
+        : reason;
       setResult({
         state: "failed",
-        message: reason,
+        message: settings.failedMessage ?? settings.reviewMessage,
         amount: numericAmount,
         beneficiary,
         reference: "Not created",
-        reason
+        reason: cleanReason
       });
       setStep("success");
     } finally {
@@ -132,6 +145,9 @@ export function TransferFlow({ accounts, settings }: { accounts: Account[]; sett
         </div>
         <h2 className="text-2xl font-black text-white">{result?.state === "failed" ? "Transfer Not Submitted" : "Transfer Requires Review"}</h2>
         <p className="text-white/50 mt-2">{result?.message ?? settings.reviewMessage}</p>
+        {settings.supportInstructions ? (
+          <p className="mt-2 text-xs text-white/35">{settings.supportInstructions}</p>
+        ) : null}
         <div className="mt-6 bg-white/5 rounded-2xl p-4 text-left space-y-2">
           <div className="flex justify-between text-sm"><span className="text-white/40">Amount</span><span className="font-bold text-white">{formatCurrency(result?.amount ?? numericAmount)}</span></div>
           <div className="flex justify-between text-sm"><span className="text-white/40">Beneficiary</span><span className="font-bold text-white">{result?.beneficiary ?? beneficiary}</span></div>

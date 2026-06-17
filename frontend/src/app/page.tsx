@@ -36,9 +36,9 @@ export default async function HomePage() {
             <div className="flex items-center gap-2">
               <Link href="/login" className="hidden sm:block text-sm font-bold text-white/80 hover:text-white px-4 py-2 transition">Log in</Link>
               <Link href="/register" className="text-sm font-bold bg-green text-black px-5 py-2.5 rounded-full hover:bg-green-dim transition">Open Account</Link>
-              <button className="lg:hidden size-10 flex items-center justify-center rounded-full bg-white/8 border border-white/10">
+              <Link href="/login" className="lg:hidden size-10 flex items-center justify-center rounded-full bg-white/8 border border-white/10" aria-label="Open login">
                 <Menu className="size-5" />
-              </button>
+              </Link>
             </div>
           </header>
 

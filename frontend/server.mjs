@@ -6,11 +6,44 @@ import { Server } from "socket.io";
 import { PrismaClient } from "@prisma/client";
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = process.env.HOSTNAME ?? "0.0.0.0";
+const hostname = "0.0.0.0";
 const port = Number(process.env.PORT ?? 3000);
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
-const prisma = new PrismaClient();
+let prisma;
+
+function buildDatabaseUrl() {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  const base = process.env.MONGO_URL;
+  if (!base) return null;
+  const dbName = process.env.DB_NAME || "grand_central_liberty_bank";
+  const url = new URL(base);
+  url.pathname = `/${dbName}`;
+  if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
+  if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
+  return url.toString();
+}
+
+function getPrisma() {
+  if (prisma) return prisma;
+  const databaseUrl = buildDatabaseUrl();
+  if (!databaseUrl) {
+    throw new Error("Database is not configured.");
+  }
+  prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+  return prisma;
+}
+
+function sendHealth(res) {
+  res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+  res.end(
+    JSON.stringify({
+      ok: true,
+      service: "Grand Central Liberty Bank",
+      timestamp: new Date().toISOString()
+    })
+  );
+}
 
 function parseCookie(header = "") {
   return Object.fromEntries(
@@ -36,7 +69,7 @@ async function authenticateSocket(socket) {
     throw new Error("Missing session cookie.");
   }
   const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-  const session = await prisma.session.findFirst({
+  const session = await getPrisma().session.findFirst({
     where: {
       id: payload.jti,
       userId: payload.sub,
@@ -54,7 +87,14 @@ async function authenticateSocket(socket) {
 
 await app.prepare();
 
-const httpServer = createServer(handler);
+const httpServer = createServer((req, res) => {
+  const path = req.url?.split("?")[0];
+  if (path === "/health" || path === "/api/health") {
+    sendHealth(res);
+    return;
+  }
+  handler(req, res);
+});
 const io = new Server(httpServer, {
   path: "/socket.io",
   cors: { origin: process.env.APP_URL ?? `http://localhost:${port}`, credentials: true }
@@ -65,13 +105,13 @@ io.on("connection", async (socket) => {
   try {
     user = await authenticateSocket(socket);
   } catch (error) {
-    socket.emit("support_error", error instanceof Error ? error.message : "Authentication failed.");
+    socket.emit("support_error", "Live chat authentication failed. Please refresh and try again.");
     socket.disconnect(true);
     return;
   }
 
   socket.on("join_ticket", async (ticketId) => {
-    const ticket = await prisma.supportTicket.findFirst({
+    const ticket = await getPrisma().supportTicket.findFirst({
       where:
         user.role === "ADMIN"
           ? { id: ticketId }
@@ -84,7 +124,7 @@ io.on("connection", async (socket) => {
 
   socket.on("send_support_message", async (input, ack) => {
     try {
-      const ticket = await prisma.supportTicket.findFirst({
+      const ticket = await getPrisma().supportTicket.findFirst({
         where:
           user.role === "ADMIN"
             ? { id: input.ticketId }
@@ -93,14 +133,14 @@ io.on("connection", async (socket) => {
       if (!ticket) {
         throw new Error("Support ticket was not found.");
       }
-      const message = await prisma.supportMessage.create({
+      const message = await getPrisma().supportMessage.create({
         data: {
           ticketId: ticket.id,
           senderId: user.id,
           body: String(input.body ?? "").replace(/[<>]/g, "").slice(0, 5000)
         }
       });
-      await prisma.supportTicket.update({
+      await getPrisma().supportTicket.update({
         where: { id: ticket.id },
         data: { status: user.role === "ADMIN" ? "ACTIVE" : ticket.status, updatedAt: new Date() }
       });
@@ -115,11 +155,17 @@ io.on("connection", async (socket) => {
       });
       ack?.({ ok: true });
     } catch (error) {
-      ack?.({ error: error instanceof Error ? error.message : "Message failed." });
+      console.error("[socket] support message failed", error);
+      ack?.({ error: "Message failed. Please try again." });
     }
   });
 });
 
 httpServer.listen(port, hostname, () => {
   console.log(`Grand Central Liberty Bank ready on http://${hostname}:${port}`);
+});
+
+process.on("SIGTERM", async () => {
+  await prisma?.$disconnect().catch(() => undefined);
+  httpServer.close(() => process.exit(0));
 });

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       throw new Response("ticketId is required.", { status: 400 });
     }
     const ticket = await prisma.supportTicket.findFirst({
-      where: { id: ticketId, OR: [{ userId: user.id }, { assignedAdminId: user.id }] },
+      where: user.role === "ADMIN" ? { id: ticketId } : { id: ticketId, userId: user.id },
       include: { messages: { orderBy: { createdAt: "asc" }, include: { sender: true } } }
     });
     if (!ticket) {
@@ -29,10 +29,8 @@ export async function POST(request: NextRequest) {
   return handleApi(async () => {
     const user = await requireUser();
     const input = messageSchema.parse(await request.json());
-    // `{ assignedAdminId: null }` doesn't match documents where the field
-    // is missing on Prisma+MongoDB; use the inverse to capture unassigned.
     const ticket = await prisma.supportTicket.findFirst({
-      where: { id: input.ticketId, OR: [{ userId: user.id }, { assignedAdminId: user.id }, { NOT: { assignedAdminId: { not: null } } }] },
+      where: user.role === "ADMIN" ? { id: input.ticketId } : { id: input.ticketId, userId: user.id },
       include: { user: true }
     });
     if (!ticket) {

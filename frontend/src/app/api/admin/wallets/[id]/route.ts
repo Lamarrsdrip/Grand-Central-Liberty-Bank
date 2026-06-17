@@ -12,6 +12,7 @@ const schema = z.object({
   network: z.string().min(2).optional(),
   label: z.string().min(2).optional(),
   qrCodeUrl: z.string().optional().nullable(),
+  depositInstructions: z.string().optional().nullable(),
   enabled: z.boolean().optional()
 });
 
@@ -33,5 +34,24 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     });
 
     return ok({ wallet });
+  });
+}
+
+export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  return handleApi(async () => {
+    const admin = await requireAdmin();
+    const { id } = await context.params;
+    const { ip, userAgent } = await requestIpAndAgent();
+    await prisma.cryptoWallet.delete({ where: { id } });
+    await auditLog({
+      actorId: admin.id,
+      action: "ADMIN_DELETED_WALLET",
+      entity: "CryptoWallet",
+      entityId: id,
+      ip,
+      userAgent
+    });
+
+    return ok({ deleted: true });
   });
 }

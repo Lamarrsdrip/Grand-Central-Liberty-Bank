@@ -20,7 +20,8 @@ export default async function SupportPage() {
       id: message.id,
       body: message.body,
       senderId: message.senderId,
-      createdAt: message.createdAt.toISOString()
+      createdAt: message.createdAt.toISOString(),
+      attachmentUrl: message.attachmentUrl
     }))
   }));
 

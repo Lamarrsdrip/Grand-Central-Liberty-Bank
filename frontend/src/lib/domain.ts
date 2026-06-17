@@ -3,11 +3,21 @@ type KycStatus = "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "INFO_RE
 type Role = "USER" | "ADMIN";
 
 export const defaultTransferSettings = {
+  successMessage: "Transfer submitted successfully.",
   reviewMessage: "Your transaction requires additional review. Please contact customer support for assistance.",
+  failedMessage: "Transfer could not be submitted. Additional verification is required before this transaction can be completed.",
+  blockedMessage: "Transfer is blocked until additional account verification is completed.",
+  reasonText: "Additional verification is required before this transaction can be completed.",
   buttonText: "CONTACT SUPPORT",
   supportInstructions:
-    "A support specialist can verify your transfer and collect any additional documentation required by compliance."
+    "A support specialist can verify your transfer and collect any additional documentation required by compliance.",
+  referencePrefix: "GCLB"
 };
+
+export function formatTransferReference(prefix: string | null | undefined, id: string) {
+  const cleanPrefix = (prefix || defaultTransferSettings.referencePrefix).replace(/[^A-Z0-9]/gi, "").toUpperCase() || "GCLB";
+  return `${cleanPrefix}-${id.slice(-8).toUpperCase()}`;
+}
 
 export const defaultRetirementWithdrawalMessage =
   "Your 401(k) withdrawal request has been submitted for compliance review. Support may contact you if more information is required.";

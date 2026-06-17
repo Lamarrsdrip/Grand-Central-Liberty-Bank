@@ -191,10 +191,10 @@ export function TotalAssetsCard({
 const quickActions = [
   { label: "Transfer",  href: "/transfers", bg: "#1a2a3a", icon: "↗" },
   { label: "Pay Bills", href: "/transfers", bg: "#1a1a2a", icon: "📄" },
-  { label: "Deposit",   href: "/accounts",  bg: "#1a2a20", icon: "⬇" },
+  { label: "Deposit",   href: "/wallet",    bg: "#1a2a20", icon: "⬇" },
   { label: "Send",      href: "/transfers", bg: "#2a1a1a", icon: "↑" },
-  { label: "Convert",   href: "/crypto",    bg: "#1a2520", icon: "⇄" },
-  { label: "More",      href: "/profile",   bg: "#1a1a1a", icon: "⋯" },
+  { label: "Convert",   href: "/wallet",    bg: "#1a2520", icon: "⇄" },
+  { label: "More",      href: "/more",      bg: "#1a1a1a", icon: "⋯" },
 ];
 
 export function QuickActions() {
@@ -302,11 +302,10 @@ export function AccountCard({ account, index = 0 }: { account: FinanceAccount; i
         <span className="text-xs text-white/30">IBAN US98 GCLB</span>
       </div>
       <div className="mt-4 flex gap-2">
-        {["Freeze", "Statements", "Manage", "Activity"].map((a) => (
-          <button key={a} className="text-[0.65rem] font-bold text-white/50 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">
-            {a}
-          </button>
-        ))}
+        <Link href="/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20account." className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Freeze</Link>
+        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Statements</Link>
+        <Link href="/profile" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Manage</Link>
+        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Activity</Link>
       </div>
     </div>
   );
@@ -404,20 +403,20 @@ export function CustomerTopBar({ user, notifCount = 3 }: {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <button className="relative size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition">
+        <Link href="/profile" className="relative size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition" aria-label="Notifications">
           <Bell className="size-4" />
           {notifCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 size-4 flex items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-black text-white">
               {notifCount}
             </span>
           )}
-        </button>
-        <button className="size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition">
+        </Link>
+        <Link href="/wallet" className="size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition" aria-label="Scan QR">
           <ScanLine className="size-4" />
-        </button>
-        <button className="size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition">
+        </Link>
+        <Link href="/support" className="size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition" aria-label="Search support">
           <Search className="size-4" />
-        </button>
+        </Link>
       </div>
     </div>
   );
@@ -553,13 +552,13 @@ export function ProductShowcase() {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {products.map((p) => (
-        <div key={p.title} className="bg-white/5 border border-white/8 rounded-2xl p-5 hover:bg-white/8 transition cursor-pointer group">
+        <Link key={p.title} href="/register" className="bg-white/5 border border-white/8 rounded-2xl p-5 hover:bg-white/8 transition group">
           <div className="size-10 rounded-xl bg-white/10 flex items-center justify-center mb-4 group-hover:bg-green/20 transition">
             <p.icon className="size-5 text-white/70 group-hover:text-green transition" />
           </div>
           <p className="font-black text-white text-sm">{p.title}</p>
           <p className="text-xs text-white/50 mt-1.5 leading-relaxed">{p.body}</p>
-        </div>
+        </Link>
       ))}
     </div>
   );
@@ -578,7 +577,7 @@ export function FeatureRail() {
           <f.icon className="size-5 text-green mb-3" />
           <p className="font-black text-white text-sm">{f.title}</p>
           <p className="text-xs text-white/50 mt-1.5 leading-relaxed">{f.body}</p>
-          <p className="text-xs font-bold text-green/80 mt-3 cursor-pointer hover:text-green">Read more →</p>
+          <Link href="/register" className="inline-block text-xs font-bold text-green/80 mt-3 hover:text-green">Read more →</Link>
         </div>
       ))}
     </div>

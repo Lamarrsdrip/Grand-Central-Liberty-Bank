@@ -361,16 +361,17 @@ model RetirementWithdrawalNote {
 }
 
 model CryptoWallet {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  coin        String
-  symbol      String
-  address     String
-  network     String
-  label       String
-  qrCodeUrl   String?
-  enabled     Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  coin                String
+  symbol              String
+  address             String
+  network             String
+  label               String
+  qrCodeUrl           String?
+  depositInstructions String?
+  enabled             Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   @@unique([symbol, network])
 }
@@ -442,9 +443,14 @@ model TransferRequest {
 
 model TransferSetting {
   id                  Int      @id @map("_id") @default(1)
+  successMessage      String   @default("Transfer submitted successfully.")
   reviewMessage       String
+  failedMessage       String   @default("Transfer could not be submitted. Additional verification is required before this transaction can be completed.")
+  blockedMessage      String   @default("Transfer is blocked until additional account verification is completed.")
+  reasonText          String   @default("Additional verification is required before this transaction can be completed.")
   buttonText          String
   supportInstructions String
+  referencePrefix     String   @default("GCLB")
   updatedAt           DateTime @updatedAt
 }
 

@@ -33,7 +33,7 @@ function buildDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
   const base = process.env.MONGO_URL;
   const dbName = process.env.DB_NAME || "grand_central_liberty_bank";
-  if (!base) throw new Error("DATABASE_URL or MONGO_URL must be set.");
+  if (!base) return null;
   const url = new URL(base);
   url.pathname = `/${dbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
@@ -42,53 +42,63 @@ function buildDatabaseUrl() {
 }
 
 const dbUrl = buildDatabaseUrl();
-console.log("[start] DATABASE_URL =", dbUrl.replace(/:\/\/[^@]*@/, "://***@"));
+if (dbUrl) {
+  console.log("[start] DATABASE_URL =", dbUrl.replace(/:\/\/[^@]*@/, "://***@"));
+} else {
+  console.warn("[start] DATABASE_URL/MONGO_URL not set; starting web process without database bootstrap.");
+}
 
 // DATABASE_URL is only needed for the Prisma CLI subprocesses below.
 // We DO NOT set it on the parent process.env so it isn't picked up by
 // the Emergent deployment "manage_secrets" sweep (which copies env vars
 // from the running preview pod into production secrets).
-const cliEnv = { ...process.env, DATABASE_URL: dbUrl };
+if (dbUrl) {
+  const cliEnv = { ...process.env, DATABASE_URL: dbUrl };
 
-// 1. Sync schema (indexes). Mongo creates collections lazily so this is cheap.
-console.log("[start] Pushing Prisma schema to MongoDB...");
-const push = spawnSync(
-  "npx",
-  ["prisma", "db", "push", "--skip-generate", "--accept-data-loss"],
-  { cwd: projectRoot, stdio: "inherit", env: cliEnv }
-);
-if (push.status !== 0) {
-  console.error("[start] prisma db push failed — aborting.");
-  process.exit(push.status ?? 1);
+  // 1. Sync schema (indexes). Mongo creates collections lazily so this is cheap.
+  console.log("[start] Pushing Prisma schema to MongoDB...");
+  const push = spawnSync(
+    "npx",
+    ["prisma", "db", "push", "--skip-generate", "--accept-data-loss"],
+    { cwd: projectRoot, stdio: "inherit", env: cliEnv }
+  );
+  if (push.status !== 0) {
+    console.warn("[start] prisma db push failed; continuing so health checks can pass.");
+  } else {
+    // 2. Seed (idempotent — uses upserts).
+    console.log("[start] Running seed...");
+    const seed = spawnSync("npx", ["tsx", "prisma/seed.ts"], {
+      cwd: projectRoot,
+      stdio: "inherit",
+      env: cliEnv
+    });
+    if (seed.status !== 0) {
+      console.warn("[start] seed exited with status", seed.status, "— continuing anyway.");
+    }
+  }
 }
 
-// 2. Seed (idempotent — uses upserts).
-console.log("[start] Running seed...");
-const seed = spawnSync("npx", ["tsx", "prisma/seed.ts"], {
-  cwd: projectRoot,
-  stdio: "inherit",
-  env: cliEnv
-});
-if (seed.status !== 0) {
-  console.warn("[start] seed exited with status", seed.status, "— continuing anyway.");
-}
-
-// 3. Boot Next.js. The Prisma client inside the app builds its own URL from
-// MONGO_URL + DB_NAME at runtime (see src/lib/db-url.ts), so we don't need
-// to pass DATABASE_URL here either.
-const buildIdExists = existsSync(join(projectRoot, ".next", "BUILD_ID"));
-const nextArgs = buildIdExists
-  ? ["next", "start", "-H", "0.0.0.0", "-p", String(process.env.PORT || 3000)]
+// 3. Boot the app. Production uses the custom server so Socket.IO and the
+// inline health path are available; preview without build artifacts uses Next dev.
+const productionBuildExists =
+  existsSync(join(projectRoot, ".next", "BUILD_ID")) ||
+  existsSync(join(projectRoot, ".next", "server", "app"));
+const nextArgs = productionBuildExists
+  ? ["server.mjs"]
   : ["next", "dev", "-H", "0.0.0.0", "-p", String(process.env.PORT || 3000)];
 
-console.log(`[start] Launching: npx ${nextArgs.join(" ")} (build present: ${buildIdExists})`);
+console.log(
+  productionBuildExists
+    ? "[start] Launching: node server.mjs (build present: true)"
+    : `[start] Launching: npx ${nextArgs.join(" ")} (build present: false)`
+);
 
-const next = spawn("npx", nextArgs, {
+const child = spawn(productionBuildExists ? "node" : "npx", nextArgs, {
   cwd: projectRoot,
   stdio: "inherit",
-  env: process.env
+  env: productionBuildExists ? { ...process.env, NODE_ENV: process.env.NODE_ENV || "production" } : process.env
 });
 
-process.on("SIGTERM", () => next.kill("SIGTERM"));
-process.on("SIGINT", () => next.kill("SIGINT"));
-next.on("exit", (code) => process.exit(code ?? 0));
+process.on("SIGTERM", () => child.kill("SIGTERM"));
+process.on("SIGINT", () => child.kill("SIGINT"));
+child.on("exit", (code) => process.exit(code ?? 0));

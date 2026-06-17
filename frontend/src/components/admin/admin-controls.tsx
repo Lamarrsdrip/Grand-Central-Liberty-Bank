@@ -18,7 +18,9 @@ export function AdminJsonForm({
   endpoint,
   method = "PATCH",
   children,
-  buttonLabel
+  buttonLabel,
+  confirmMessage,
+  buttonVariant = "default"
 }: {
   title?: string;
   description?: string;
@@ -26,6 +28,8 @@ export function AdminJsonForm({
   method?: string;
   children: React.ReactNode;
   buttonLabel: string;
+  confirmMessage?: string;
+  buttonVariant?: "default" | "secondary" | "outline" | "ghost" | "destructive";
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -35,6 +39,9 @@ export function AdminJsonForm({
       className="grid gap-3"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+          return;
+        }
         const form = new FormData(event.currentTarget);
         const data: Record<string, unknown> = {};
         form.forEach((value, key) => {
@@ -63,7 +70,7 @@ export function AdminJsonForm({
       ) : null}
       <Notice message={message} />
       {children}
-      <Button size="sm">{buttonLabel}</Button>
+      <Button size="sm" variant={buttonVariant}>{buttonLabel}</Button>
     </form>
   );
 }
@@ -222,6 +229,7 @@ export function WalletForm() {
             <Field><Label>Label</Label><Input name="label" placeholder="Treasury wallet" required /></Field>
             <Field className="sm:col-span-2"><Label>Address</Label><Input name="address" required /></Field>
             <Field className="sm:col-span-2"><Label>QR code URL</Label><Input name="qrCodeUrl" /></Field>
+            <Field className="sm:col-span-2"><Label>Deposit instructions</Label><Textarea name="depositInstructions" placeholder="Network-specific instructions shown to users" /></Field>
             <input type="hidden" name="enabled" value="true" />
           </div>
         </AdminJsonForm>
@@ -230,7 +238,140 @@ export function WalletForm() {
   );
 }
 
-export function TransferSettingsForm({ settings }: { settings: { reviewMessage: string; buttonText: string; supportInstructions: string } }) {
+type WalletRecord = {
+  id: string;
+  coin: string;
+  symbol: string;
+  address: string;
+  network: string;
+  label: string;
+  qrCodeUrl?: string | null;
+  depositInstructions?: string | null;
+  enabled: boolean;
+};
+
+export function WalletManagementPanel({ wallets }: { wallets: WalletRecord[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Crypto Wallet Infrastructure</CardTitle>
+        <CardDescription>Add, edit, enable, disable, and delete global wallet addresses.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {wallets.map((wallet) => (
+          <div key={wallet.id} className="rounded-2xl border p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-black">{wallet.coin} ({wallet.symbol})</p>
+                <p className="break-all text-xs text-muted-foreground">{wallet.network} - {wallet.address}</p>
+              </div>
+              <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${wallet.enabled ? "bg-emerald-400/15 text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                {wallet.enabled ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+            <AdminJsonForm endpoint={`/api/admin/wallets/${wallet.id}`} buttonLabel="Save wallet">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field><Label>Coin</Label><Input name="coin" defaultValue={wallet.coin} required /></Field>
+                <Field><Label>Symbol</Label><Input name="symbol" defaultValue={wallet.symbol} required /></Field>
+                <Field><Label>Network</Label><Input name="network" defaultValue={wallet.network} required /></Field>
+                <Field><Label>Label</Label><Input name="label" defaultValue={wallet.label} required /></Field>
+                <Field className="sm:col-span-2"><Label>Address</Label><Input name="address" defaultValue={wallet.address} required /></Field>
+                <Field className="sm:col-span-2"><Label>QR code URL</Label><Input name="qrCodeUrl" defaultValue={wallet.qrCodeUrl ?? ""} /></Field>
+                <Field className="sm:col-span-2"><Label>Deposit instructions</Label><Textarea name="depositInstructions" defaultValue={wallet.depositInstructions ?? ""} /></Field>
+                <Field><Label>Status</Label><Select name="enabled" defaultValue={String(wallet.enabled)}><option value="true">Enabled</option><option value="false">Disabled</option></Select></Field>
+              </div>
+            </AdminJsonForm>
+            <div className="mt-3">
+              <AdminJsonForm
+                endpoint={`/api/admin/wallets/${wallet.id}`}
+                method="DELETE"
+                buttonLabel="Delete wallet"
+                buttonVariant="destructive"
+                confirmMessage={`Delete ${wallet.symbol} ${wallet.network} wallet?`}
+              >
+                <p className="text-xs text-muted-foreground">Deleting removes this wallet from all user deposit screens immediately.</p>
+              </AdminJsonForm>
+            </div>
+          </div>
+        ))}
+        {!wallets.length ? <p className="rounded-2xl border p-4 text-sm text-muted-foreground">No wallets configured yet.</p> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function BalanceAdjustmentForm({
+  users
+}: {
+  users: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    accounts: Array<{ id: string; type: string; accountNumber: string; balance: unknown; availableBalance: unknown; currency: string }>;
+  }>;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Balance Adjustment</CardTitle>
+        <CardDescription>Top up or deduct account balances with a required reason and audit trail.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <AdminJsonForm
+          endpoint="/api/admin/accounts/adjust-balance"
+          method="POST"
+          buttonLabel="Review and apply adjustment"
+          confirmMessage="Apply this balance adjustment? This creates an audit log and user-visible transaction."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field>
+              <Label>User</Label>
+              <Select name="userId" required>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>{user.firstName} {user.lastName} - {user.email}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field>
+              <Label>Account</Label>
+              <Select name="accountId" required>
+                {users.flatMap((user) =>
+                  user.accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {user.email} - {account.type} •••• {account.accountNumber.slice(-4)} ({account.currency} {String(account.availableBalance)})
+                    </option>
+                  ))
+                )}
+              </Select>
+            </Field>
+            <Field>
+              <Label>Action</Label>
+              <Select name="action" defaultValue="TOP_UP">
+                <option value="TOP_UP">Top up</option>
+                <option value="DEDUCT">Deduct</option>
+              </Select>
+            </Field>
+            <Field><Label>Amount</Label><Input name="amount" type="number" step="0.01" min="0.01" required /></Field>
+            <Field><Label>Allow negative balance</Label><Select name="allowNegative" defaultValue="false"><option value="false">No</option><option value="true">Yes, authorized</option></Select></Field>
+            <Field className="sm:col-span-2"><Label>Reason</Label><Textarea name="reason" required placeholder="Required operational reason shown in audit logs and user activity" /></Field>
+          </div>
+        </AdminJsonForm>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function TransferSettingsForm({ settings }: { settings: {
+  successMessage?: string;
+  reviewMessage: string;
+  failedMessage?: string;
+  blockedMessage?: string;
+  reasonText?: string;
+  buttonText: string;
+  supportInstructions: string;
+  referencePrefix?: string;
+} }) {
   return (
     <Card>
       <CardHeader>
@@ -239,9 +380,14 @@ export function TransferSettingsForm({ settings }: { settings: { reviewMessage: 
       </CardHeader>
       <CardContent>
         <AdminJsonForm endpoint="/api/admin/transfer-settings" method="PUT" buttonLabel="Save transfer settings">
+          <Field><Label>Success message</Label><Textarea name="successMessage" defaultValue={settings.successMessage ?? "Transfer submitted successfully."} required /></Field>
           <Field><Label>Review message</Label><Textarea name="reviewMessage" defaultValue={settings.reviewMessage} required /></Field>
+          <Field><Label>Failed message</Label><Textarea name="failedMessage" defaultValue={settings.failedMessage ?? "Transfer could not be submitted. Additional verification is required before this transaction can be completed."} required /></Field>
+          <Field><Label>Blocked message</Label><Textarea name="blockedMessage" defaultValue={settings.blockedMessage ?? "Transfer is blocked until additional account verification is completed."} required /></Field>
+          <Field><Label>Reason text</Label><Textarea name="reasonText" defaultValue={settings.reasonText ?? "Additional verification is required before this transaction can be completed."} required /></Field>
           <Field><Label>Button text</Label><Input name="buttonText" defaultValue={settings.buttonText} required /></Field>
           <Field><Label>Support instructions</Label><Textarea name="supportInstructions" defaultValue={settings.supportInstructions} required /></Field>
+          <Field><Label>Reference prefix</Label><Input name="referencePrefix" defaultValue={settings.referencePrefix ?? "GCLB"} required /></Field>
         </AdminJsonForm>
       </CardContent>
     </Card>

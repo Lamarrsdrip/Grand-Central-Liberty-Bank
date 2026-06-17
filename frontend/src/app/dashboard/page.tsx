@@ -28,16 +28,14 @@ export default async function DashboardPage() {
   const totalAssets    = accountTotal + retirementTotal;
 
   const checking    = data.accounts.filter(a => a.type === "CHECKING").reduce((s,a) => s+Number(a.balance),0);
-  const savings     = data.accounts.filter(a => a.type === "SAVINGS").reduce((s,a) => s+Number(a.balance),0);
   const crypto      = data.accounts.filter(a => a.type === "CRYPTO").reduce((s,a) => s+Number(a.balance),0);
-  const investments = 63679.40;
+  const selectedAccount = data.accounts.find((account) => account.type === "CHECKING") ?? data.accounts[0];
 
   const wealthItems = [
-    { label: "Checking",    value: checking,        color: "bg-blue-400"   },
-    { label: "Savings",     value: savings,         color: "bg-emerald-400"},
-    { label: "Crypto",      value: crypto,          color: "bg-amber-400"  },
-    { label: "401(k)",      value: retirementTotal, color: "bg-fuchsia-400"},
-    { label: "Investments", value: investments,     color: "bg-cyan-400"   },
+    { label: "Checking",      value: checking,        color: "bg-blue-400"   },
+    { label: "Crypto Wallet", value: crypto,          color: "bg-amber-400"  },
+    { label: "401(k)",        value: retirementTotal, color: "bg-fuchsia-400"},
+    { label: "Cards",         value: 0,               color: "bg-cyan-400"   },
   ];
 
   const pendingTransfers = data.user?.transferRequests.filter(
@@ -61,6 +59,19 @@ export default async function DashboardPage() {
           todayChange={`+$${(totalAssets * 0.0173).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} (1.73%)`}
         />
 
+        {selectedAccount ? (
+          <Link href="/accounts" className="card-dark block p-5 transition hover:bg-white/6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-white/40">Selected Account Balance</p>
+                <p className="mt-1 text-3xl font-black text-white">{money(selectedAccount.balance, selectedAccount.currency)}</p>
+                <p className="mt-1 text-sm text-white/40">{selectedAccount.type} •••• {selectedAccount.accountNumber.slice(-4)}</p>
+              </div>
+              <ArrowRight className="size-5 text-green" />
+            </div>
+          </Link>
+        ) : null}
+
         {/* ── Quick Actions ─────────────── */}
         <div className="card-dark p-4">
           <QuickActions />
@@ -76,8 +87,9 @@ export default async function DashboardPage() {
               </div>
               <div className="flex items-center gap-1">
                 {["All","Income","Spend"].map((tab, i) => (
-                  <button
+                  <Link
                     key={tab}
+                    href={`/accounts?filter=${tab.toLowerCase()}`}
                     className={`text-xs font-bold px-3 py-1.5 rounded-full transition ${
                       i === 0
                         ? "bg-white/15 text-white"
@@ -85,7 +97,7 @@ export default async function DashboardPage() {
                     }`}
                   >
                     {tab}
-                  </button>
+                  </Link>
                 ))}
                 <Link href="/accounts" className="text-xs font-bold text-green ml-2 hover:text-green-dim transition">
                   View all →
@@ -131,7 +143,7 @@ export default async function DashboardPage() {
 
         {/* ── Crypto + 401k summary ─────── */}
         <div className="grid grid-cols-2 gap-4">
-          <Link href="/crypto" className="card-dark p-5 hover:bg-white/6 transition rounded-2xl block">
+            <Link href="/wallet" className="card-dark p-5 hover:bg-white/6 transition rounded-2xl block">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Crypto</p>
               <span className="text-xs font-bold text-green bg-green/10 px-2 py-0.5 rounded-full">+3.8%</span>

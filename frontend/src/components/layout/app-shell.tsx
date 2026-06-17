@@ -19,6 +19,7 @@ type User = {
 const userNav = [
   { href: "/dashboard", label: "Home",        icon: Home          },
   { href: "/accounts",  label: "Accounts",    icon: Landmark      },
+  { href: "/wallet",    label: "Wallet",      icon: WalletCards   },
   { href: "/transfers", label: "Payments",    icon: Send          },
   { href: "/cards",     label: "Cards",       icon: CreditCard    },
   { href: "/retirement",label: "Invest",      icon: LineChart     },
@@ -30,6 +31,7 @@ const userNav = [
 const adminNav = [
   { href: "/admin#overview",   label: "Dashboard", icon: Home          },
   { href: "/admin#users",      label: "Users",     icon: UserCircle    },
+  { href: "/admin#accounts",   label: "Accounts",  icon: Landmark      },
   { href: "/admin#kyc",        label: "KYC",       icon: ShieldCheck   },
   { href: "/admin#wallets",    label: "Wallets",   icon: WalletCards   },
   { href: "/admin#retirement", label: "401(k)",    icon: LineChart     },
@@ -44,9 +46,9 @@ type MobileNavItem = { href: string; label: string; icon: typeof Home; center?: 
 const mobileNav: MobileNavItem[] = [
   { href: "/dashboard", label: "Home",     icon: Home       },
   { href: "/accounts",  label: "Accounts", icon: Landmark   },
+  { href: "/wallet",    label: "Wallet",   icon: WalletCards },
   { href: "/transfers", label: "",         icon: ArrowLeftRight, center: true },
-  { href: "/cards",     label: "Cards",    icon: CreditCard },
-  { href: "/profile",   label: "More",     icon: MoreHorizontal },
+  { href: "/more",      label: "More",     icon: MoreHorizontal },
 ];
 
 export function AppShell({
@@ -125,16 +127,18 @@ export function AppShell({
             <p className="text-lg font-black text-white">{user.firstName} {user.lastName}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition">
+            <Link href="/support" className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Search support">
               <Search className="size-4" />
-            </button>
-            <button className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition">
+            </Link>
+            <Link href="/wallet" className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Open wallet QR">
               <QrCode className="size-4" />
-            </button>
-            <button className="relative size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition">
+            </Link>
+            <Link href="/profile" className="relative size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Notifications">
               <Bell className="size-4" />
-              <span className="absolute -top-0.5 -right-0.5 size-4 flex items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-black text-white">3</span>
-            </button>
+              {announcements.length > 0 ? (
+                <span className="absolute -top-0.5 -right-0.5 size-4 flex items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-black text-white">{announcements.length}</span>
+              ) : null}
+            </Link>
           </div>
         </header>
 

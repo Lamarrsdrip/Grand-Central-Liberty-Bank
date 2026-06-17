@@ -42,9 +42,14 @@ export function apiError(error: unknown) {
   }
 
   if (error instanceof Error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[api]", error);
+    return NextResponse.json(
+      { error: "Request could not be completed. Please try again or contact support." },
+      { status: 500 }
+    );
   }
 
+  console.error("[api] unexpected", error);
   return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });
 }
 

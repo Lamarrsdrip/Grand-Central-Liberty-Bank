@@ -27,11 +27,10 @@ export async function PUT(request: NextRequest) {
     const admin = await requireAdmin();
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
-    const settings = await prisma.retirementFeeSetting.upsert({
-      where: { id: 1 },
-      update: input,
-      create: { id: 1, ...input }
-    });
+    const existing = await prisma.retirementFeeSetting.findUnique({ where: { id: 1 } });
+    const settings = existing
+      ? await prisma.retirementFeeSetting.update({ where: { id: 1 }, data: input })
+      : await prisma.retirementFeeSetting.create({ data: { id: 1, ...input } });
     await auditLog({
       actorId: admin.id,
       action: "ADMIN_UPDATED_RETIREMENT_FEE_SETTINGS",

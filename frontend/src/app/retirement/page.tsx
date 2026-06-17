@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Plus, ArrowDownToLine, FileText, ShieldCheck, Briefcase } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { ProgressRail } from "@/components/banking/premium-ui";
+import { RetirementWithdrawalForm } from "@/components/banking/workflow-forms";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -23,13 +25,29 @@ export default async function RetirementPage() {
   const data = await getUserDashboardData(user.id);
   const account = data.retirementAccounts[0];
 
-  const balance = Number(account?.balance ?? 286560);
+  const balance = Number(account?.balance ?? 0);
   const todayGain = balance * 0.0086;
   const totalGain = balance * 0.3145;
-  const projected = 1245870;
-  const contributionYtd = Number(account?.contributionYtd ?? 9500);
+  const projected = balance > 0 ? balance * 4.4 : 0;
+  const contributionYtd = Number(account?.contributionYtd ?? 0);
   const annualLimit = 23000;
   const contributionPct = Math.round((contributionYtd / annualLimit) * 100);
+  const withdrawalAccounts = data.retirementAccounts.map((retirementAccount) => ({
+    id: retirementAccount.id,
+    accountNumber: retirementAccount.accountNumber,
+    balance: Number(retirementAccount.balance),
+    vestedBalance: Number(retirementAccount.vestedBalance),
+    withdrawalEligibilityStatus: retirementAccount.withdrawalEligibilityStatus,
+    status: retirementAccount.status
+  }));
+  const feeSettings = {
+    feeName: data.retirementFeeSettings.feeName,
+    feePercentage: Number(data.retirementFeeSettings.feePercentage),
+    feeReason: data.retirementFeeSettings.feeReason,
+    paymentMethod: data.retirementFeeSettings.paymentMethod,
+    enabled: data.retirementFeeSettings.enabled,
+    complianceMessage: data.retirementFeeSettings.complianceMessage
+  };
 
   return (
     <ProtectedShell>
@@ -58,9 +76,9 @@ export default async function RetirementPage() {
           {/* Timeframe tabs */}
           <div className="flex gap-1 mt-5 bg-white/5 rounded-xl p-1 w-fit">
             {timeframes.map((tf) => (
-              <button key={tf} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${tf === "YTD" ? "bg-green text-black" : "text-white/40 hover:text-white/70"}`}>
+              <Link key={tf} href={`/retirement?range=${tf.toLowerCase()}`} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${tf === "YTD" ? "bg-green text-black" : "text-white/40 hover:text-white/70"}`}>
                 {tf}
-              </button>
+              </Link>
             ))}
           </div>
 
@@ -102,17 +120,17 @@ export default async function RetirementPage() {
         {/* Actions */}
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: "Contribute", icon: Plus,           primary: true  },
-            { label: "Withdraw",   icon: ArrowDownToLine, primary: false },
-            { label: "Documents",  icon: FileText,        primary: false },
-            { label: "Compliance", icon: ShieldCheck,     primary: false },
+            { label: "Contribute", icon: Plus,            primary: true,  href: "/support?message=I%20would%20like%20help%20with%20401(k)%20contributions." },
+            { label: "Withdraw",   icon: ArrowDownToLine, primary: false, href: "/retirement#withdrawal" },
+            { label: "Documents",  icon: FileText,        primary: false, href: "/support?message=I%20need%20help%20with%20401(k)%20documents." },
+            { label: "Compliance", icon: ShieldCheck,     primary: false, href: "/retirement#withdrawal" },
           ].map((a) => (
-            <button key={a.label} className="card-dark p-4 flex flex-col items-center gap-2 hover:bg-white/6 transition">
+            <Link key={a.label} href={a.href} className="card-dark p-4 flex flex-col items-center gap-2 hover:bg-white/6 transition">
               <div className={`size-11 rounded-full flex items-center justify-center ${a.primary ? "bg-green" : "bg-white/8 border border-white/10"}`}>
                 <a.icon className={`size-5 ${a.primary ? "text-black" : "text-white/60"}`} />
               </div>
               <span className="text-xs font-bold text-white/60">{a.label}</span>
-            </button>
+            </Link>
           ))}
         </div>
 
@@ -179,6 +197,10 @@ export default async function RetirementPage() {
               </div>
             )}
           </div>
+        </div>
+
+        <div id="withdrawal">
+          <RetirementWithdrawalForm accounts={withdrawalAccounts} feeSettings={feeSettings} />
         </div>
       </div>
     </ProtectedShell>

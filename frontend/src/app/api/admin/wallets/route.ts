@@ -12,6 +12,7 @@ const schema = z.object({
   network: z.string().min(2),
   label: z.string().min(2),
   qrCodeUrl: z.string().optional(),
+  depositInstructions: z.string().optional(),
   enabled: z.boolean().default(true)
 });
 

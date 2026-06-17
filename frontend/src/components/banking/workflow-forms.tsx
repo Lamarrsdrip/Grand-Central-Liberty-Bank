@@ -13,7 +13,12 @@ import { formatCurrency } from "@/lib/utils";
 
 type Account = { id: string; type: string; accountNumber: string; availableBalance: unknown; currency: string };
 type TransferSettings = { reviewMessage: string; buttonText: string; supportInstructions: string };
-type Ticket = { id: string; subject: string; status: string; messages: Array<{ id: string; body: string; senderId: string; createdAt: string }> };
+type Ticket = {
+  id: string;
+  subject: string;
+  status: string;
+  messages: Array<{ id: string; body: string; senderId: string; createdAt: string; attachmentUrl?: string | null }>;
+};
 type RetirementAccount = {
   id: string;
   accountNumber: string;
@@ -394,8 +399,11 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
   const [message, setMessage] = useState("");
   const [draftSubject, setDraftSubject] = useState("Support request");
   const [draftBody, setDraftBody] = useState("");
+  const [draftFile, setDraftFile] = useState<File | null>(null);
+  const [messageFile, setMessageFile] = useState<File | null>(null);
   const [seededSupportRequest, setSeededSupportRequest] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [busy, setBusy] = useState(false);
   const activeTicket = useMemo(() => tickets.find((ticket) => ticket.id === activeId), [tickets, activeId]);
 
   useEffect(() => {
@@ -455,16 +463,23 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
             className="grid gap-3 border-t pt-3"
             onSubmit={async (event) => {
               event.preventDefault();
+              setBusy(true);
               const formElement = event.currentTarget;
-              const data = await secureFetch("/api/support/tickets", {
-                method: "POST",
-                body: JSON.stringify({ subject: draftSubject, body: draftBody })
-              });
-              setTickets((current) => [data.ticket, ...current]);
-              setActiveId(data.ticket.id);
-              setDraftSubject("Support request");
-              setDraftBody("");
-              formElement.reset();
+              try {
+                const attachmentUrl = draftFile ? await uploadFile(draftFile, "support-attachments") : undefined;
+                const data = await secureFetch("/api/support/tickets", {
+                  method: "POST",
+                  body: JSON.stringify({ subject: draftSubject, body: draftBody, attachmentUrl })
+                });
+                setTickets((current) => [data.ticket, ...current]);
+                setActiveId(data.ticket.id);
+                setDraftSubject("Support request");
+                setDraftBody("");
+                setDraftFile(null);
+                formElement.reset();
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             <Input
@@ -481,7 +496,12 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
               value={draftBody}
               onChange={(event) => setDraftBody(event.target.value)}
             />
-            <Button size="sm">Open ticket</Button>
+            <Input
+              name="attachment"
+              type="file"
+              onChange={(event) => setDraftFile(event.target.files?.[0] ?? null)}
+            />
+            <Button size="sm" disabled={busy}>{busy ? "Opening..." : "Open ticket"}</Button>
           </form>
         </CardContent>
       </Card>
@@ -495,38 +515,53 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
             {activeTicket?.messages.map((item) => (
               <div key={item.id} className={`mb-3 max-w-[80%] rounded-lg p-3 text-sm ${item.senderId === userId ? "ml-auto bg-primary text-primary-foreground" : "bg-card"}`}>
                 {item.body}
+                {item.attachmentUrl ? (
+                  <a href={item.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 block text-xs font-black underline">
+                    View attachment
+                  </a>
+                ) : null}
               </div>
             ))}
           </div>
           {activeTicket ? (
             <form
-              className="flex gap-2"
+              className="grid gap-2 sm:grid-cols-[1fr_auto_auto]"
               onSubmit={async (event) => {
                 event.preventDefault();
-                if (!message.trim()) {
+                if (!message.trim() && !messageFile) {
                   return;
                 }
-                if (socket?.connected) {
+                setBusy(true);
+                const text = message.trim() || "Attachment uploaded";
+                try {
+                  const attachmentUrl = messageFile ? await uploadFile(messageFile, "support-attachments") : undefined;
+                  if (socket?.connected && !attachmentUrl) {
                   socket.emit("send_support_message", { ticketId: activeTicket.id, body: message }, (response: { error?: string }) => {
                     if (response?.error) {
                       window.alert(response.error);
                     }
                   });
-                } else {
-                  const data = await secureFetch("/api/support/messages", {
-                    method: "POST",
-                    body: JSON.stringify({ ticketId: activeTicket.id, body: message })
-                  });
-                  setTickets((current) =>
-                    current.map((ticket) =>
-                      ticket.id === activeTicket.id ? { ...ticket, messages: [...ticket.messages, data.message] } : ticket
-                    )
-                  );
+                  } else {
+                    const data = await secureFetch("/api/support/messages", {
+                      method: "POST",
+                      body: JSON.stringify({ ticketId: activeTicket.id, body: text, attachmentUrl })
+                    });
+                    setTickets((current) =>
+                      current.map((ticket) =>
+                        ticket.id === activeTicket.id ? { ...ticket, messages: [...ticket.messages, data.message] } : ticket
+                      )
+                    );
+                  }
+                  setMessage("");
+                  setMessageFile(null);
+                  event.currentTarget.reset();
+                } finally {
+                  setBusy(false);
                 }
-                setMessage("");
               }}
             >
               <Input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Type your message..." />
+              <Input className="sm:w-56" type="file" onChange={(event) => setMessageFile(event.target.files?.[0] ?? null)} />
               <Button type="submit" size="icon" aria-label="Send message">
                 <Send data-icon="inline-start" />
               </Button>
