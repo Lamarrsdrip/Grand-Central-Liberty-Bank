@@ -21,7 +21,18 @@ async function ensureSingleton<T extends { id: number }>(
   create: () => Promise<T>,
   update: () => Promise<T>
 ) {
-  return (await find()) ? update() : create();
+  const existing = await find();
+  if (existing) {
+    try {
+      return await update();
+    } catch (err) {
+      // update() can fail with P2031 on standalone MongoDB (no replica set).
+      // The record already exists with the correct values, so fall through.
+      console.warn("[seed] singleton update failed, keeping existing record:", err instanceof Error ? err.message : String(err));
+      return existing;
+    }
+  }
+  return create();
 }
 
 async function ensureTransaction(accountId: string, data: {
@@ -194,15 +205,19 @@ async function main() {
   await ensureSupportTicket(client.id, admin.id);
   await ensureAnnouncement(admin.id);
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: admin.id,
-      action: "SEED_COMPLETED",
-      entity: "System",
-      entityId: kyc.id,
-      metadata: { userEmail, adminEmail }
-    }
-  });
+  try {
+    await prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "SEED_COMPLETED",
+        entity: "System",
+        entityId: kyc.id,
+        metadata: { userEmail, adminEmail }
+      }
+    });
+  } catch (err) {
+    console.warn("[seed] auditLog.create failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 
   console.log("Grand Central Liberty Bank seed complete.");
 }

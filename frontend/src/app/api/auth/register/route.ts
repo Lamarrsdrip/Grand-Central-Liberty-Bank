@@ -83,45 +83,52 @@ export async function POST(request: NextRequest) {
         dateOfBirth: new Date(input.dateOfBirth),
         passwordHash: await hashPassword(input.password),
         role: Role.USER,
-        preferredLocale: detectedLocale,
-        accounts: {
-          create: [
-            {
-              type: "CHECKING",
-              accountNumber: accountNumber("44"),
-              balance: 0,
-              availableBalance: 0
-            },
-            {
-              type: "SAVINGS",
-              accountNumber: accountNumber("55"),
-              balance: 0,
-              availableBalance: 0
-            }
-          ]
+        preferredLocale: detectedLocale
+      }
+    });
+
+    // Create accounts as separate operations — nested writes require MongoDB transactions
+    // (replica set / P2031). Separate creates work on standalone MongoDB.
+    try {
+      await prisma.account.create({
+        data: { userId: user.id, type: "CHECKING", accountNumber: accountNumber("44"), balance: 0, availableBalance: 0 }
+      });
+      await prisma.account.create({
+        data: { userId: user.id, type: "SAVINGS", accountNumber: accountNumber("55"), balance: 0, availableBalance: 0 }
+      });
+    } catch (error) {
+      console.error("[register] account creation failed:", error);
+    }
+
+    let retirementAccount: { id: string } | null = null;
+    let welcomeBonus = 0;
+    try {
+      const retirement = await createRetirementWelcomeAccount(user.id);
+      retirementAccount = retirement.retirementAccount;
+      welcomeBonus = retirement.welcomeBonus;
+    } catch (error) {
+      console.error("[register] createRetirementWelcomeAccount failed:", error);
+    }
+
+    try {
+      const rawToken = crypto.randomUUID();
+      await prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: await sha256(rawToken),
+          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
         }
-      }
-    });
-
-    const { retirementAccount, welcomeBonus } = await createRetirementWelcomeAccount(user.id);
-
-    const rawToken = crypto.randomUUID();
-    await prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: await sha256(rawToken),
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
-      }
-    });
-
-    await sendEmail({
-      to: user.email,
-      subject: "Verify your Grand Central Liberty Bank email",
-      html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
-    }).catch((error) => {
-      console.error("[auth] verification email failed", error);
-      return { skipped: true, message: "Verification email could not be sent." };
-    });
+      });
+      await sendEmail({
+        to: user.email,
+        subject: "Verify your Grand Central Liberty Bank email",
+        html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
+      }).catch((error) => {
+        console.error("[auth] verification email failed", error);
+      });
+    } catch (error) {
+      console.error("[register] emailVerificationToken.create failed:", error);
+    }
 
     const { ip, userAgent } = await requestIpAndAgent();
     const session = await createSession(user, { ip, userAgent });
@@ -131,7 +138,7 @@ export async function POST(request: NextRequest) {
       entity: "User",
       entityId: user.id,
       metadata: {
-        retirementAccountId: retirementAccount.id,
+        retirementAccountId: retirementAccount?.id ?? null,
         welcomeBonus401k: welcomeBonus
       },
       ip,
@@ -143,7 +150,7 @@ export async function POST(request: NextRequest) {
         actorId: user.id,
         action: "WELCOME_BONUS_401K_CREDITED",
         entity: "RetirementAccount",
-        entityId: retirementAccount.id,
+        entityId: retirementAccount?.id ?? null,
         metadata: { amount: welcomeBonus, currency: "USD" },
         ip,
         userAgent

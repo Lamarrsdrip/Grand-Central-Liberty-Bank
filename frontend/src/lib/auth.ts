@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { jwtVerify, SignJWT } from "jose";
 import { Role, UserStatus } from "@prisma/client";
@@ -90,24 +90,23 @@ export async function sha256(value: string) {
 
 export async function createSession(user: { id: string; role: Role }, options?: { ip?: string; userAgent?: string }) {
   const expiresAt = new Date(Date.now() + sessionTtlHours() * 60 * 60 * 1000);
+  // Pre-generate a MongoDB-compatible ObjectId (12 random bytes → 24-char hex).
+  // Signing the JWT before the DB write lets us set the real tokenHash in one
+  // create call, eliminating the follow-up session.update that triggers P2031
+  // on standalone (non-replica-set) MongoDB.
+  const sessionId = randomBytes(12).toString("hex");
+  const token = await signSessionToken({ sessionId, userId: user.id, role: user.role });
+  const tokenHash = await sha256(token);
+
   const session = await prisma.session.create({
     data: {
+      id: sessionId,
       userId: user.id,
-      tokenHash: crypto.randomUUID(),
+      tokenHash,
       ip: options?.ip,
       userAgent: options?.userAgent,
       expiresAt
     }
-  });
-  const token = await signSessionToken({
-    sessionId: session.id,
-    userId: user.id,
-    role: user.role
-  });
-
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { tokenHash: await sha256(token) }
   });
 
   return { token, expiresAt, sessionId: session.id };
