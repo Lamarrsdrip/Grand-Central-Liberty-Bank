@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, CreditCard, Bell } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
+import { CryptoIcon } from "@/components/banking/crypto-icons";
 import {
   AccountCard, CustomerTopBar, InsightPanel,
   MarketStrip, MiniChart, QuickActions,
@@ -158,7 +159,14 @@ export default async function DashboardPage() {
               <span className="text-xs font-bold text-green bg-green/10 px-2 py-0.5 rounded-full">+3.8%</span>
             </div>
             <p className="text-xl font-black text-white">{money(crypto)}</p>
-            <p className="text-xs text-white/30 mt-0.5">{data.wallets.length} active networks</p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="text-xs text-white/30">{data.wallets.length} active networks</p>
+              <div className="flex -space-x-2">
+                {["BTC", "ETH", "USDT", "SOL"].map((symbol) => (
+                  <CryptoIcon key={symbol} symbol={symbol} className="size-7 border border-[#161c28]" />
+                ))}
+              </div>
+            </div>
             <MiniChart className="mt-3 h-10 w-full" color="#f59e0b"
               path="M0 30 C14 20 26 28 40 14 C52 4 64 18 80 8" />
           </Link>

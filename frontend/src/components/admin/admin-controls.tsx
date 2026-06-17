@@ -6,6 +6,7 @@ import { Send } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CryptoIcon } from "@/components/banking/crypto-icons";
 import { Field, Input, Label, Select, Textarea } from "@/components/ui/input";
 import { secureFetch } from "@/lib/client-api";
 import { LOCALE_LABELS, SUPPORTED_LOCALES, type SupportedLocale } from "@/lib/locales";
@@ -502,9 +503,12 @@ export function WalletManagementPanel({ wallets }: { wallets: WalletRecord[] }) 
         {wallets.map((wallet) => (
           <div key={wallet.id} className="rounded-2xl border p-4">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+              <div className="flex items-start gap-3">
+                <CryptoIcon symbol={wallet.symbol} className="size-11" />
+                <div>
                 <p className="font-black">{wallet.coin} ({wallet.symbol})</p>
                 <p className="break-all text-xs text-muted-foreground">{wallet.network} - {wallet.address}</p>
+                </div>
               </div>
               <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${wallet.enabled ? "bg-emerald-400/15 text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                 {wallet.enabled ? "Enabled" : "Disabled"}
@@ -700,8 +704,22 @@ export function BankSettingsForm({ settings }: { settings: Record<string, unknow
             <Field><Label>Support email</Label><Input name="supportEmail" type="email" defaultValue={String(settings.supportEmail)} required /></Field>
             <Field><Label>Support phone</Label><Input name="supportPhone" defaultValue={String(settings.supportPhone)} required /></Field>
             <Field><Label>Default locale</Label><Select name="defaultLocale" defaultValue={String(settings.defaultLocale)}>{SUPPORTED_LOCALES.map((code) => (<option key={code} value={code}>{LOCALE_LABELS[code as SupportedLocale]}</option>))}</Select></Field>
+            <Field>
+              <Label>401(k) welcome bonus</Label>
+              <Input name="welcomeBonusAmount" type="number" min="0" step="0.01" defaultValue={String(settings.welcomeBonusAmount ?? 500)} />
+            </Field>
+            <Field>
+              <Label>Welcome bonus status</Label>
+              <Select name="welcomeBonusEnabled" defaultValue={String(settings.welcomeBonusEnabled ?? true)}>
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </Select>
+            </Field>
             {SUPPORTED_LOCALES.map((code) => (<input key={code} type="hidden" name="supportedLocales[]" value={code} />))}
             <Field className="sm:col-span-2"><Label>Bank address</Label><Input name="bankAddress" defaultValue={String(settings.bankAddress)} required /></Field>
+            <p className="rounded-2xl border border-emerald-400/15 bg-emerald-400/10 p-3 text-xs font-semibold leading-5 text-emerald-100 sm:col-span-2">
+              The welcome bonus is credited only to new user 401(k) retirement accounts as a contribution record. Checking, savings, crypto, and card balances are not credited.
+            </p>
             <Field className="sm:col-span-2"><Label>Terms</Label><Textarea name="terms" defaultValue={String(settings.terms)} required /></Field>
             <Field className="sm:col-span-2"><Label>Privacy policy</Label><Textarea name="privacyPolicy" defaultValue={String(settings.privacyPolicy)} required /></Field>
           </div>

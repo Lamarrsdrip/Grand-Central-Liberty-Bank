@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowDownToLine, ArrowUpFromLine, Check, Copy, QrCode, RefreshCcw, Send, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Label, Select, Textarea } from "@/components/ui/input";
+import { CryptoIcon } from "@/components/banking/crypto-icons";
 import { MiniChart } from "@/components/banking/premium-ui";
 import { cryptoAssets, money } from "@/components/banking/finance";
 import { secureFetch } from "@/lib/client-api";
@@ -118,7 +119,10 @@ export function WalletFlow({
           <div className="space-y-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-white/40">Selected wallet</p>
-              <h3 className="mt-1 text-xl font-black text-white">{selectedWallet.coin} {selectedWallet.network}</h3>
+              <div className="mt-1 flex items-center gap-3">
+                <CryptoIcon symbol={selectedWallet.symbol} className="size-10" />
+                <h3 className="text-xl font-black text-white">{selectedWallet.coin} {selectedWallet.network}</h3>
+              </div>
               <p className="text-sm text-white/45">{selectedWallet.label}</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
@@ -289,7 +293,7 @@ export function WalletFlow({
           <div className="mt-4 space-y-3">
             {cryptoAssets.slice(0, 4).map((coin) => (
               <div key={coin.symbol} className="flex items-center gap-3">
-                <div className="size-9 rounded-full text-black grid place-items-center text-xs font-black" style={{ background: coin.color }}>{coin.symbol[0]}</div>
+                <CryptoIcon symbol={coin.symbol} className="size-9" />
                 <div className="flex-1">
                   <p className="text-sm font-black text-white">{coin.symbol}</p>
                   <p className="text-xs text-white/40">{coin.name}</p>

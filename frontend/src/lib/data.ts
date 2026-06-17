@@ -19,6 +19,8 @@ export async function getBankSettings() {
       websiteUrl: "https://grandcentrallibertybank.com",
       defaultLocale: "en",
       supportedLocales: [...SUPPORTED_LOCALES],
+      welcomeBonusEnabled: true,
+      welcomeBonusAmount: 500,
       terms: "Grand Central Liberty Bank terms are managed by the bank operations team.",
       privacyPolicy: "Grand Central Liberty Bank privacy policy is managed by the bank operations team.",
       updatedAt: new Date()
@@ -121,6 +123,16 @@ export async function getUserSupportTickets(userId: string) {
           }
         }
       }
+    }
+  });
+}
+
+export async function getUnreadSupportReplyCount(userId: string) {
+  return prisma.supportMessage.count({
+    where: {
+      readAt: null,
+      senderId: { not: userId },
+      ticket: { userId }
     }
   });
 }

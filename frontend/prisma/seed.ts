@@ -54,6 +54,8 @@ async function main() {
         websiteUrl: "https://grandcentrallibertybank.com",
         defaultLocale: "en",
         supportedLocales: ["en", "es", "fr"],
+        welcomeBonusEnabled: true,
+        welcomeBonusAmount: 500,
         terms:
           "Grand Central Liberty Bank provides digital account services subject to customer verification, account controls, and bank review procedures.",
         privacyPolicy:

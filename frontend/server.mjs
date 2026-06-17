@@ -59,11 +59,21 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-async function authenticateSocket(socket) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("JWT_SECRET must be configured for live chat.");
+function authSecret() {
+  const raw =
+    process.env.JWT_SECRET ||
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    process.env.CSRF_SECRET ||
+    process.env.SETTINGS_MASTER_KEY;
+  if (!raw) {
+    throw new Error("JWT secret is not configured.");
   }
+  return raw.length >= 32 ? raw : createHash("sha256").update(raw).digest("hex");
+}
+
+async function authenticateSocket(socket) {
+  const secret = authSecret();
   const token = parseCookie(socket.handshake.headers.cookie).gclb_session;
   if (!token) {
     throw new Error("Missing session cookie.");

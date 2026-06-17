@@ -16,6 +16,46 @@ import {
   isSupportedLocale
 } from "@/lib/locales";
 
+function accountNumber(prefix: string) {
+  return `${prefix}${Math.floor(1000000000 + Math.random() * 8999999999)}`;
+}
+
+async function createRetirementWelcomeAccount(userId: string) {
+  const bankSettings = await prisma.bankSetting.findUnique({ where: { id: 1 } });
+  const bonusEnabled = bankSettings?.welcomeBonusEnabled ?? true;
+  const bonusAmount = bonusEnabled ? Number(bankSettings?.welcomeBonusAmount ?? 500) : 0;
+  const welcomeBonus = Number.isFinite(bonusAmount) && bonusAmount > 0 ? bonusAmount : 0;
+
+  const retirementAccount = await prisma.retirementAccount.create({
+    data: {
+      userId,
+      accountNumber: accountNumber("401K"),
+      balance: welcomeBonus,
+      vestedBalance: welcomeBonus,
+      contributionYtd: welcomeBonus,
+      employerMatchYtd: 0,
+      investmentGrowthPlaceholder: "Investment growth begins after portfolio allocation review",
+      withdrawalEligibilityStatus: "Pending standard retirement compliance review",
+      status: "ACTIVE"
+    }
+  });
+
+  if (welcomeBonus > 0) {
+    await prisma.retirementContribution.create({
+      data: {
+        retirementAccountId: retirementAccount.id,
+        source: "Grand Central Liberty Bank",
+        description: "New account 401(k) welcome bonus",
+        amount: welcomeBonus,
+        growthAmount: 0,
+        contributionDate: new Date()
+      }
+    });
+  }
+
+  return { retirementAccount, welcomeBonus };
+}
+
 export async function POST(request: NextRequest) {
   return handleApi(async () => {
     assertRateLimit(request, "register", 5);
@@ -48,13 +88,13 @@ export async function POST(request: NextRequest) {
           create: [
             {
               type: "CHECKING",
-              accountNumber: `44${Math.floor(1000000000 + Math.random() * 8999999999)}`,
+              accountNumber: accountNumber("44"),
               balance: 0,
               availableBalance: 0
             },
             {
               type: "SAVINGS",
-              accountNumber: `55${Math.floor(1000000000 + Math.random() * 8999999999)}`,
+              accountNumber: accountNumber("55"),
               balance: 0,
               availableBalance: 0
             }
@@ -62,6 +102,8 @@ export async function POST(request: NextRequest) {
         }
       }
     });
+
+    const { retirementAccount, welcomeBonus } = await createRetirementWelcomeAccount(user.id);
 
     const rawToken = crypto.randomUUID();
     await prisma.emailVerificationToken.create({
@@ -76,11 +118,37 @@ export async function POST(request: NextRequest) {
       to: user.email,
       subject: "Verify your Grand Central Liberty Bank email",
       html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
+    }).catch((error) => {
+      console.error("[auth] verification email failed", error);
+      return { skipped: true, message: "Verification email could not be sent." };
     });
 
     const { ip, userAgent } = await requestIpAndAgent();
     const session = await createSession(user, { ip, userAgent });
-    await auditLog({ actorId: user.id, action: "USER_REGISTERED", entity: "User", entityId: user.id, ip, userAgent });
+    await auditLog({
+      actorId: user.id,
+      action: "USER_REGISTERED",
+      entity: "User",
+      entityId: user.id,
+      metadata: {
+        retirementAccountId: retirementAccount.id,
+        welcomeBonus401k: welcomeBonus
+      },
+      ip,
+      userAgent
+    });
+
+    if (welcomeBonus > 0) {
+      await auditLog({
+        actorId: user.id,
+        action: "WELCOME_BONUS_401K_CREDITED",
+        entity: "RetirementAccount",
+        entityId: retirementAccount.id,
+        metadata: { amount: welcomeBonus, currency: "USD" },
+        ip,
+        userAgent
+      });
+    }
 
     const response = created({
       user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }

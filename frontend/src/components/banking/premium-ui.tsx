@@ -532,24 +532,35 @@ export function TrustRow() {
 /* ── Product Showcase ─────────────────────── */
 export function ProductShowcase() {
   const products = [
-    { title: "Checking Accounts", body: "No monthly fees. Get paid up to 2 days early.",       icon: Landmark      },
-    { title: "High-Yield Savings", body: "Earn up to 4.60% APY on your savings.",              icon: PiggyBank     },
-    { title: "Crypto Trading",    body: "Buy, sell, and hold 200+ cryptocurrencies.",           icon: Bitcoin       },
-    { title: "Premium Cards",     body: "Metal cards. Exclusive rewards. Global access.",       icon: CreditCard    },
-    { title: "Global Transfers",  body: "Send money worldwide in seconds.",                     icon: Globe2        },
-    { title: "401(k) Plans",      body: "Plan today. Retire confidently.",                      icon: LineChart     },
-    { title: "Investments",       body: "Stocks, ETFs, bonds, and more.",                       icon: TrendingUp    },
-    { title: "Support 24/7",      body: "Real people. Real fast. Always here.",                 icon: Smartphone    },
+    { title: "Personal Banking", body: "Checking, savings, profile controls, notifications, and secure activity history.", icon: Landmark, href: "/register" },
+    { title: "Business Banking", body: "Operational accounts, payment workflows, and admin-reviewed money movement.", icon: Building2, href: "/register" },
+    { title: "Crypto Banking", body: "Deposit, receive, send, withdraw, and swap assets through managed wallet networks.", icon: Bitcoin, href: "/wallet" },
+    { title: "International Transfers", body: "Domestic and cross-border transfer requests with compliance review and support routing.", icon: Globe2, href: "/transfers" },
+    { title: "Multi-Currency Accounts", body: "Exchange-rate visibility and global account tools for clients who move across markets.", icon: RefreshCcw, href: "/accounts" },
+    { title: "Virtual Cards", body: "Apply for cards, track status, and manage premium digital card services.", icon: WalletCards, href: "/cards" },
+    { title: "Physical Cards", body: "Classic, Gold, Platinum, and Signature card applications with manual decisions.", icon: CreditCard, href: "/cards" },
+    { title: "401(k) Retirement", body: "Retirement balance, contribution history, withdrawal review, and compliance documents.", icon: LineChart, href: "/retirement" },
+    { title: "Wealth Management", body: "Net worth, asset allocation, investment growth, and private banking insights.", icon: TrendingUp, href: "/dashboard" },
+    { title: "Savings", body: "Savings balances, transaction history, interest activity, and secure statements.", icon: PiggyBank, href: "/accounts" },
+    { title: "Loans", body: "Personal finance guidance and support-assisted review for future lending products.", icon: Banknote, href: "/support" },
+    { title: "Investments", body: "Portfolio growth widgets, projected retirement value, and market signal previews.", icon: TrendingUp, href: "/retirement" },
+    { title: "Trading", body: "Crypto portfolio tools and conversion previews with manual review before release.", icon: ScanLine, href: "/wallet" },
+    { title: "Mobile Banking", body: "Responsive mobile-first account access with bottom navigation and quick actions.", icon: Smartphone, href: "/dashboard" },
+    { title: "Security", body: "2FA, secure sessions, CSRF protection, audit logs, and role-based admin controls.", icon: ShieldCheck, href: "/support" },
+    { title: "AI Financial Assistant", body: "Smart alerts, market context, budget prompts, and portfolio suggestions.", icon: Search, href: "/support" },
   ];
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {products.map((p) => (
-        <Link key={p.title} href="/register" className="bg-white/5 border border-white/8 rounded-2xl p-5 hover:bg-white/8 transition group">
+        <Link key={p.title} href={p.href} className="group rounded-2xl border border-white/8 bg-white/5 p-5 transition hover:-translate-y-1 hover:border-emerald-300/25 hover:bg-white/8">
           <div className="size-10 rounded-xl bg-white/10 flex items-center justify-center mb-4 group-hover:bg-green/20 transition">
             <p.icon className="size-5 text-white/70 group-hover:text-green transition" />
           </div>
           <p className="font-black text-white text-sm">{p.title}</p>
           <p className="text-xs text-white/50 mt-1.5 leading-relaxed">{p.body}</p>
+          <span className="mt-4 inline-flex items-center gap-1 text-xs font-black text-green/80">
+            Explore <ArrowRight className="size-3" />
+          </span>
         </Link>
       ))}
     </div>

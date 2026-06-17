@@ -477,6 +477,8 @@ model BankSetting {
   supportedLocales String[]
   terms         String
   privacyPolicy String
+  welcomeBonusEnabled Boolean?
+  welcomeBonusAmount Float?
   updatedAt     DateTime @updatedAt
 }
 

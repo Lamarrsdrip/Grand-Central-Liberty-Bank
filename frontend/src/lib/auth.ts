@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { createHash } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { jwtVerify, SignJWT } from "jose";
 import { Role, UserStatus } from "@prisma/client";
@@ -26,12 +27,24 @@ export type AuthenticatedUser = {
 };
 
 function jwtSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("JWT_SECRET must be at least 32 characters.");
+  const raw =
+    process.env.JWT_SECRET ||
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    process.env.CSRF_SECRET ||
+    process.env.SETTINGS_MASTER_KEY;
+
+  if (!raw) {
+    throw new Error("JWT_SECRET, AUTH_SECRET, NEXTAUTH_SECRET, CSRF_SECRET, or SETTINGS_MASTER_KEY must be configured.");
   }
 
+  const secret = raw.length >= 32 ? raw : createHash("sha256").update(raw).digest("hex");
   return new TextEncoder().encode(secret);
+}
+
+function sessionTtlHours() {
+  const value = Number(process.env.SESSION_TTL_HOURS ?? 12);
+  return Number.isFinite(value) && value > 0 ? value : 12;
 }
 
 export async function hashPassword(password: string) {
@@ -43,7 +56,7 @@ export async function verifyPassword(password: string, hash: string) {
 }
 
 export async function signSessionToken(payload: SessionTokenPayload) {
-  const ttlHours = Number(process.env.SESSION_TTL_HOURS ?? 12);
+  const ttlHours = sessionTtlHours();
 
   return new SignJWT({ role: payload.role })
     .setProtectedHeader({ alg: "HS256" })
@@ -76,7 +89,7 @@ export async function sha256(value: string) {
 }
 
 export async function createSession(user: { id: string; role: Role }, options?: { ip?: string; userAgent?: string }) {
-  const expiresAt = new Date(Date.now() + Number(process.env.SESSION_TTL_HOURS ?? 12) * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + sessionTtlHours() * 60 * 60 * 1000);
   const session = await prisma.session.create({
     data: {
       userId: user.id,

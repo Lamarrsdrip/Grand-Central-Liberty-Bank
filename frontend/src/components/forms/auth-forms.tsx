@@ -13,8 +13,10 @@ function Status({ message }: { message: string }) {
 
 export function LoginForm() {
   const router = useRouter();
+  const params = useSearchParams();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const supportPrompt = params.get("support") === "1";
 
   return (
     <Card>
@@ -48,6 +50,11 @@ export function LoginForm() {
             }
           }}
         >
+          {supportPrompt ? (
+            <p className="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-emerald-100">
+              Sign in or create an account to open a secure live support chat.
+            </p>
+          ) : null}
           <Status message={message} />
           <FieldGroup>
             <Field>

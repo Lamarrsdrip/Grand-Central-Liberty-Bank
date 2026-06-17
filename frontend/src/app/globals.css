@@ -298,13 +298,82 @@ button, input, textarea, select {
 
 .landing-hero-bg {
   background:
-    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(34, 197, 94, 0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(8,12,20,0.88) 0%, rgba(8,12,20,0.72) 42%, #080c14 100%),
+    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(34, 197, 94, 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
     #080c14;
 }
 
 .hero-card-glow {
   filter: drop-shadow(0 32px 80px rgba(34, 197, 94, 0.2));
+}
+
+.landing-grid-mask {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(circle at 50% 15%, black 0%, transparent 68%);
+}
+
+.landing-visual-stage {
+  position: relative;
+  min-height: 36rem;
+  isolation: isolate;
+}
+
+.landing-notification,
+.landing-portfolio-widget {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(17, 24, 39, 0.82);
+  border-radius: 1.25rem;
+  padding: 0.75rem;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+  animation: landing-float 7s ease-in-out infinite;
+}
+
+.landing-portfolio-widget {
+  display: block;
+  padding: 1rem;
+  animation-delay: 900ms;
+}
+
+.landing-asset-stack {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  animation: landing-float 8s ease-in-out infinite;
+  animation-delay: 500ms;
+}
+
+.landing-asset-stack > * + * {
+  margin-left: -0.6rem;
+}
+
+.landing-world-card {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(34,197,94,0.16), transparent 34%),
+    linear-gradient(135deg, rgba(17,24,39,0.92), rgba(8,12,20,0.88));
+  padding: 1.25rem;
+  box-shadow: 0 30px 90px rgba(0,0,0,0.28);
+}
+
+.stat-count {
+  animation: counter-up 700ms ease both;
+}
+
+@keyframes landing-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
 }
 
 /* ── Crypto coin row ─────────────────────── */
@@ -469,6 +538,17 @@ button, input, textarea, select {
   backdrop-filter: blur(24px);
 }
 
+.floating-support-button {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+}
+
 @media (max-width: 640px) {
   input,
   textarea,
@@ -491,5 +571,10 @@ button, input, textarea, select {
   .luxury-surface,
   .assets-hero {
     max-width: 100%;
+  }
+
+  .floating-support-button {
+    right: max(0.85rem, env(safe-area-inset-right));
+    bottom: calc(5.75rem + env(safe-area-inset-bottom));
   }
 }

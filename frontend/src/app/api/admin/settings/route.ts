@@ -16,6 +16,8 @@ const schema = z.object({
   websiteUrl: z.string().url(),
   defaultLocale: localeEnum,
   supportedLocales: z.array(localeEnum).min(1),
+  welcomeBonusEnabled: z.boolean().default(false),
+  welcomeBonusAmount: z.coerce.number().min(0).default(0),
   terms: z.string().min(20),
   privacyPolicy: z.string().min(20)
 });
@@ -42,7 +44,12 @@ export async function PUT(request: NextRequest) {
       action: "ADMIN_UPDATED_BANK_SETTINGS",
       entity: "BankSetting",
       entityId: "1",
-      metadata: { bankName: input.bankName, defaultLocale: input.defaultLocale },
+      metadata: {
+        bankName: input.bankName,
+        defaultLocale: input.defaultLocale,
+        welcomeBonusEnabled: input.welcomeBonusEnabled,
+        welcomeBonusAmount: input.welcomeBonusAmount
+      },
       ip,
       userAgent
     });
