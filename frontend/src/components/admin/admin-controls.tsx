@@ -1,7 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Send } from "lucide-react";
+import { io, Socket } from "socket.io-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Label, Select, Textarea } from "@/components/ui/input";
@@ -10,6 +12,14 @@ import { LOCALE_LABELS, SUPPORTED_LOCALES, type SupportedLocale } from "@/lib/lo
 
 function Notice({ message }: { message: string }) {
   return message ? <p className="rounded-md bg-secondary px-3 py-2 text-sm font-semibold">{message}</p> : null;
+}
+
+async function uploadAdminFile(file: File, folder: string) {
+  const form = new FormData();
+  form.set("file", file);
+  form.set("folder", folder);
+  const response = await secureFetch("/api/upload", { method: "POST", body: form });
+  return response.url as string;
 }
 
 export function AdminJsonForm({
@@ -86,6 +96,35 @@ export function UserStatusControl({ userId }: { userId: string }) {
           <option value="ACTIVATE">Activate</option>
         </Select>
         <Input name="reason" placeholder="Required reason" required />
+      </div>
+    </AdminJsonForm>
+  );
+}
+
+export function UserProfileEditControl({
+  user
+}: {
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    country: string;
+    address: string;
+  };
+}) {
+  return (
+    <AdminJsonForm endpoint={`/api/admin/users/${user.id}`} buttonLabel="Save user profile">
+      <input type="hidden" name="action" value="EDIT_PROFILE" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field><Label>First name</Label><Input name="firstName" defaultValue={user.firstName} required /></Field>
+        <Field><Label>Last name</Label><Input name="lastName" defaultValue={user.lastName} required /></Field>
+        <Field><Label>Email</Label><Input name="email" type="email" defaultValue={user.email} required /></Field>
+        <Field><Label>Phone</Label><Input name="phone" defaultValue={user.phone} required /></Field>
+        <Field><Label>Country</Label><Input name="country" defaultValue={user.country} required /></Field>
+        <Field><Label>Address</Label><Input name="address" defaultValue={user.address} required /></Field>
+        <Field className="sm:col-span-2"><Label>Reason</Label><Input name="reason" placeholder="Required audit reason" required /></Field>
       </div>
     </AdminJsonForm>
   );
@@ -210,6 +249,208 @@ export function SupportStatusControl({ id }: { id: string }) {
         <span className="text-sm font-semibold text-muted-foreground">Assign to me</span>
       </div>
     </AdminJsonForm>
+  );
+}
+
+type AdminSupportTicket = {
+  id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  user: { id: string; firstName: string; lastName: string; email: string };
+  assignedAdmin?: { id: string; firstName: string; lastName: string; email: string } | null;
+  messages: Array<{
+    id: string;
+    body: string;
+    senderId: string;
+    createdAt: string;
+    attachmentUrl?: string | null;
+    senderName?: string;
+    senderRole?: string;
+  }>;
+};
+
+function appendSupportMessage(
+  tickets: AdminSupportTicket[],
+  ticketId: string,
+  message: AdminSupportTicket["messages"][number]
+) {
+  return tickets.map((ticket) => {
+    if (ticket.id !== ticketId || ticket.messages.some((item) => item.id === message.id)) {
+      return ticket;
+    }
+
+    return { ...ticket, status: ticket.status === "CLOSED" ? ticket.status : "ACTIVE", messages: [...ticket.messages, message] };
+  });
+}
+
+export function AdminSupportCenter({
+  tickets: initialTickets,
+  adminId
+}: {
+  tickets: AdminSupportTicket[];
+  adminId: string;
+}) {
+  const [tickets, setTickets] = useState(initialTickets);
+  const [activeId, setActiveId] = useState(initialTickets[0]?.id ?? "");
+  const [reply, setReply] = useState("");
+  const [replyFile, setReplyFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const activeTicket = useMemo(() => tickets.find((ticket) => ticket.id === activeId), [activeId, tickets]);
+
+  useEffect(() => setTickets(initialTickets), [initialTickets]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const nextSocket = io({ path: "/socket.io" });
+    setSocket(nextSocket);
+    nextSocket.emit("join_ticket", activeId);
+    nextSocket.on("support_message", (incoming: { ticketId: string; message: AdminSupportTicket["messages"][number] }) => {
+      setTickets((current) => appendSupportMessage(current, incoming.ticketId, incoming.message));
+    });
+    return () => {
+      nextSocket.disconnect();
+      setSocket(null);
+    };
+  }, [activeId]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Live Support Desk</CardTitle>
+        <CardDescription>Open chats, reply as an admin, assign tickets, and close or reopen conversations.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
+          <div className="grid max-h-[34rem] gap-2 overflow-y-auto pr-1">
+            {tickets.map((ticket) => (
+              <button
+                key={ticket.id}
+                type="button"
+                onClick={() => setActiveId(ticket.id)}
+                className={`rounded-2xl border p-4 text-left transition ${
+                  ticket.id === activeId ? "border-emerald-300/50 bg-emerald-400/12" : "border-white/10 bg-white/5 hover:bg-white/8"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-black text-white">{ticket.user.firstName} {ticket.user.lastName}</p>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.65rem] font-black text-white/70">{ticket.status}</span>
+                </div>
+                <p className="mt-1 truncate text-xs font-semibold text-muted-foreground">{ticket.subject}</p>
+                <p className="mt-2 text-[0.65rem] font-bold uppercase tracking-wider text-white/35">
+                  {ticket.messages.length} messages · {ticket.priority}
+                </p>
+              </button>
+            ))}
+            {!tickets.length ? (
+              <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm font-semibold text-muted-foreground">
+                No support conversations yet.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="min-w-0 rounded-3xl border border-white/10 bg-black/18 p-4">
+            {activeTicket ? (
+              <div className="grid gap-4">
+                <div className="flex flex-col gap-3 border-b border-white/10 pb-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-lg font-black text-white">{activeTicket.subject}</p>
+                    <p className="text-sm text-muted-foreground">{activeTicket.user.email}</p>
+                    <p className="mt-1 text-xs text-white/35">
+                      Assigned: {activeTicket.assignedAdmin ? `${activeTicket.assignedAdmin.firstName} ${activeTicket.assignedAdmin.lastName}` : "Unassigned"}
+                    </p>
+                  </div>
+                  <div className="w-full lg:w-[22rem]">
+                    <SupportStatusControl id={activeTicket.id} />
+                  </div>
+                </div>
+
+                <div className="max-h-[26rem] min-h-72 overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0f18] p-4">
+                  {activeTicket.messages.map((message) => {
+                    const mine = message.senderId === adminId;
+                    return (
+                      <div
+                        key={message.id}
+                        className={`mb-3 max-w-[88%] rounded-2xl p-3 text-sm ${mine ? "ml-auto bg-primary text-primary-foreground" : "bg-white/8 text-white"}`}
+                      >
+                        <p className={`mb-1 text-[0.65rem] font-black ${mine ? "text-black/55" : "text-white/40"}`}>
+                          {mine ? "You" : message.senderName ?? activeTicket.user.firstName}
+                        </p>
+                        <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                        {message.attachmentUrl ? (
+                          <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 block text-xs font-black underline">
+                            View attachment
+                          </a>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <form
+                  className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_14rem_auto]"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    const body = reply.trim();
+                    if ((!body && !replyFile) || !activeTicket) return;
+                    setBusy(true);
+                    try {
+                      const attachmentUrl = replyFile ? await uploadAdminFile(replyFile, "support-attachments") : undefined;
+                      const finalBody = body || "Attachment uploaded";
+                      if (socket?.connected && !attachmentUrl) {
+                        await new Promise<void>((resolve, reject) => {
+                          socket.emit(
+                            "send_support_message",
+                            { ticketId: activeTicket.id, body: finalBody },
+                            (response: { error?: string; message?: AdminSupportTicket["messages"][number] }) => {
+                              if (response?.error) {
+                                reject(new Error(response.error));
+                                return;
+                              }
+                              if (response?.message) {
+                                setTickets((current) => appendSupportMessage(current, activeTicket.id, response.message!));
+                              }
+                              resolve();
+                            }
+                          );
+                        });
+                      } else {
+                        const data = await secureFetch("/api/support/messages", {
+                          method: "POST",
+                          body: JSON.stringify({ ticketId: activeTicket.id, body: finalBody, attachmentUrl })
+                        });
+                        setTickets((current) => appendSupportMessage(current, activeTicket.id, {
+                          ...data.message,
+                          senderName: "You",
+                          senderRole: "ADMIN"
+                        }));
+                      }
+                      setReply("");
+                      setReplyFile(null);
+                      event.currentTarget.reset();
+                    } catch (error) {
+                      window.alert(error instanceof Error ? error.message : "Reply failed. Please try again.");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <Textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Reply to this customer..." className="min-h-14" />
+                  <Input type="file" onChange={(event) => setReplyFile(event.target.files?.[0] ?? null)} />
+                  <Button type="submit" disabled={busy || (!reply.trim() && !replyFile)} className="h-full min-h-14">
+                    <Send data-icon="inline-start" />
+                    Reply
+                  </Button>
+                </form>
+              </div>
+            ) : (
+              <p className="py-16 text-center text-sm font-semibold text-muted-foreground">Select a support ticket to begin.</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

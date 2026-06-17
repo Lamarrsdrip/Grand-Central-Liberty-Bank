@@ -105,6 +105,26 @@ export async function getUserDashboardData(userId: string) {
   };
 }
 
+export async function getUserSupportTickets(userId: string) {
+  return prisma.supportTicket.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    include: {
+      assignedAdmin: {
+        select: { id: true, firstName: true, lastName: true, email: true }
+      },
+      messages: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          sender: {
+            select: { id: true, firstName: true, lastName: true, role: true }
+          }
+        }
+      }
+    }
+  });
+}
+
 export async function getAdminData() {
   const [
     users,
@@ -134,7 +154,18 @@ export async function getAdminData() {
     prisma.cryptoWallet.findMany({ orderBy: [{ symbol: "asc" }] }),
     prisma.supportTicket.findMany({
       orderBy: { updatedAt: "desc" },
-      include: { user: true, assignedAdmin: true, messages: { orderBy: { createdAt: "asc" } } },
+      include: {
+        user: true,
+        assignedAdmin: true,
+        messages: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            sender: {
+              select: { id: true, firstName: true, lastName: true, role: true }
+            }
+          }
+        }
+      },
       take: 50
     }),
     prisma.emailSetting.findUnique({ where: { id: 1 } }),

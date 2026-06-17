@@ -43,6 +43,11 @@ export async function POST(request: NextRequest) {
         senderId: user.id,
         body: plainText(input.body),
         attachmentUrl: input.attachmentUrl
+      },
+      include: {
+        sender: {
+          select: { firstName: true, lastName: true, role: true }
+        }
       }
     });
     await prisma.supportTicket.update({
@@ -60,6 +65,16 @@ export async function POST(request: NextRequest) {
     }
     await auditLog({ actorId: user.id, action: "SUPPORT_MESSAGE_SENT", entity: "SupportTicket", entityId: ticket.id });
 
-    return created({ message });
+    return created({
+      message: {
+        id: message.id,
+        body: message.body,
+        senderId: message.senderId,
+        attachmentUrl: message.attachmentUrl,
+        createdAt: message.createdAt,
+        senderName: `${message.sender.firstName} ${message.sender.lastName}`,
+        senderRole: message.sender.role
+      }
+    });
   });
 }

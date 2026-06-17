@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Plus, ShoppingCart, ArrowDownToLine } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { AccountCard } from "@/components/banking/premium-ui";
-import { money, accountLabel } from "@/components/banking/finance";
+import { accountLabel } from "@/components/banking/finance";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { formatCurrency, formatDate } from "@/lib/utils";

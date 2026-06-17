@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, Building2 } from "lucide-react";
+import { ArrowLeft, Building2 } from "lucide-react";
 import { LoginForm } from "@/components/forms/auth-forms";
 import { CardMockup } from "@/components/banking/premium-ui";
 

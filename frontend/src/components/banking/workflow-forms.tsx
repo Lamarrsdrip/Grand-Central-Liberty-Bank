@@ -17,7 +17,17 @@ type Ticket = {
   id: string;
   subject: string;
   status: string;
-  messages: Array<{ id: string; body: string; senderId: string; createdAt: string; attachmentUrl?: string | null }>;
+  priority?: string;
+  assignedAdmin?: { id: string; name: string; email: string } | null;
+  messages: Array<{
+    id: string;
+    body: string;
+    senderId: string;
+    createdAt: string;
+    attachmentUrl?: string | null;
+    senderName?: string;
+    senderRole?: string;
+  }>;
 };
 type RetirementAccount = {
   id: string;
@@ -38,6 +48,20 @@ type RetirementFeeSettings = {
 
 function Status({ message }: { message: string }) {
   return message ? <p className="rounded-md bg-secondary px-3 py-2 text-sm font-semibold">{message}</p> : null;
+}
+
+function appendTicketMessage(tickets: Ticket[], ticketId: string, message: Ticket["messages"][number]) {
+  return tickets.map((ticket) => {
+    if (ticket.id !== ticketId || ticket.messages.some((item) => item.id === message.id)) {
+      return ticket;
+    }
+
+    return {
+      ...ticket,
+      status: ticket.status === "CLOSED" ? ticket.status : "ACTIVE",
+      messages: [...ticket.messages, message]
+    };
+  });
 }
 
 async function uploadFile(file: File, folder: string) {
@@ -427,11 +451,7 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
       setSocket(socket);
       socket.emit("join_ticket", activeId);
       socket.on("support_message", (incoming: { ticketId: string; message: Ticket["messages"][number] }) => {
-        setTickets((current) =>
-          current.map((ticket) =>
-            ticket.id === incoming.ticketId ? { ...ticket, messages: [...ticket.messages, incoming.message] } : ticket
-          )
-        );
+        setTickets((current) => appendTicketMessage(current, incoming.ticketId, incoming.message));
       });
     }
     return () => {
@@ -455,8 +475,13 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
               type="button"
               onClick={() => setActiveId(ticket.id)}
             >
-              <p className="font-bold">{ticket.subject}</p>
-              <p className="text-xs text-muted-foreground">{ticket.status}</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-bold text-white">{ticket.subject}</p>
+                <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[0.65rem] font-black text-emerald-200">{ticket.status}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {ticket.messages.length} messages{ticket.assignedAdmin ? ` · ${ticket.assignedAdmin.name}` : ""}
+              </p>
             </button>
           ))}
           <form
@@ -508,13 +533,16 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
       <Card>
         <CardHeader>
           <CardTitle>Live Chat</CardTitle>
-          <CardDescription>{activeTicket ? activeTicket.subject : "Open a ticket to begin."}</CardDescription>
+          <CardDescription>{activeTicket ? `${activeTicket.subject} · ${activeTicket.status}` : "Open a ticket to begin."}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="min-h-80 rounded-md border bg-muted/40 p-4">
+          <div className="min-h-80 max-h-[28rem] overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-4">
             {activeTicket?.messages.map((item) => (
-              <div key={item.id} className={`mb-3 max-w-[80%] rounded-lg p-3 text-sm ${item.senderId === userId ? "ml-auto bg-primary text-primary-foreground" : "bg-card"}`}>
-                {item.body}
+              <div key={item.id} className={`mb-3 max-w-[88%] rounded-2xl p-3 text-sm shadow-sm ${item.senderId === userId ? "ml-auto bg-primary text-primary-foreground" : "bg-white/8 text-white"}`}>
+                <p className={`mb-1 text-[0.65rem] font-black ${item.senderId === userId ? "text-black/55" : "text-white/40"}`}>
+                  {item.senderId === userId ? "You" : item.senderName ?? "GCLB Support"}
+                </p>
+                <p className="whitespace-pre-wrap break-words">{item.body}</p>
                 {item.attachmentUrl ? (
                   <a href={item.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 block text-xs font-black underline">
                     View attachment
@@ -522,10 +550,13 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
                 ) : null}
               </div>
             ))}
+            {!activeTicket?.messages.length ? (
+              <p className="py-16 text-center text-sm font-semibold text-muted-foreground">No messages yet.</p>
+            ) : null}
           </div>
           {activeTicket ? (
             <form
-              className="grid gap-2 sm:grid-cols-[1fr_auto_auto]"
+              className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (!message.trim() && !messageFile) {
@@ -536,25 +567,34 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
                 try {
                   const attachmentUrl = messageFile ? await uploadFile(messageFile, "support-attachments") : undefined;
                   if (socket?.connected && !attachmentUrl) {
-                  socket.emit("send_support_message", { ticketId: activeTicket.id, body: message }, (response: { error?: string }) => {
-                    if (response?.error) {
-                      window.alert(response.error);
-                    }
-                  });
+                    await new Promise<void>((resolve, reject) => {
+                      socket.emit(
+                        "send_support_message",
+                        { ticketId: activeTicket.id, body: text },
+                        (response: { error?: string; message?: Ticket["messages"][number] }) => {
+                          if (response?.error) {
+                            reject(new Error(response.error));
+                            return;
+                          }
+                          if (response?.message) {
+                            setTickets((current) => appendTicketMessage(current, activeTicket.id, response.message!));
+                          }
+                          resolve();
+                        }
+                      );
+                    });
                   } else {
                     const data = await secureFetch("/api/support/messages", {
                       method: "POST",
                       body: JSON.stringify({ ticketId: activeTicket.id, body: text, attachmentUrl })
                     });
-                    setTickets((current) =>
-                      current.map((ticket) =>
-                        ticket.id === activeTicket.id ? { ...ticket, messages: [...ticket.messages, data.message] } : ticket
-                      )
-                    );
+                    setTickets((current) => appendTicketMessage(current, activeTicket.id, data.message));
                   }
                   setMessage("");
                   setMessageFile(null);
                   event.currentTarget.reset();
+                } catch (error) {
+                  window.alert(error instanceof Error ? error.message : "Message failed. Please try again.");
                 } finally {
                   setBusy(false);
                 }
@@ -562,7 +602,7 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
             >
               <Input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Type your message..." />
               <Input className="sm:w-56" type="file" onChange={(event) => setMessageFile(event.target.files?.[0] ?? null)} />
-              <Button type="submit" size="icon" aria-label="Send message">
+              <Button type="submit" size="icon" aria-label="Send message" disabled={busy}>
                 <Send data-icon="inline-start" />
               </Button>
             </form>

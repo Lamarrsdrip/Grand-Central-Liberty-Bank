@@ -5,7 +5,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        "h-12 w-full rounded-2xl border bg-background/78 px-4 text-sm font-semibold outline-none transition placeholder:text-muted-foreground focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        "h-12 w-full min-w-0 rounded-2xl border border-white/14 bg-[#101827] px-4 text-sm font-semibold text-white outline-none transition placeholder:text-white/35 focus:border-emerald-300/70 focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
@@ -17,7 +17,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return (
     <textarea
       className={cn(
-        "min-h-28 w-full rounded-2xl border bg-background/78 px-4 py-3 text-sm font-semibold outline-none transition placeholder:text-muted-foreground focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        "min-h-28 w-full min-w-0 rounded-2xl border border-white/14 bg-[#101827] px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/35 focus:border-emerald-300/70 focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
@@ -29,7 +29,7 @@ export function Select({ className, children, ...props }: React.SelectHTMLAttrib
   return (
     <select
       className={cn(
-        "h-12 w-full rounded-2xl border bg-background/78 px-4 text-sm font-semibold outline-none transition focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        "h-12 w-full min-w-0 rounded-2xl border border-white/14 bg-[#101827] px-4 text-sm font-semibold text-white outline-none transition focus:border-emerald-300/70 focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}

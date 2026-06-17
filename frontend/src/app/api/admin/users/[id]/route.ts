@@ -9,7 +9,17 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("FREEZE"), reason: z.string().min(5) }),
   z.object({ action: z.literal("UNFREEZE"), reason: z.string().min(5) }),
   z.object({ action: z.literal("SUSPEND"), reason: z.string().min(5) }),
-  z.object({ action: z.literal("ACTIVATE"), reason: z.string().min(5) })
+  z.object({ action: z.literal("ACTIVATE"), reason: z.string().min(5) }),
+  z.object({
+    action: z.literal("EDIT_PROFILE"),
+    firstName: z.string().min(2),
+    lastName: z.string().min(2),
+    email: z.string().email(),
+    phone: z.string().min(7),
+    country: z.string().min(2),
+    address: z.string().min(5),
+    reason: z.string().min(5)
+  })
 ]);
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -42,6 +52,20 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
 
+    if (input.action === "EDIT_PROFILE") {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          phone: input.phone,
+          country: input.country,
+          address: input.address
+        }
+      });
+    }
+
     if (input.action === "SUSPEND" || input.action === "ACTIVATE") {
       await prisma.user.update({
         where: { id },
@@ -52,30 +76,28 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     if (input.action === "FREEZE" || input.action === "UNFREEZE") {
       const status = input.action === "FREEZE" ? "FROZEN" : "ACTIVE";
       const accounts = await prisma.account.findMany({ where: { userId: id } });
-      await prisma.$transaction(
-        accounts.map((account) =>
-          prisma.account.update({
-            where: { id: account.id },
-            data: {
-              status,
-              freezeReason: input.action === "FREEZE" ? input.reason : null,
-              frozenAt: input.action === "FREEZE" ? new Date() : null,
-              freezeEvents: {
-                create: {
-                  actorId: admin.id,
-                  action: status,
-                  reason: input.reason
-                }
+      for (const account of accounts) {
+        await prisma.account.update({
+          where: { id: account.id },
+          data: {
+            status,
+            freezeReason: input.action === "FREEZE" ? input.reason : null,
+            frozenAt: input.action === "FREEZE" ? new Date() : null,
+            freezeEvents: {
+              create: {
+                actorId: admin.id,
+                action: status,
+                reason: input.reason
               }
             }
-          })
-        )
-      );
+          }
+        });
+      }
     }
 
     await notifyUser(id, {
       type: "SYSTEM",
-      title: "Account status updated",
+      title: input.action === "EDIT_PROFILE" ? "Profile updated by bank operations" : "Account status updated",
       body: input.reason
     });
     await auditLog({

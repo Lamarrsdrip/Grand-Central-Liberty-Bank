@@ -1,33 +1,23 @@
 "use client";
 import Link from "next/link";
 import {
-  ArrowDownRight,
   ArrowRight,
-  ArrowUpRight,
   Banknote,
   Bell,
   Bitcoin,
   Building2,
-  CircleDollarSign,
   CreditCard,
   Globe2,
-  Home,
   Landmark,
   LineChart,
   LockKeyhole,
-  LucideIcon,
-  MoreHorizontal,
   PiggyBank,
-  Plane,
   QrCode,
-  ReceiptText,
   RefreshCcw,
   ScanLine,
   Search,
-  Send,
   ShieldCheck,
   Smartphone,
-  Sparkles,
   TrendingUp,
   WalletCards
 } from "lucide-react";
@@ -156,6 +146,7 @@ export function TotalAssetsCard({
             {money(total)}
           </h2>
           <p className="mt-2 text-sm font-semibold text-green">{todayChange} today</p>
+          <p className="mt-1 text-xs font-bold text-white/35">Available now {money(available)}</p>
         </div>
         <Link href="/accounts" className="text-xs font-bold text-white/40 hover:text-white/70 transition mt-1">
           Net Worth →
@@ -278,7 +269,7 @@ const accountCardStyles: Record<string, string> = {
   CRYPTO: "account-card-business",
 };
 
-export function AccountCard({ account, index = 0 }: { account: FinanceAccount; index?: number }) {
+export function AccountCard({ account }: { account: FinanceAccount; index?: number }) {
   const cardClass = accountCardStyles[account.type] ?? "account-card-checking";
   const typeLabel = accountLabel(account.type).toUpperCase();
   return (
@@ -314,6 +305,7 @@ export function AccountCard({ account, index = 0 }: { account: FinanceAccount; i
 /* ── Insight Panel ─────────────────────── */
 export function InsightPanel({ total, retirement }: { total: number; retirement: number }) {
   const spending = total * 0.042;
+  const retirementShare = total > 0 ? Math.round((retirement / total) * 100) : 0;
   const cats = [
     { label: "Shopping",       pct: 32, color: "#6366f1" },
     { label: "Food & Dining",  pct: 24, color: "#22c55e" },
@@ -345,7 +337,7 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
       </div>
       <p className="text-xs text-white/40 mb-1">Spending</p>
       <p className="text-2xl font-black text-white">{money(spending)}</p>
-      <p className="text-xs text-white/30 mb-5">-8.6% vs last month</p>
+      <p className="text-xs text-white/30 mb-5">-8.6% vs last month · 401(k) {retirementShare}% of assets</p>
 
       {/* Donut chart */}
       <div className="flex items-center gap-5">

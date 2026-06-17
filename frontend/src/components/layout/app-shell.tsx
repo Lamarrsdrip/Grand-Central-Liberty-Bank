@@ -1,13 +1,12 @@
 import Link from "next/link";
 import {
   BadgeDollarSign, Bell, Bitcoin, Building2, CreditCard,
-  Headphones, Home, Landmark, LineChart, LogOut,
+  Headphones, Home, Landmark, LineChart,
   QrCode, Search, Send, Settings2, ShieldCheck,
   UserCircle, WalletCards, ArrowLeftRight, MoreHorizontal
 } from "lucide-react";
 import { Role } from "@prisma/client";
 import { LogoutButton } from "@/components/layout/logout-button";
-import { BrandMark } from "@/components/banking/premium-ui";
 import { initials } from "@/lib/utils";
 
 type User = {
@@ -46,8 +45,8 @@ type MobileNavItem = { href: string; label: string; icon: typeof Home; center?: 
 const mobileNav: MobileNavItem[] = [
   { href: "/dashboard", label: "Home",     icon: Home       },
   { href: "/accounts",  label: "Accounts", icon: Landmark   },
-  { href: "/wallet",    label: "Wallet",   icon: WalletCards },
   { href: "/transfers", label: "",         icon: ArrowLeftRight, center: true },
+  { href: "/wallet",    label: "Wallet",   icon: WalletCards },
   { href: "/more",      label: "More",     icon: MoreHorizontal },
 ];
 
@@ -119,7 +118,7 @@ export function AppShell({
       </aside>
 
       {/* ── Main content ─────────────────────── */}
-      <div className="flex-1 lg:pl-[15.5rem] flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 lg:pl-[15.5rem] flex flex-col min-h-screen">
         {/* Desktop top bar */}
         <header className="hidden lg:flex sticky top-0 z-20 items-center justify-between px-8 py-4 bg-[#0b0f18]/90 backdrop-blur-xl border-b border-white/5">
           <div>
@@ -159,7 +158,7 @@ export function AppShell({
         ))}
 
         {/* Page content */}
-        <main className="flex-1 px-4 lg:px-8 pb-28 lg:pb-8 pt-5">
+        <main className="flex-1 min-w-0 w-full px-4 sm:px-5 lg:px-8 pb-28 lg:pb-8 pt-5 overflow-x-hidden">
           {children}
         </main>
       </div>
@@ -171,7 +170,7 @@ export function AppShell({
             const Icon = item.icon;
             if (item.center) {
               return (
-                <Link key={item.href} href={item.href} className="flex flex-col items-center -mt-4">
+                <Link key={item.href} href={item.href} className="flex flex-col items-center justify-center -mt-4" aria-label="Transfer">
                   <div className="bottom-nav-center">
                     <Icon className="size-5 text-white" />
                   </div>

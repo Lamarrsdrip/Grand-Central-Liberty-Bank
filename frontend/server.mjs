@@ -124,6 +124,10 @@ io.on("connection", async (socket) => {
 
   socket.on("send_support_message", async (input, ack) => {
     try {
+      const body = String(input.body ?? "").replace(/[<>]/g, "").trim().slice(0, 5000);
+      if (!body) {
+        throw new Error("Message body is required.");
+      }
       const ticket = await getPrisma().supportTicket.findFirst({
         where:
           user.role === "ADMIN"
@@ -137,23 +141,48 @@ io.on("connection", async (socket) => {
         data: {
           ticketId: ticket.id,
           senderId: user.id,
-          body: String(input.body ?? "").replace(/[<>]/g, "").slice(0, 5000)
+          body
         }
       });
+      socket.join(`ticket:${ticket.id}`);
       await getPrisma().supportTicket.update({
         where: { id: ticket.id },
         data: { status: user.role === "ADMIN" ? "ACTIVE" : ticket.status, updatedAt: new Date() }
       });
-      io.to(`ticket:${ticket.id}`).emit("support_message", {
-        ticketId: ticket.id,
-        message: {
-          id: message.id,
-          body: message.body,
-          senderId: message.senderId,
-          createdAt: message.createdAt.toISOString()
+      const payload = {
+        id: message.id,
+        body: message.body,
+        senderId: message.senderId,
+        senderName: `${user.firstName} ${user.lastName}`,
+        senderRole: user.role,
+        attachmentUrl: message.attachmentUrl,
+        createdAt: message.createdAt.toISOString()
+      };
+      const recipientId = user.id === ticket.userId ? ticket.assignedAdminId : ticket.userId;
+      if (recipientId) {
+        await getPrisma().notification.create({
+          data: {
+            userId: recipientId,
+            type: "NEW_MESSAGE",
+            title: "New support message",
+            body: `${user.firstName} sent a new support message.`
+          }
+        });
+      }
+      await getPrisma().auditLog.create({
+        data: {
+          actorId: user.id,
+          action: "SUPPORT_MESSAGE_SENT",
+          entity: "SupportTicket",
+          entityId: ticket.id,
+          metadata: { via: "socket" }
         }
       });
-      ack?.({ ok: true });
+      socket.to(`ticket:${ticket.id}`).emit("support_message", {
+        ticketId: ticket.id,
+        message: payload
+      });
+      ack?.({ ok: true, message: payload });
     } catch (error) {
       console.error("[socket] support message failed", error);
       ack?.({ error: "Message failed. Please try again." });

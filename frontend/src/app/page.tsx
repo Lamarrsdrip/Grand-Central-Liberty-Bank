@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Menu, Play, ShieldCheck, LockKeyhole, Banknote } from "lucide-react";
+import { ArrowRight, Menu, Play, ShieldCheck } from "lucide-react";
 import {
   CardMockup, FeatureRail, MarketStrip, ProductShowcase,
   PublicPhoneMockup, TrustRow

@@ -35,7 +35,15 @@ export async function POST(request: NextRequest) {
           }
         }
       },
-      include: { messages: true }
+      include: {
+        messages: {
+          include: {
+            sender: {
+              select: { firstName: true, lastName: true, role: true }
+            }
+          }
+        }
+      }
     });
     await notifyUser(user.id, {
       type: "NEW_MESSAGE",
@@ -44,6 +52,19 @@ export async function POST(request: NextRequest) {
     });
     await auditLog({ actorId: user.id, action: "SUPPORT_TICKET_OPENED", entity: "SupportTicket", entityId: ticket.id });
 
-    return created({ ticket });
+    return created({
+      ticket: {
+        ...ticket,
+        messages: ticket.messages.map((message) => ({
+          id: message.id,
+          body: message.body,
+          senderId: message.senderId,
+          attachmentUrl: message.attachmentUrl,
+          createdAt: message.createdAt,
+          senderName: `${message.sender.firstName} ${message.sender.lastName}`,
+          senderRole: message.sender.role
+        }))
+      }
+    });
   });
 }

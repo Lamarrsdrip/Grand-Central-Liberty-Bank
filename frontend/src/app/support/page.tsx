@@ -4,24 +4,34 @@ import { SupportCenter } from "@/components/banking/workflow-forms";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { PageHeader } from "@/components/banking/premium-ui";
 import { getCurrentUser } from "@/lib/auth";
-import { getUserDashboardData } from "@/lib/data";
+import { getUserSupportTickets } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export default async function SupportPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const data = await getUserDashboardData(user.id);
-  const tickets = data.tickets.map((ticket) => ({
+  const supportTickets = await getUserSupportTickets(user.id);
+  const tickets = supportTickets.map((ticket) => ({
     id: ticket.id,
     subject: ticket.subject,
     status: ticket.status,
+    priority: ticket.priority,
+    assignedAdmin: ticket.assignedAdmin
+      ? {
+          id: ticket.assignedAdmin.id,
+          name: `${ticket.assignedAdmin.firstName} ${ticket.assignedAdmin.lastName}`,
+          email: ticket.assignedAdmin.email
+        }
+      : null,
     messages: ticket.messages.map((message) => ({
       id: message.id,
       body: message.body,
       senderId: message.senderId,
       createdAt: message.createdAt.toISOString(),
-      attachmentUrl: message.attachmentUrl
+      attachmentUrl: message.attachmentUrl,
+      senderName: `${message.sender.firstName} ${message.sender.lastName}`,
+      senderRole: message.sender.role
     }))
   }));
 

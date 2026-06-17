@@ -1,19 +1,16 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowRight, ArrowUpRight, ArrowDownRight,
-  CreditCard, Bell, TrendingUp, BarChart3
-} from "lucide-react";
+import { ArrowRight, CreditCard, Bell } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import {
   AccountCard, CustomerTopBar, InsightPanel,
-  MarketStrip, MiniChart, PageHeader, QuickActions,
+  MarketStrip, MiniChart, QuickActions,
   TotalAssetsCard, TransactionCards
 } from "@/components/banking/premium-ui";
-import { compactMoney, money, cryptoAssets } from "@/components/banking/finance";
+import { money } from "@/components/banking/finance";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +26,25 @@ export default async function DashboardPage() {
 
   const checking    = data.accounts.filter(a => a.type === "CHECKING").reduce((s,a) => s+Number(a.balance),0);
   const crypto      = data.accounts.filter(a => a.type === "CRYPTO").reduce((s,a) => s+Number(a.balance),0);
-  const selectedAccount = data.accounts.find((account) => account.type === "CHECKING") ?? data.accounts[0];
+  const primaryRetirement = data.retirementAccounts[0];
+  const fallbackAccount = data.accounts.find((account) => account.type === "CHECKING") ?? data.accounts[0];
+  const selectedBalance = primaryRetirement
+    ? {
+        label: "401(k) Retirement",
+        balance: primaryRetirement.balance,
+        currency: "USD",
+        detail: `Status ${primaryRetirement.status.replaceAll("_", " ")} •••• ${primaryRetirement.accountNumber.slice(-4)}`,
+        href: "/retirement"
+      }
+    : fallbackAccount
+      ? {
+          label: `${fallbackAccount.type} Account`,
+          balance: fallbackAccount.balance,
+          currency: fallbackAccount.currency,
+          detail: `${fallbackAccount.type} •••• ${fallbackAccount.accountNumber.slice(-4)}`,
+          href: "/accounts"
+        }
+      : null;
 
   const wealthItems = [
     { label: "Checking",      value: checking,        color: "bg-blue-400"   },
@@ -37,12 +52,6 @@ export default async function DashboardPage() {
     { label: "401(k)",        value: retirementTotal, color: "bg-fuchsia-400"},
     { label: "Cards",         value: 0,               color: "bg-cyan-400"   },
   ];
-
-  const pendingTransfers = data.user?.transferRequests.filter(
-    t => t.status !== "APPROVED" && t.status !== "REJECTED"
-  ).length ?? 0;
-
-  const primaryRetirement = data.retirementAccounts[0];
 
   return (
     <ProtectedShell>
@@ -59,13 +68,13 @@ export default async function DashboardPage() {
           todayChange={`+$${(totalAssets * 0.0173).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} (1.73%)`}
         />
 
-        {selectedAccount ? (
-          <Link href="/accounts" className="card-dark block p-5 transition hover:bg-white/6">
+        {selectedBalance ? (
+          <Link href={selectedBalance.href} className="card-dark block p-5 transition hover:bg-white/6">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-white/40">Selected Account Balance</p>
-                <p className="mt-1 text-3xl font-black text-white">{money(selectedAccount.balance, selectedAccount.currency)}</p>
-                <p className="mt-1 text-sm text-white/40">{selectedAccount.type} •••• {selectedAccount.accountNumber.slice(-4)}</p>
+                <p className="mt-1 text-3xl font-black text-white">{money(selectedBalance.balance, selectedBalance.currency)}</p>
+                <p className="mt-1 text-sm text-white/40">{selectedBalance.label} · {selectedBalance.detail}</p>
               </div>
               <ArrowRight className="size-5 text-green" />
             </div>
