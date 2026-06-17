@@ -67,15 +67,20 @@ export async function POST(request: NextRequest) {
         feeAmount: fee.amount,
         feeReason: feeSettings.feeReason,
         paymentMethod: feeSettings.paymentMethod,
-        feeEnabled: fee.enabled,
-        notes: {
-          create: {
-            body: "401(k) withdrawal request received for compliance review.",
-            visibleToUser: true
-          }
-        }
+        feeEnabled: fee.enabled
       }
     });
+    try {
+      await prisma.retirementWithdrawalNote.create({
+        data: {
+          retirementWithdrawalRequestId: withdrawal.id,
+          body: "401(k) withdrawal request received for compliance review.",
+          visibleToUser: true
+        }
+      });
+    } catch (error) {
+      console.error("[retirement] withdrawal note create failed:", error);
+    }
 
     await notifyUser(user.id, {
       type: "SYSTEM",

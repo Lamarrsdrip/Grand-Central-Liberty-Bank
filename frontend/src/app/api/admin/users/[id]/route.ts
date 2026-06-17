@@ -82,16 +82,21 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
           data: {
             status,
             freezeReason: input.action === "FREEZE" ? input.reason : null,
-            frozenAt: input.action === "FREEZE" ? new Date() : null,
-            freezeEvents: {
-              create: {
-                actorId: admin.id,
-                action: status,
-                reason: input.reason
-              }
-            }
+            frozenAt: input.action === "FREEZE" ? new Date() : null
           }
         });
+        try {
+          await prisma.accountFreezeEvent.create({
+            data: {
+              accountId: account.id,
+              actorId: admin.id,
+              action: status,
+              reason: input.reason
+            }
+          });
+        } catch (error) {
+          console.error("[admin] accountFreezeEvent.create failed:", error);
+        }
       }
     }
 

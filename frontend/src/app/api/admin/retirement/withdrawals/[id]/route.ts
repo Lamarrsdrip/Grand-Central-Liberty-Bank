@@ -23,27 +23,35 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         status: input.status,
         internalNote: input.internalNote,
         reviewedById: admin.id,
-        reviewedAt: new Date(),
-        notes: {
-          create: [
-            {
-              authorId: admin.id,
-              body: input.internalNote,
-              visibleToUser: false
-            },
-            ...(input.userNote
-              ? [
-                  {
-                    authorId: admin.id,
-                    body: input.userNote,
-                    visibleToUser: true
-                  }
-                ]
-              : [])
-          ]
-        }
+        reviewedAt: new Date()
       }
     });
+    try {
+      await prisma.retirementWithdrawalNote.create({
+        data: {
+          retirementWithdrawalRequestId: id,
+          authorId: admin.id,
+          body: input.internalNote,
+          visibleToUser: false
+        }
+      });
+    } catch (error) {
+      console.error("[admin] retirementWithdrawalNote (internal) create failed:", error);
+    }
+    if (input.userNote) {
+      try {
+        await prisma.retirementWithdrawalNote.create({
+          data: {
+            retirementWithdrawalRequestId: id,
+            authorId: admin.id,
+            body: input.userNote,
+            visibleToUser: true
+          }
+        });
+      } catch (error) {
+        console.error("[admin] retirementWithdrawalNote (user) create failed:", error);
+      }
+    }
 
     await notifyUser(withdrawal.userId, {
       type: "SYSTEM",

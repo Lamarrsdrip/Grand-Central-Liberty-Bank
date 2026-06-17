@@ -28,15 +28,20 @@ export async function POST(request: NextRequest) {
         documentType: input.documentType,
         documentUrl: input.documentUrl,
         selfieUrl: input.selfieUrl,
-        status: "PENDING",
-        notesHistory: {
-          create: {
-            body: "Documents received and queued for manual verification.",
-            visibleToUser: true
-          }
-        }
+        status: "PENDING"
       }
     });
+    try {
+      await prisma.kycNote.create({
+        data: {
+          kycSubmissionId: submission.id,
+          body: "Documents received and queued for manual verification.",
+          visibleToUser: true
+        }
+      });
+    } catch (error) {
+      console.error("[kyc] note create failed:", error);
+    }
     await notifyUser(user.id, {
       type: "SYSTEM",
       title: "KYC submitted",

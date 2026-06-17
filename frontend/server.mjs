@@ -121,14 +121,18 @@ io.on("connection", async (socket) => {
   }
 
   socket.on("join_ticket", async (ticketId) => {
-    const ticket = await getPrisma().supportTicket.findFirst({
-      where:
-        user.role === "ADMIN"
-          ? { id: ticketId }
-          : { id: ticketId, userId: user.id }
-    });
-    if (ticket) {
-      socket.join(`ticket:${ticket.id}`);
+    try {
+      const ticket = await getPrisma().supportTicket.findFirst({
+        where:
+          user.role === "ADMIN"
+            ? { id: ticketId }
+            : { id: ticketId, userId: user.id }
+      });
+      if (ticket) {
+        socket.join(`ticket:${ticket.id}`);
+      }
+    } catch (error) {
+      console.error("[socket] join_ticket failed", error);
     }
   });
 
@@ -168,18 +172,25 @@ io.on("connection", async (socket) => {
         attachmentUrl: message.attachmentUrl,
         createdAt: message.createdAt.toISOString()
       };
+      // Deliver to room and ack sender first — side-effects must not block delivery.
+      socket.to(`ticket:${ticket.id}`).emit("support_message", {
+        ticketId: ticket.id,
+        message: payload
+      });
+      ack?.({ ok: true, message: payload });
+      // Best-effort side-effects — P2031 or network errors must not affect delivery.
       const recipientId = user.id === ticket.userId ? ticket.assignedAdminId : ticket.userId;
       if (recipientId) {
-        await getPrisma().notification.create({
+        getPrisma().notification.create({
           data: {
             userId: recipientId,
             type: "NEW_MESSAGE",
             title: "New support message",
             body: `${user.firstName} sent a new support message.`
           }
-        });
+        }).catch((error) => console.error("[socket] notification.create failed", error));
       }
-      await getPrisma().auditLog.create({
+      getPrisma().auditLog.create({
         data: {
           actorId: user.id,
           action: "SUPPORT_MESSAGE_SENT",
@@ -187,12 +198,7 @@ io.on("connection", async (socket) => {
           entityId: ticket.id,
           metadata: { via: "socket" }
         }
-      });
-      socket.to(`ticket:${ticket.id}`).emit("support_message", {
-        ticketId: ticket.id,
-        message: payload
-      });
-      ack?.({ ok: true, message: payload });
+      }).catch((error) => console.error("[socket] auditLog.create failed", error));
     } catch (error) {
       console.error("[socket] support message failed", error);
       ack?.({ error: "Message failed. Please try again." });

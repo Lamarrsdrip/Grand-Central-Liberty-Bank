@@ -26,23 +26,18 @@ export async function POST(request: NextRequest) {
     const ticket = await prisma.supportTicket.create({
       data: {
         userId: user.id,
-        subject: plainText(input.subject, 160),
-        messages: {
-          create: {
-            senderId: user.id,
-            body: plainText(input.body),
-            attachmentUrl: input.attachmentUrl
-          }
-        }
+        subject: plainText(input.subject, 160)
+      }
+    });
+    const message = await prisma.supportMessage.create({
+      data: {
+        ticketId: ticket.id,
+        senderId: user.id,
+        body: plainText(input.body),
+        attachmentUrl: input.attachmentUrl
       },
       include: {
-        messages: {
-          include: {
-            sender: {
-              select: { firstName: true, lastName: true, role: true }
-            }
-          }
-        }
+        sender: { select: { firstName: true, lastName: true, role: true } }
       }
     });
     await notifyUser(user.id, {
@@ -55,7 +50,7 @@ export async function POST(request: NextRequest) {
     return created({
       ticket: {
         ...ticket,
-        messages: ticket.messages.map((message) => ({
+        messages: [{
           id: message.id,
           body: message.body,
           senderId: message.senderId,
@@ -63,7 +58,7 @@ export async function POST(request: NextRequest) {
           createdAt: message.createdAt,
           senderName: `${message.sender.firstName} ${message.sender.lastName}`,
           senderRole: message.sender.role
-        }))
+        }]
       }
     });
   });
