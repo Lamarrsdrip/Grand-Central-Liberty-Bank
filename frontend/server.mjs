@@ -13,10 +13,20 @@ const handler = app.getRequestHandler();
 let prisma;
 
 function buildDatabaseUrl() {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const base = process.env.MONGO_URL;
+  const explicit = process.env.DATABASE_URL?.trim();
+  if (explicit) {
+    if (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://")) {
+      return explicit;
+    }
+    const proto = explicit.split("://")[0] || "(empty)";
+    console.error(
+      `[server] DATABASE_URL uses protocol "${proto}://" — expected "mongodb://" or "mongodb+srv://". ` +
+        "Falling back to MONGO_URL. Set DATABASE_URL to a valid MongoDB connection string."
+    );
+  }
+  const base = process.env.MONGO_URL?.trim();
   if (!base) return null;
-  const dbName = process.env.DB_NAME || "grand_central_liberty_bank";
+  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
   const url = new URL(base);
   url.pathname = `/${dbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");

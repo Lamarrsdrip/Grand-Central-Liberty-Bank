@@ -315,9 +315,19 @@ async function waitForPrimary(shell, host, port, timeoutMs) {
 await ensureReplicaSet();
 
 function buildDatabaseUrl() {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const base = process.env.MONGO_URL;
-  const dbName = process.env.DB_NAME || "grand_central_liberty_bank";
+  const explicit = process.env.DATABASE_URL?.trim();
+  if (explicit) {
+    if (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://")) {
+      return explicit;
+    }
+    const proto = explicit.split("://")[0] || "(empty)";
+    console.error(
+      `[start] DATABASE_URL uses protocol "${proto}://" — expected "mongodb://" or "mongodb+srv://". ` +
+        "Falling back to MONGO_URL. In Emergent, update the DATABASE_URL secret to a MongoDB connection string."
+    );
+  }
+  const base = process.env.MONGO_URL?.trim();
+  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
   if (!base) return null;
   const url = new URL(base);
   url.pathname = `/${dbName}`;
@@ -327,8 +337,30 @@ function buildDatabaseUrl() {
 }
 
 const dbUrl = buildDatabaseUrl();
+
+// Startup environment validation — catches misconfigured production secrets early.
+{
+  const rawDbUrl = process.env.DATABASE_URL?.trim();
+  if (rawDbUrl && !rawDbUrl.startsWith("mongodb://") && !rawDbUrl.startsWith("mongodb+srv://")) {
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.error("[start] CONFIGURATION ERROR: DATABASE_URL is set but is NOT a MongoDB URL.");
+    console.error(`[start]   Current value protocol: ${rawDbUrl.split("://")[0]}://...`);
+    console.error("[start]   Required:               mongodb://... or mongodb+srv://...");
+    console.error("[start]   Fix: In Emergent Production Secrets, change DATABASE_URL to your");
+    console.error("[start]        MongoDB connection string, or remove it so MONGO_URL is used.");
+    if (process.env.MONGO_URL) {
+      console.error("[start]   Falling back to MONGO_URL for this session.");
+    } else {
+      console.error("[start]   MONGO_URL is also not set — database will be unavailable!");
+    }
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  } else if (!rawDbUrl && !process.env.MONGO_URL) {
+    console.error("[start] CONFIGURATION ERROR: Neither DATABASE_URL nor MONGO_URL is set.");
+  }
+}
+
 if (dbUrl) {
-  console.log("[start] DATABASE_URL =", dbUrl.replace(/:\/\/[^@]*@/, "://***@"));
+  console.log("[start] MongoDB URL resolved:", dbUrl.replace(/:\/\/[^@]*@/, "://***@"));
 } else {
   console.warn("[start] DATABASE_URL/MONGO_URL not set; starting web process without database bootstrap.");
 }

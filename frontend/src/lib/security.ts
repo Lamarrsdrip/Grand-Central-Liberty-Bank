@@ -48,9 +48,18 @@ export function apiError(error: unknown) {
   }
 
   if (error instanceof Error) {
-    console.error("[api]", error);
+    const isDatabaseInit =
+      error.name === "PrismaClientInitializationError" ||
+      error.message.includes("DATABASE_URL") ||
+      error.message.includes("MONGO_URL") ||
+      error.message.includes("mongo");
+    console.error("[api]", error.name, error.message);
     return NextResponse.json(
-      { error: "Request could not be completed. Please try again or contact support." },
+      {
+        error: isDatabaseInit
+          ? "Database connection failed. Please check server configuration."
+          : "Request could not be completed. Please try again or contact support."
+      },
       { status: 500 }
     );
   }
