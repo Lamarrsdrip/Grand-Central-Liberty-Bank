@@ -28,6 +28,7 @@
     "lucide-react": "latest",
     "next": "15.5.19",
     "nodemailer": "latest",
+    "prisma": "6.19.3",
     "qrcode": "latest",
     "react": "19.2.7",
     "react-dom": "19.2.7",
@@ -35,6 +36,7 @@
     "socket.io-client": "latest",
     "speakeasy": "latest",
     "tailwind-merge": "latest",
+    "tsx": "latest",
     "zod": "latest"
   },
   "devDependencies": {
@@ -49,9 +51,7 @@
     "eslint": "latest",
     "eslint-config-next": "15.5.19",
     "playwright": "^1.61.0",
-    "prisma": "6.19.3",
     "tailwindcss": "4.3.1",
-    "tsx": "latest",
     "typescript": "latest",
     "vitest": "latest"
   },
