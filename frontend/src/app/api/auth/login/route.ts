@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { randomBytes } from "node:crypto";
 import speakeasy from "speakeasy";
 import { handleApi, ok } from "@/lib/api";
 import { auditLog } from "@/lib/audit";
@@ -6,6 +7,30 @@ import { createSession, requestIpAndAgent, sessionCookieName, verifyPassword } f
 import { prisma } from "@/lib/db";
 import { assertRateLimit } from "@/lib/security";
 import { loginSchema } from "@/lib/validators";
+
+async function recordLoginAttempt(input: {
+  userId?: string;
+  email: string;
+  ip?: string;
+  userAgent?: string;
+  success: boolean;
+}) {
+  await prisma.$runCommandRaw({
+    insert: "LoginHistory",
+    documents: [
+      {
+        _id: { $oid: randomBytes(12).toString("hex") },
+        userId: input.userId ? { $oid: input.userId } : null,
+        email: input.email,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        success: input.success,
+        createdAt: { $date: new Date().toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+}
 
 export async function POST(request: NextRequest) {
   return handleApi(async () => {
@@ -15,19 +40,13 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
     const passwordValid = user ? await verifyPassword(input.password, user.passwordHash) : false;
 
-    try {
-      await prisma.loginHistory.create({
-        data: {
-          userId: user?.id,
-          email: input.email.toLowerCase(),
-          ip,
-          userAgent,
-          success: Boolean(user && passwordValid)
-        }
-      });
-    } catch (error) {
-      console.error("[auth] loginHistory.create failed:", error);
-    }
+    void recordLoginAttempt({
+        userId: user?.id,
+        email: input.email.toLowerCase(),
+        ip,
+        userAgent,
+        success: Boolean(user && passwordValid)
+      }).catch((error) => console.error("[auth] login history failed:", error));
 
     if (!user || !passwordValid || user.status === "SUSPENDED") {
       throw new Response("Invalid credentials.", { status: 401 });
@@ -51,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await createSession(user, { ip, userAgent });
-    await auditLog({ actorId: user.id, action: "USER_LOGIN", entity: "Session", entityId: session.sessionId, ip, userAgent });
+    void auditLog({ actorId: user.id, action: "USER_LOGIN", entity: "Session", entityId: session.sessionId, ip, userAgent });
 
     const response = ok({
       user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }

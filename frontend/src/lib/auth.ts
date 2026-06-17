@@ -98,7 +98,7 @@ export async function createSession(user: { id: string; role: Role }, options?: 
   const token = await signSessionToken({ sessionId, userId: user.id, role: user.role });
   const tokenHash = await sha256(token);
 
-  const session = await createSessionRecord({
+  await createSessionRecord({
     id: sessionId,
     userId: user.id,
     tokenHash,
@@ -107,11 +107,7 @@ export async function createSession(user: { id: string; role: Role }, options?: 
     expiresAt
   });
 
-  return { token, expiresAt, sessionId: session.id };
-}
-
-function isMongoTransactionError(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "P2031";
+  return { token, expiresAt, sessionId };
 }
 
 async function createSessionRecord(input: {
@@ -122,38 +118,22 @@ async function createSessionRecord(input: {
   userAgent?: string;
   expiresAt: Date;
 }) {
-  try {
-    return await prisma.session.create({
-      data: input
-    });
-  } catch (error) {
-    if (!isMongoTransactionError(error)) {
-      throw error;
-    }
-
-    const now = new Date();
-    await prisma.$runCommandRaw({
-      insert: "Session",
-      documents: [
-        {
-          _id: { $oid: input.id },
-          userId: { $oid: input.userId },
-          tokenHash: input.tokenHash,
-          ip: input.ip ?? null,
-          userAgent: input.userAgent ?? null,
-          expiresAt: { $date: input.expiresAt.toISOString() },
-          createdAt: { $date: now.toISOString() }
-        }
-      ],
-      writeConcern: { w: 1 }
-    });
-
-    const session = await prisma.session.findUnique({ where: { id: input.id } });
-    if (!session) {
-      throw new Error("Session creation failed.");
-    }
-    return session;
-  }
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "Session",
+    documents: [
+      {
+        _id: { $oid: input.id },
+        userId: { $oid: input.userId },
+        tokenHash: input.tokenHash,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        expiresAt: { $date: input.expiresAt.toISOString() },
+        createdAt: { $date: now.toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
@@ -230,9 +210,15 @@ export async function revokeCurrentSession() {
 
   const payload = await verifySessionToken(token).catch(() => null);
   if (payload) {
-    await prisma.session.updateMany({
-      where: { id: payload.sessionId },
-      data: { revokedAt: new Date() }
+    await prisma.$runCommandRaw({
+      update: "Session",
+      updates: [
+        {
+          q: { _id: { $oid: payload.sessionId } },
+          u: { $set: { revokedAt: { $date: new Date().toISOString() } } }
+        }
+      ],
+      writeConcern: { w: 1 }
     });
   }
 }

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { cookies, headers } from "next/headers";
-import { Role, type User } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { created, handleApi } from "@/lib/api";
 import { auditLog } from "@/lib/audit";
@@ -21,10 +20,6 @@ function accountNumber(prefix: string) {
   return `${prefix}${Math.floor(1000000000 + Math.random() * 8999999999)}`;
 }
 
-function isMongoTransactionError(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "P2031";
-}
-
 async function createUserRecord(input: {
   firstName: string;
   lastName: string;
@@ -35,60 +30,39 @@ async function createUserRecord(input: {
   dateOfBirth: Date;
   passwordHash: string;
   preferredLocale: string;
-}): Promise<User> {
-  try {
-    return await prisma.user.create({
-      data: {
+}) {
+  const userId = randomBytes(12).toString("hex");
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "User",
+    documents: [
+      {
+        _id: { $oid: userId },
         firstName: input.firstName,
         lastName: input.lastName,
         email: input.email,
         phone: input.phone,
         country: input.country,
         address: input.address,
-        dateOfBirth: input.dateOfBirth,
+        dateOfBirth: { $date: input.dateOfBirth.toISOString() },
         passwordHash: input.passwordHash,
-        role: Role.USER,
-        preferredLocale: input.preferredLocale
+        role: "USER",
+        status: "ACTIVE",
+        twoFactorEnabled: false,
+        preferredLocale: input.preferredLocale,
+        themePreference: "system",
+        createdAt: { $date: now.toISOString() },
+        updatedAt: { $date: now.toISOString() }
       }
-    });
-  } catch (error) {
-    if (!isMongoTransactionError(error)) {
-      throw error;
-    }
+    ],
+    writeConcern: { w: 1 }
+  });
 
-    const userId = randomBytes(12).toString("hex");
-    const now = new Date();
-    await prisma.$runCommandRaw({
-      insert: "User",
-      documents: [
-        {
-          _id: { $oid: userId },
-          firstName: input.firstName,
-          lastName: input.lastName,
-          email: input.email,
-          phone: input.phone,
-          country: input.country,
-          address: input.address,
-          dateOfBirth: { $date: input.dateOfBirth.toISOString() },
-          passwordHash: input.passwordHash,
-          role: Role.USER,
-          status: "ACTIVE",
-          twoFactorEnabled: false,
-          preferredLocale: input.preferredLocale,
-          themePreference: "system",
-          createdAt: { $date: now.toISOString() },
-          updatedAt: { $date: now.toISOString() }
-        }
-      ],
-      writeConcern: { w: 1 }
-    });
-
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new Error("User creation failed.");
-    }
-    return user;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error("User creation failed.");
   }
+  return user;
 }
 
 async function createAccountRecord(input: {
@@ -98,32 +72,27 @@ async function createAccountRecord(input: {
   balance: number;
   availableBalance: number;
 }) {
-  try {
-    return await prisma.account.create({ data: input });
-  } catch (error) {
-    if (!isMongoTransactionError(error)) throw error;
-    const id = randomBytes(12).toString("hex");
-    const now = new Date();
-    await prisma.$runCommandRaw({
-      insert: "Account",
-      documents: [
-        {
-          _id: { $oid: id },
-          userId: { $oid: input.userId },
-          type: input.type,
-          currency: "USD",
-          accountNumber: input.accountNumber,
-          balance: input.balance,
-          availableBalance: input.availableBalance,
-          status: "ACTIVE",
-          createdAt: { $date: now.toISOString() },
-          updatedAt: { $date: now.toISOString() }
-        }
-      ],
-      writeConcern: { w: 1 }
-    });
-    return { id, ...input };
-  }
+  const id = randomBytes(12).toString("hex");
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "Account",
+    documents: [
+      {
+        _id: { $oid: id },
+        userId: { $oid: input.userId },
+        type: input.type,
+        currency: "USD",
+        accountNumber: input.accountNumber,
+        balance: input.balance,
+        availableBalance: input.availableBalance,
+        status: "ACTIVE",
+        createdAt: { $date: now.toISOString() },
+        updatedAt: { $date: now.toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+  return { id, ...input };
 }
 
 async function createRetirementAccountRecord(input: {
@@ -137,34 +106,29 @@ async function createRetirementAccountRecord(input: {
   withdrawalEligibilityStatus: string;
   status: "ACTIVE";
 }) {
-  try {
-    return await prisma.retirementAccount.create({ data: input });
-  } catch (error) {
-    if (!isMongoTransactionError(error)) throw error;
-    const id = randomBytes(12).toString("hex");
-    const now = new Date();
-    await prisma.$runCommandRaw({
-      insert: "RetirementAccount",
-      documents: [
-        {
-          _id: { $oid: id },
-          userId: { $oid: input.userId },
-          accountNumber: input.accountNumber,
-          balance: input.balance,
-          vestedBalance: input.vestedBalance,
-          contributionYtd: input.contributionYtd,
-          employerMatchYtd: input.employerMatchYtd,
-          investmentGrowthPlaceholder: input.investmentGrowthPlaceholder,
-          withdrawalEligibilityStatus: input.withdrawalEligibilityStatus,
-          status: input.status,
-          createdAt: { $date: now.toISOString() },
-          updatedAt: { $date: now.toISOString() }
-        }
-      ],
-      writeConcern: { w: 1 }
-    });
-    return { id, ...input };
-  }
+  const id = randomBytes(12).toString("hex");
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "RetirementAccount",
+    documents: [
+      {
+        _id: { $oid: id },
+        userId: { $oid: input.userId },
+        accountNumber: input.accountNumber,
+        balance: input.balance,
+        vestedBalance: input.vestedBalance,
+        contributionYtd: input.contributionYtd,
+        employerMatchYtd: input.employerMatchYtd,
+        investmentGrowthPlaceholder: input.investmentGrowthPlaceholder,
+        withdrawalEligibilityStatus: input.withdrawalEligibilityStatus,
+        status: input.status,
+        createdAt: { $date: now.toISOString() },
+        updatedAt: { $date: now.toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+  return { id, ...input };
 }
 
 async function createRetirementContributionRecord(input: {
@@ -175,49 +139,39 @@ async function createRetirementContributionRecord(input: {
   growthAmount: number;
   contributionDate: Date;
 }) {
-  try {
-    await prisma.retirementContribution.create({ data: input });
-  } catch (error) {
-    if (!isMongoTransactionError(error)) throw error;
-    await prisma.$runCommandRaw({
-      insert: "RetirementContribution",
-      documents: [
-        {
-          _id: { $oid: randomBytes(12).toString("hex") },
-          retirementAccountId: { $oid: input.retirementAccountId },
-          source: input.source,
-          description: input.description,
-          amount: input.amount,
-          growthAmount: input.growthAmount,
-          currency: "USD",
-          contributionDate: { $date: input.contributionDate.toISOString() },
-          createdAt: { $date: new Date().toISOString() }
-        }
-      ],
-      writeConcern: { w: 1 }
-    });
-  }
+  await prisma.$runCommandRaw({
+    insert: "RetirementContribution",
+    documents: [
+      {
+        _id: { $oid: randomBytes(12).toString("hex") },
+        retirementAccountId: { $oid: input.retirementAccountId },
+        source: input.source,
+        description: input.description,
+        amount: input.amount,
+        growthAmount: input.growthAmount,
+        currency: "USD",
+        contributionDate: { $date: input.contributionDate.toISOString() },
+        createdAt: { $date: new Date().toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
 }
 
 async function createEmailVerificationTokenRecord(input: { userId: string; tokenHash: string; expiresAt: Date }) {
-  try {
-    await prisma.emailVerificationToken.create({ data: input });
-  } catch (error) {
-    if (!isMongoTransactionError(error)) throw error;
-    await prisma.$runCommandRaw({
-      insert: "EmailVerificationToken",
-      documents: [
-        {
-          _id: { $oid: randomBytes(12).toString("hex") },
-          userId: { $oid: input.userId },
-          tokenHash: input.tokenHash,
-          expiresAt: { $date: input.expiresAt.toISOString() },
-          createdAt: { $date: new Date().toISOString() }
-        }
-      ],
-      writeConcern: { w: 1 }
-    });
-  }
+  await prisma.$runCommandRaw({
+    insert: "EmailVerificationToken",
+    documents: [
+      {
+        _id: { $oid: randomBytes(12).toString("hex") },
+        userId: { $oid: input.userId },
+        tokenHash: input.tokenHash,
+        expiresAt: { $date: input.expiresAt.toISOString() },
+        createdAt: { $date: new Date().toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
 }
 
 async function createRetirementWelcomeAccount(userId: string) {
@@ -252,6 +206,86 @@ async function createRetirementWelcomeAccount(userId: string) {
   return { retirementAccount, welcomeBonus };
 }
 
+async function runPostRegistrationTasks(input: {
+  user: Awaited<ReturnType<typeof createUserRecord>>;
+  ip?: string;
+  userAgent?: string;
+}) {
+  const { user, ip, userAgent } = input;
+
+  try {
+    await createAccountRecord({
+      userId: user.id,
+      type: "CHECKING",
+      accountNumber: accountNumber("44"),
+      balance: 0,
+      availableBalance: 0
+    });
+    await createAccountRecord({
+      userId: user.id,
+      type: "SAVINGS",
+      accountNumber: accountNumber("55"),
+      balance: 0,
+      availableBalance: 0
+    });
+  } catch (error) {
+    console.error("[register] account creation failed:", error);
+  }
+
+  let retirementAccount: { id: string } | null = null;
+  let welcomeBonus = 0;
+  try {
+    const retirement = await createRetirementWelcomeAccount(user.id);
+    retirementAccount = retirement.retirementAccount;
+    welcomeBonus = retirement.welcomeBonus;
+  } catch (error) {
+    console.error("[register] createRetirementWelcomeAccount failed:", error);
+  }
+
+  try {
+    const rawToken = crypto.randomUUID();
+    await createEmailVerificationTokenRecord({
+      userId: user.id,
+      tokenHash: await sha256(rawToken),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
+    });
+    await sendEmail({
+      to: user.email,
+      subject: "Verify your Grand Central Liberty Bank email",
+      html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
+    }).catch((error) => {
+      console.error("[auth] verification email failed", error);
+    });
+  } catch (error) {
+    console.error("[register] email verification setup failed:", error);
+  }
+
+  await auditLog({
+    actorId: user.id,
+    action: "USER_REGISTERED",
+    entity: "User",
+    entityId: user.id,
+    metadata: {
+      retirementAccountId: retirementAccount?.id ?? null,
+      welcomeBonus401k: welcomeBonus
+    },
+    ip,
+    userAgent
+  });
+
+  if (welcomeBonus > 0) {
+    await auditLog({
+      actorId: user.id,
+      action: "WELCOME_BONUS_401K_CREDITED",
+      entity: "RetirementAccount",
+      entityId: retirementAccount?.id ?? null,
+      metadata: { amount: welcomeBonus, currency: "USD" },
+      ip,
+      userAgent
+    });
+  }
+}
+
 export async function POST(request: NextRequest) {
   return handleApi(async () => {
     assertRateLimit(request, "register", 5);
@@ -280,81 +314,8 @@ export async function POST(request: NextRequest) {
       preferredLocale: detectedLocale
     });
 
-    // Create accounts as separate operations — nested writes require MongoDB transactions
-    // (replica set / P2031). Separate creates work on standalone MongoDB.
-    try {
-      await createAccountRecord({
-        userId: user.id,
-        type: "CHECKING",
-        accountNumber: accountNumber("44"),
-        balance: 0,
-        availableBalance: 0
-      });
-      await createAccountRecord({
-        userId: user.id,
-        type: "SAVINGS",
-        accountNumber: accountNumber("55"),
-        balance: 0,
-        availableBalance: 0
-      });
-    } catch (error) {
-      console.error("[register] account creation failed:", error);
-    }
-
-    let retirementAccount: { id: string } | null = null;
-    let welcomeBonus = 0;
-    try {
-      const retirement = await createRetirementWelcomeAccount(user.id);
-      retirementAccount = retirement.retirementAccount;
-      welcomeBonus = retirement.welcomeBonus;
-    } catch (error) {
-      console.error("[register] createRetirementWelcomeAccount failed:", error);
-    }
-
-    try {
-      const rawToken = crypto.randomUUID();
-      await createEmailVerificationTokenRecord({
-        userId: user.id,
-        tokenHash: await sha256(rawToken),
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
-      });
-      await sendEmail({
-        to: user.email,
-        subject: "Verify your Grand Central Liberty Bank email",
-        html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
-      }).catch((error) => {
-        console.error("[auth] verification email failed", error);
-      });
-    } catch (error) {
-      console.error("[register] emailVerificationToken.create failed:", error);
-    }
-
     const { ip, userAgent } = await requestIpAndAgent();
     const session = await createSession(user, { ip, userAgent });
-    await auditLog({
-      actorId: user.id,
-      action: "USER_REGISTERED",
-      entity: "User",
-      entityId: user.id,
-      metadata: {
-        retirementAccountId: retirementAccount?.id ?? null,
-        welcomeBonus401k: welcomeBonus
-      },
-      ip,
-      userAgent
-    });
-
-    if (welcomeBonus > 0) {
-      await auditLog({
-        actorId: user.id,
-        action: "WELCOME_BONUS_401K_CREDITED",
-        entity: "RetirementAccount",
-        entityId: retirementAccount?.id ?? null,
-        metadata: { amount: welcomeBonus, currency: "USD" },
-        ip,
-        userAgent
-      });
-    }
 
     const response = created({
       user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }
@@ -366,6 +327,7 @@ export async function POST(request: NextRequest) {
       expires: session.expiresAt,
       path: "/"
     });
+    void runPostRegistrationTasks({ user, ip, userAgent });
     return response;
   });
 }
