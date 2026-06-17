@@ -15,15 +15,19 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
     const passwordValid = user ? await verifyPassword(input.password, user.passwordHash) : false;
 
-    await prisma.loginHistory.create({
-      data: {
-        userId: user?.id,
-        email: input.email.toLowerCase(),
-        ip,
-        userAgent,
-        success: Boolean(user && passwordValid)
-      }
-    });
+    try {
+      await prisma.loginHistory.create({
+        data: {
+          userId: user?.id,
+          email: input.email.toLowerCase(),
+          ip,
+          userAgent,
+          success: Boolean(user && passwordValid)
+        }
+      });
+    } catch (error) {
+      console.error("[auth] loginHistory.create failed:", error);
+    }
 
     if (!user || !passwordValid || user.status === "SUSPENDED") {
       throw new Response("Invalid credentials.", { status: 401 });
