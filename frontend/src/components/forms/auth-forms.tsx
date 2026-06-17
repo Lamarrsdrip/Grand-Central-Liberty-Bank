@@ -161,6 +161,7 @@ export function RegisterForm() {
 
 export function ForgotPasswordForm() {
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   return (
     <Card>
@@ -173,12 +174,20 @@ export function ForgotPasswordForm() {
           className="grid gap-4"
           onSubmit={async (event) => {
             event.preventDefault();
+            setLoading(true);
+            setMessage("");
             const form = new FormData(event.currentTarget);
-            const data = await secureFetch("/api/auth/forgot-password", {
-              method: "POST",
-              body: JSON.stringify({ email: form.get("email") })
-            });
-            setMessage(data.message);
+            try {
+              const data = await secureFetch("/api/auth/forgot-password", {
+                method: "POST",
+                body: JSON.stringify({ email: form.get("email") })
+              });
+              setMessage(data.message ?? "If that account exists, a password reset email has been sent.");
+            } catch (error) {
+              setMessage(error instanceof Error ? error.message : "Request failed. Please try again.");
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           <Status message={message} />
@@ -186,7 +195,7 @@ export function ForgotPasswordForm() {
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" required />
           </Field>
-          <Button>Send reset link</Button>
+          <Button disabled={loading}>{loading ? "Sending..." : "Send reset link"}</Button>
         </form>
       </CardContent>
     </Card>
@@ -196,6 +205,7 @@ export function ForgotPasswordForm() {
 export function ResetPasswordForm() {
   const params = useSearchParams();
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   return (
     <Card>
@@ -208,12 +218,20 @@ export function ResetPasswordForm() {
           className="grid gap-4"
           onSubmit={async (event) => {
             event.preventDefault();
+            setLoading(true);
+            setMessage("");
             const form = new FormData(event.currentTarget);
-            await secureFetch("/api/auth/reset-password", {
-              method: "POST",
-              body: JSON.stringify({ token: form.get("token"), password: form.get("password") })
-            });
-            setMessage("Password updated. You can sign in with the new password.");
+            try {
+              await secureFetch("/api/auth/reset-password", {
+                method: "POST",
+                body: JSON.stringify({ token: form.get("token"), password: form.get("password") })
+              });
+              setMessage("Password updated. You can sign in with the new password.");
+            } catch (error) {
+              setMessage(error instanceof Error ? error.message : "Password reset failed. Please try again.");
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           <Status message={message} />
@@ -225,7 +243,7 @@ export function ResetPasswordForm() {
             <Label htmlFor="password">New password</Label>
             <Input id="password" name="password" type="password" minLength={12} required />
           </Field>
-          <Button>Update password</Button>
+          <Button disabled={loading}>{loading ? "Updating..." : "Update password"}</Button>
         </form>
       </CardContent>
     </Card>
@@ -235,6 +253,7 @@ export function ResetPasswordForm() {
 export function VerifyEmailForm() {
   const params = useSearchParams();
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   return (
     <Card>
@@ -247,12 +266,20 @@ export function VerifyEmailForm() {
           className="grid gap-4"
           onSubmit={async (event) => {
             event.preventDefault();
+            setLoading(true);
+            setMessage("");
             const form = new FormData(event.currentTarget);
-            await secureFetch("/api/auth/verify-email", {
-              method: "POST",
-              body: JSON.stringify({ token: form.get("token") })
-            });
-            setMessage("Email verified.");
+            try {
+              await secureFetch("/api/auth/verify-email", {
+                method: "POST",
+                body: JSON.stringify({ token: form.get("token") })
+              });
+              setMessage("Email verified.");
+            } catch (error) {
+              setMessage(error instanceof Error ? error.message : "Verification failed. Please try again.");
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           <Status message={message} />
@@ -260,7 +287,7 @@ export function VerifyEmailForm() {
             <Label htmlFor="token">Verification token</Label>
             <Input id="token" name="token" defaultValue={params.get("token") ?? ""} required />
           </Field>
-          <Button>Verify email</Button>
+          <Button disabled={loading}>{loading ? "Verifying..." : "Verify email"}</Button>
         </form>
       </CardContent>
     </Card>
