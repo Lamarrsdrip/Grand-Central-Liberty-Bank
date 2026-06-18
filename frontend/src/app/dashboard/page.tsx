@@ -61,6 +61,17 @@ export default async function DashboardPage() {
         {/* ── Top bar ─────────────────── */}
         <CustomerTopBar user={user} notifCount={data.notifications.filter(n => !n.readAt).length} />
 
+        {/* ── Frozen account notice ─────── */}
+        {user.status === "FROZEN" && (
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-5 py-4">
+            <p className="font-black text-amber-300">Account Temporarily Frozen</p>
+            <p className="mt-1 text-sm text-amber-100/70">
+              Your account has been placed on a temporary hold. Transactions are suspended pending review.
+              Please <Link href="/support" className="underline">contact support</Link> to resolve this.
+            </p>
+          </div>
+        )}
+
         {/* ── Total Assets Hero ─────────── */}
         <TotalAssetsCard
           total={totalAssets}

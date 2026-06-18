@@ -34,7 +34,8 @@ async function recordLoginAttempt(input: {
 
 export async function POST(request: NextRequest) {
   return handleApi(async () => {
-    assertRateLimit(request, "login", 10);
+    // 25 attempts per IP per minute — generous enough for shared proxy IPs
+    assertRateLimit(request, "login", 25);
     const input = loginSchema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
     const lookupEmail = input.email.toLowerCase();
@@ -61,8 +62,12 @@ export async function POST(request: NextRequest) {
         success: Boolean(user && passwordValid)
       }).catch((error) => console.error("[auth] login history failed:", error));
 
-    if (!user || !passwordValid || user.status === "SUSPENDED") {
+    if (!user || !passwordValid) {
       throw new Response("Invalid credentials.", { status: 401 });
+    }
+
+    if (user.status === "SUSPENDED") {
+      throw new Response("This account has been suspended. Please contact support for assistance.", { status: 403 });
     }
 
     if (user.twoFactorEnabled) {
