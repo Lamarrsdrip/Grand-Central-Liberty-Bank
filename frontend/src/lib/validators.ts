@@ -44,13 +44,26 @@ export const cardApplicationSchema = z.object({
 export const transferSchema = z.object({
   fromAccountId: z.string().min(1),
   type: z.enum(["INTERNAL", "DOMESTIC", "INTERNATIONAL"]),
-  beneficiaryName: z.string().min(2),
-  beneficiaryBank: z.string().optional(),
-  beneficiaryAccount: z.string().optional(),
-  ibanSwift: z.string().optional(),
-  amount: z.coerce.number().positive(),
+  beneficiaryName: z.string().trim().min(2, "Recipient full name is required"),
+  beneficiaryBank: z.string().trim().min(1, "Bank name is required"),
+  beneficiaryAccount: z.string().trim().min(4, "Account number / IBAN is required"),
+  ibanSwift: z.string().trim().optional(),
+  recipientCountry: z.string().min(1, "Recipient country is required"),
+  amount: z.coerce.number().positive("Amount must be greater than 0"),
+  currency: z.string().min(1, "Currency is required").default("USD"),
+  purpose: z.string().trim().min(2, "Transfer purpose is required"),
+  saveBeneficiary: z.boolean().optional().default(false),
+  beneficiaryNickname: z.string().trim().optional()
+});
+
+export const beneficiarySchema = z.object({
+  recipientName: z.string().trim().min(2, "Recipient name is required"),
+  bankName: z.string().trim().min(1, "Bank name is required"),
+  accountNumber: z.string().trim().min(4, "Account number is required"),
+  routingSwift: z.string().trim().optional(),
+  recipientCountry: z.string().min(1, "Country is required"),
   currency: z.string().default("USD"),
-  purpose: z.string().min(3)
+  nickname: z.string().trim().optional()
 });
 
 export const ticketSchema = z.object({

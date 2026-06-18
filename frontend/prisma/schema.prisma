@@ -185,6 +185,7 @@ model User {
   assignedTickets    SupportTicket[]   @relation("TicketAssignee")
   supportMessages    SupportMessage[]
   transferRequests   TransferRequest[]
+  savedBeneficiaries SavedBeneficiary[]
   notifications      Notification[]
   broadcastEmails    BroadcastEmail[]
   auditLogs          AuditLog[]
@@ -433,6 +434,7 @@ model TransferRequest {
   beneficiaryBank    String?
   beneficiaryAccount String?
   ibanSwift          String?
+  recipientCountry   String?
   amount             Float
   currency           String         @default("USD")
   purpose            String
@@ -440,6 +442,21 @@ model TransferRequest {
   adminNote          String?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
+}
+
+model SavedBeneficiary {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @db.ObjectId
+  user             User     @relation(fields: [userId], references: [id])
+  nickname         String?
+  recipientName    String
+  bankName         String
+  accountNumber    String
+  routingSwift     String?
+  recipientCountry String
+  currency         String   @default("USD")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model TransferSetting {
