@@ -18,7 +18,10 @@ const MONGO_REJECTED_PARAMS = ["timeoutms", "timeout"];
 
 function cleanMongoUrl(raw, dbName) {
   const url = new URL(raw);
-  for (const p of MONGO_REJECTED_PARAMS) url.searchParams.delete(p);
+  // Case-insensitive delete — Emergent's MONGO_URL uses timeoutMS (camelCase)
+  for (const key of Array.from(url.searchParams.keys())) {
+    if (MONGO_REJECTED_PARAMS.includes(key.toLowerCase())) url.searchParams.delete(key);
+  }
   if (dbName) url.pathname = `/${dbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
   if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");

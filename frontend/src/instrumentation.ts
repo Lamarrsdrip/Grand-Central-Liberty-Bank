@@ -18,7 +18,10 @@ export async function register() {
 
   function buildClean(raw: string): string {
     const url = new URL(raw);
-    for (const p of REJECTED) url.searchParams.delete(p);
+    // Case-insensitive delete — Emergent's MONGO_URL uses timeoutMS (camelCase)
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (REJECTED.includes(key.toLowerCase())) url.searchParams.delete(key);
+    }
     if (dbName) url.pathname = `/${dbName}`;
     if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
     if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
