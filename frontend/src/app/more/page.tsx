@@ -9,7 +9,7 @@ const moreItems = [
   { href: "/support", label: "Support", body: "Live chat, tickets, and secure documents", icon: Headphones },
   { href: "/retirement", label: "401(k)", body: "Retirement portfolio, withdrawals, and documents", icon: LineChart },
   { href: "/profile", label: "Profile", body: "Personal details, security, language, and theme", icon: UserCircle },
-  { href: "/kyc", label: "Verification", body: "KYC documents, notes, and review history", icon: ShieldCheck },
+  { href: "/profile#kyc", label: "Verification", body: "KYC documents, notes, and review history", icon: ShieldCheck },
   { href: "/profile", label: "Settings", body: "Account preferences and secure sessions", icon: Settings2 }
 ];
 

@@ -66,7 +66,7 @@ export default async function DashboardPage() {
           total={totalAssets}
           available={available}
           items={wealthItems}
-          todayChange={`+$${(totalAssets * 0.0173).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} (1.73%)`}
+          todayChange={null}
         />
 
         {selectedBalance ? (
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
             <Link href="/wallet" className="card-dark p-5 hover:bg-white/6 transition rounded-2xl block">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Crypto</p>
-              <span className="text-xs font-bold text-green bg-green/10 px-2 py-0.5 rounded-full">+3.8%</span>
+              <span className="text-xs font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{data.wallets.length} networks</span>
             </div>
             <p className="text-xl font-black text-white">{money(crypto)}</p>
             <div className="mt-2 flex items-center justify-between gap-2">
@@ -174,7 +174,7 @@ export default async function DashboardPage() {
           <Link href="/retirement" className="card-dark p-5 hover:bg-white/6 transition rounded-2xl block">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-white/40 uppercase tracking-wider">401(k)</p>
-              <span className="text-xs font-bold text-green bg-green/10 px-2 py-0.5 rounded-full">+8.4%</span>
+              <span className="text-xs font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{data.retirementAccounts.length > 0 ? "Active" : "Inactive"}</span>
             </div>
             <p className="text-xl font-black text-white">{money(retirementTotal)}</p>
             <p className="text-xs text-white/30 mt-0.5">
@@ -196,7 +196,7 @@ export default async function DashboardPage() {
           <div className="card-dark p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-black text-white">Notifications</h3>
-              <Link href="/profile" className="text-xs font-bold text-green hover:text-green-dim transition">See all</Link>
+              <Link href="/notifications" className="text-xs font-bold text-green hover:text-green-dim transition">See all</Link>
             </div>
             <div className="space-y-3">
               {data.notifications.slice(0, 3).map((n) => (

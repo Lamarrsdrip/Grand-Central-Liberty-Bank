@@ -128,12 +128,12 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
 
 /* ── Total Assets Card (matches screenshot) ─ */
 export function TotalAssetsCard({
-  total, available, items, todayChange = "+$4,275.20 (1.73%)"
+  total, available, items, todayChange = null
 }: {
   total: number;
   available: number;
   items: Array<{ label: string; value: number; color: string }>;
-  todayChange?: string;
+  todayChange?: string | null;
 }) {
   return (
     <div className="assets-hero p-5 sm:p-7 fade-up">
@@ -146,7 +146,7 @@ export function TotalAssetsCard({
           <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-none">
             {money(total)}
           </h2>
-          <p className="mt-2 text-sm font-semibold text-green">{todayChange} today</p>
+          {todayChange && <p className="mt-2 text-sm font-semibold text-green">{todayChange} today</p>}
           <p className="mt-1 text-xs font-bold text-white/35">Available now {money(available)}</p>
         </div>
         <Link href="/accounts" className="text-xs font-bold text-white/40 hover:text-white/70 transition mt-1">
@@ -463,7 +463,7 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
 }
 
 /* ── Customer Top Bar ─────────────────── */
-export function CustomerTopBar({ user, notifCount = 3 }: {
+export function CustomerTopBar({ user, notifCount = 0 }: {
   user: { firstName: string; lastName: string };
   notifCount?: number;
 }) {
@@ -482,11 +482,11 @@ export function CustomerTopBar({ user, notifCount = 3 }: {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Link href="/profile" className="relative size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition" aria-label="Notifications">
+        <Link href="/notifications" className="relative size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition" aria-label="Notifications">
           <Bell className="size-4" />
           {notifCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 size-4 flex items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-black text-white">
-              {notifCount}
+              {Math.min(notifCount, 9)}
             </span>
           )}
         </Link>

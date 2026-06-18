@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, ShoppingCart, ArrowDownToLine } from "lucide-react";
+import { Plus, ShoppingCart, ArrowDownToLine, Download } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { AccountCard } from "@/components/banking/premium-ui";
 import { accountLabel } from "@/components/banking/finance";
@@ -25,7 +25,15 @@ export default async function AccountsPage() {
             <h1 className="text-3xl font-black text-white">Accounts</h1>
             <p className="text-sm text-white/50 mt-1">Your accounts at a glance</p>
           </div>
-          <div className="absolute right-4 top-4 size-16 rounded-full bg-green/10 blur-xl" />
+          <a
+            href="/api/user/statement"
+            download
+            className="absolute top-4 right-4 z-10 flex items-center gap-1.5 bg-white/10 hover:bg-white/15 border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-white/70 hover:text-white transition"
+          >
+            <Download className="size-3.5" />
+            Statement
+          </a>
+          <div className="absolute right-4 bottom-0 size-16 rounded-full bg-green/10 blur-xl" />
         </div>
 
         {/* Account cards */}
@@ -48,7 +56,7 @@ export default async function AccountsPage() {
         <div className="card-dark p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-black text-white">Recent Activity</h3>
-            <Link href="/transfers" className="text-xs font-bold text-green hover:text-green-dim transition">See all</Link>
+            <a href="/api/user/statement" download className="text-xs font-bold text-green hover:text-green-dim transition flex items-center gap-1"><Download className="size-3" />Export</a>
           </div>
           <div className="space-y-1">
             {data.transactions.slice(0, 6).map((tx) => {

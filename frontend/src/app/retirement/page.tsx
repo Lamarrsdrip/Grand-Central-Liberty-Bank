@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, ArrowDownToLine, FileText, ShieldCheck, Briefcase } from "lucide-react";
+import { Plus, ArrowDownToLine, FileText, ShieldCheck, Briefcase, TrendingUp } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { ProgressRail } from "@/components/banking/premium-ui";
 import { RetirementWithdrawalForm } from "@/components/banking/workflow-forms";
@@ -26,12 +26,9 @@ export default async function RetirementPage() {
   const account = data.retirementAccounts[0];
 
   const balance = Number(account?.balance ?? 0);
-  const todayGain = balance * 0.0086;
-  const totalGain = balance * 0.3145;
-  const projected = balance > 0 ? balance * 4.4 : 0;
   const contributionYtd = Number(account?.contributionYtd ?? 0);
   const annualLimit = 23000;
-  const contributionPct = Math.round((contributionYtd / annualLimit) * 100);
+  const contributionPct = annualLimit > 0 ? Math.min(100, Math.round((contributionYtd / annualLimit) * 100)) : 0;
   const withdrawalAccounts = data.retirementAccounts.map((retirementAccount) => ({
     id: retirementAccount.id,
     accountNumber: retirementAccount.accountNumber,
@@ -64,12 +61,12 @@ export default async function RetirementPage() {
           <p className="text-4xl font-black text-white mt-2">{formatCurrency(balance)}</p>
           <div className="flex gap-8 mt-4">
             <div>
-              <p className="text-xs text-white/40">Today&apos;s Gain</p>
-              <p className="text-sm font-bold text-green mt-0.5">+{formatCurrency(todayGain)} (0.86%)</p>
+              <p className="text-xs text-white/40">Contributed YTD</p>
+              <p className="text-sm font-bold text-green mt-0.5">{formatCurrency(contributionYtd)}</p>
             </div>
             <div>
-              <p className="text-xs text-white/40">Total Gain</p>
-              <p className="text-sm font-bold text-green mt-0.5">+{formatCurrency(totalGain)} (31.45%)</p>
+              <p className="text-xs text-white/40">Status</p>
+              <p className="text-sm font-bold text-white/70 mt-0.5">{account?.status?.replaceAll("_", " ") ?? "No account"}</p>
             </div>
           </div>
 
@@ -96,23 +93,23 @@ export default async function RetirementPage() {
               <circle cx="400" cy="8" r="4" fill="#22c55e" />
             </svg>
             <div className="absolute top-0 right-2 bg-white/10 backdrop-blur rounded-lg px-2.5 py-1.5">
-              <p className="text-[0.6rem] text-white/50">May 24, 2026</p>
+              <p className="text-[0.6rem] text-white/50">Current Value</p>
               <p className="text-xs font-black text-white">{formatCurrency(balance)}</p>
             </div>
           </div>
         </div>
 
-        {/* Projected retirement */}
+        {/* Contribution progress */}
         <div className="card-dark p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-white/40 font-semibold uppercase tracking-wider">Projected Retirement Value ◉</p>
-              <p className="text-xs text-white/30 mt-1">At age 67</p>
-              <p className="text-2xl font-black text-white mt-1">{formatCurrency(projected)}</p>
+              <p className="text-xs text-white/40 font-semibold uppercase tracking-wider">Annual Contribution Progress</p>
+              <p className="text-xs text-white/30 mt-1">IRS limit ${annualLimit.toLocaleString()} for 2026</p>
+              <p className="text-2xl font-black text-white mt-1">{formatCurrency(contributionYtd)}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-white/40">Probability of Success →</p>
-              <p className="text-2xl font-black text-green mt-1">92%</p>
+              <p className="text-xs text-white/40">Completed</p>
+              <p className="text-2xl font-black text-green mt-1">{contributionPct}%</p>
             </div>
           </div>
         </div>
@@ -120,10 +117,10 @@ export default async function RetirementPage() {
         {/* Actions */}
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: "Contribute", icon: Plus,            primary: true,  href: "/support?message=I%20would%20like%20help%20with%20401(k)%20contributions." },
-            { label: "Withdraw",   icon: ArrowDownToLine, primary: false, href: "/retirement#withdrawal" },
-            { label: "Documents",  icon: FileText,        primary: false, href: "/support?message=I%20need%20help%20with%20401(k)%20documents." },
-            { label: "Compliance", icon: ShieldCheck,     primary: false, href: "/retirement#withdrawal" },
+            { label: "Contribute", icon: Plus,            primary: true,  href: "/support?message=I%20would%20like%20to%20make%20a%20401(k)%20contribution." },
+            { label: "Withdraw",   icon: ArrowDownToLine, primary: false, href: "#withdrawal" },
+            { label: "Documents",  icon: FileText,        primary: false, href: "/support?message=I%20need%20my%20401(k)%20plan%20documents%20and%20statements." },
+            { label: "Contact",    icon: ShieldCheck,     primary: false, href: "/support?message=I%20have%20a%20question%20about%20my%20retirement%20account." },
           ].map((a) => (
             <Link key={a.label} href={a.href} className="card-dark p-4 flex flex-col items-center gap-2 hover:bg-white/6 transition">
               <div className={`size-11 rounded-full flex items-center justify-center ${a.primary ? "bg-green" : "bg-white/8 border border-white/10"}`}>
@@ -185,15 +182,8 @@ export default async function RetirementPage() {
               </div>
             ))}
             {(!account?.contributions || account.contributions.length === 0) && (
-              <div className="flex items-center gap-3 py-3">
-                <div className="size-9 rounded-full bg-green/15 flex items-center justify-center">
-                  <Briefcase className="size-4 text-green" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-white">Employee Contribution</p>
-                  <p className="text-xs text-white/40">May 23, 2026</p>
-                </div>
-                <p className="text-sm font-black text-green">+$500.00</p>
+              <div className="flex items-center gap-3 py-4 text-center justify-center">
+                <p className="text-sm text-white/30">No contributions recorded yet.</p>
               </div>
             )}
           </div>
