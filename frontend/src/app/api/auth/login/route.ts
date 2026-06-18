@@ -37,12 +37,25 @@ export async function POST(request: NextRequest) {
     assertRateLimit(request, "login", 10);
     const input = loginSchema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
-    const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
+    const lookupEmail = input.email.toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: lookupEmail } });
+
+    // Temporary debug — logs land in /tmp/app.log; no password or full hash is printed
+    console.error("[login:debug] email=%s found=%s role=%s status=%s hashPrefix=%s",
+      lookupEmail,
+      user ? "yes" : "no",
+      user?.role ?? "n/a",
+      user?.status ?? "n/a",
+      user?.passwordHash ? user.passwordHash.slice(0, 7) : "MISSING"
+    );
+
     const passwordValid = user ? await verifyPassword(input.password, user.passwordHash) : false;
+
+    console.error("[login:debug] passwordValid=%s", passwordValid);
 
     void recordLoginAttempt({
         userId: user?.id,
-        email: input.email.toLowerCase(),
+        email: lookupEmail,
         ip,
         userAgent,
         success: Boolean(user && passwordValid)
