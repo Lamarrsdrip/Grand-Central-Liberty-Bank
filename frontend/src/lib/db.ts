@@ -7,8 +7,12 @@ let prismaClient = globalForPrisma.prisma;
 function getPrismaClient() {
   if (prismaClient) return prismaClient;
 
+  // Ensure PRISMA_DATABASE_URL is set before PrismaClient is instantiated.
+  // instrumentation.ts runs earlier and should have already done this,
+  // but buildMongoDatabaseUrl() is a safe second layer.
+  buildMongoDatabaseUrl();
+
   prismaClient = new PrismaClient({
-    datasources: { db: { url: buildMongoDatabaseUrl() } },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"]
   });
 

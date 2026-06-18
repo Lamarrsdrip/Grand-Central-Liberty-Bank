@@ -26,31 +26,36 @@ function cleanMongoUrl(raw, dbName) {
 }
 
 function buildDatabaseUrl() {
+  // schema.prisma now reads PRISMA_DATABASE_URL, not DATABASE_URL.
+  // If instrumentation.ts already set it, use it directly.
+  const already = process.env.PRISMA_DATABASE_URL?.trim();
+  if (already) return already;
+
   const explicit = process.env.DATABASE_URL?.trim();
   const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
 
-  if (explicit) {
-    if (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://")) {
-      const clean = cleanMongoUrl(explicit, dbName);
-      if (clean !== explicit) {
-        process.env.DATABASE_URL = clean;
-        console.log("[server] Removed invalid params from DATABASE_URL (e.g. timeoutms).");
-      }
-      return clean;
+  let clean;
+  if (explicit && (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://"))) {
+    clean = cleanMongoUrl(explicit, dbName);
+    if (clean !== explicit) {
+      console.log("[server] Removed invalid params from DATABASE_URL (e.g. timeoutms).");
     }
-    const proto = explicit.split("://")[0] || "(empty)";
-    console.error(
-      `[server] DATABASE_URL uses protocol "${proto}://" — expected "mongodb://" or "mongodb+srv://". ` +
-        "Overwriting process.env.DATABASE_URL with MONGO_URL for this session."
-    );
+  } else {
+    if (explicit) {
+      const proto = explicit.split("://")[0] || "(empty)";
+      console.error(
+        `[server] DATABASE_URL uses protocol "${proto}://" — ignoring. ` +
+          "Building from MONGO_URL instead."
+      );
+    }
+    const base = process.env.MONGO_URL?.trim();
+    if (!base) return null;
+    clean = cleanMongoUrl(base, dbName);
+    console.log("[server] MongoDB URL built from MONGO_URL.");
   }
 
-  const base = process.env.MONGO_URL?.trim();
-  if (!base) return null;
-  const clean = cleanMongoUrl(base, dbName);
-  // Patch env so all downstream code reading process.env.DATABASE_URL gets a valid MongoDB URL.
-  process.env.DATABASE_URL = clean;
-  console.log("[server] DATABASE_URL patched from MONGO_URL for this session.");
+  // Write to PRISMA_DATABASE_URL so schema.prisma and Prisma CLI both find it.
+  process.env.PRISMA_DATABASE_URL = clean;
   return clean;
 }
 

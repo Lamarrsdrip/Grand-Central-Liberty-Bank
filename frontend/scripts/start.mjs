@@ -353,12 +353,13 @@ function buildDatabaseUrl() {
 
 const dbUrl = buildDatabaseUrl();
 
-// Patch process.env.DATABASE_URL NOW — before spawning the Next.js child process.
-// Without this the child inherits the original (bad) DATABASE_URL from the platform
-// (e.g. postgresql://...) and every Prisma call inside Next.js fails at runtime.
+// Set PRISMA_DATABASE_URL — the var that schema.prisma now reads — before spawning
+// the child process so the child inherits the correct MongoDB URL.
+// DATABASE_URL is intentionally left as-is; Emergent's postgresql:// value in
+// DATABASE_URL no longer reaches Prisma since schema.prisma reads PRISMA_DATABASE_URL.
 if (dbUrl) {
-  process.env.DATABASE_URL = dbUrl;
-  console.log("[start] process.env.DATABASE_URL set to resolved MongoDB URL.");
+  process.env.PRISMA_DATABASE_URL = dbUrl;
+  console.log("[start] process.env.PRISMA_DATABASE_URL set to resolved MongoDB URL.");
 }
 
 // Startup environment validation — catches misconfigured production secrets early.
@@ -426,7 +427,8 @@ function startDatabaseBootstrap() {
   // We DO NOT set it on the parent process.env so it isn't picked up by
   // the Emergent deployment "manage_secrets" sweep (which copies env vars
   // from the running preview pod into production secrets).
-  const cliEnv = { ...process.env, DATABASE_URL: dbUrl };
+  // Prisma CLI reads PRISMA_DATABASE_URL now (schema.prisma changed from DATABASE_URL).
+  const cliEnv = { ...process.env, PRISMA_DATABASE_URL: dbUrl, DATABASE_URL: dbUrl };
 
   setTimeout(async () => {
     const pushed = await runBackgroundCommand(
