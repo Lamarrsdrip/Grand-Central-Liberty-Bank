@@ -31,6 +31,8 @@ export async function register() {
     if (dbName) url.pathname = `/${dbName}`;
     if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
     if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
+    if (!url.searchParams.has("serverSelectionTimeoutMS")) url.searchParams.set("serverSelectionTimeoutMS", "5000");
+    if (!url.searchParams.has("connectTimeoutMS")) url.searchParams.set("connectTimeoutMS", "10000");
     return url.toString();
   }
 
