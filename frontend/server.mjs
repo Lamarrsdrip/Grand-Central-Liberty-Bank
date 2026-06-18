@@ -78,12 +78,20 @@ function getPrisma() {
   return prisma;
 }
 
+const BUILD_FINGERPRINT = "2026-06-18T-login-debug";
+
 function sendHealth(res) {
   res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
   res.end(
     JSON.stringify({
       ok: true,
       service: "Grand Central Liberty Bank",
+      build: BUILD_FINGERPRINT,
+      db: process.env.PRISMA_DATABASE_URL
+        ? process.env.PRISMA_DATABASE_URL.replace(/:\/\/[^@]+@/, "://***@").split("?")[0]
+        : process.env.MONGO_URL
+          ? process.env.MONGO_URL.replace(/:\/\/[^@]+@/, "://***@").split("?")[0]
+          : "not-set",
       timestamp: new Date().toISOString()
     })
   );

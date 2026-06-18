@@ -40,8 +40,8 @@ export async function POST(request: NextRequest) {
     const lookupEmail = input.email.toLowerCase();
     const user = await prisma.user.findUnique({ where: { email: lookupEmail } });
 
-    // Temporary debug — logs land in /tmp/app.log; no password or full hash is printed
-    console.error("[login:debug] email=%s found=%s role=%s status=%s hashPrefix=%s",
+    // Temporary debug — BUILD:2026-06-18T-login-debug
+    console.error("[login:debug] BUILD=2026-06-18T-login-debug email=%s found=%s role=%s status=%s hashPrefix=%s",
       lookupEmail,
       user ? "yes" : "no",
       user?.role ?? "n/a",

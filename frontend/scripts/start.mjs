@@ -140,19 +140,14 @@ async function ensureReplicaSet() {
     console.warn("[start] Relaunch did not produce a replica set primary. Continuing…");
   }
 
-  // ── Step 3c: Companion mongod on alternate port (safe last resort) ───────
-  console.log("[start] Starting companion replica-set mongod as fallback…");
-  const rsPort = String(Number(port) + 2); // e.g. 27017 → 27019
-  const dbName = process.env.DB_NAME || "grand_central_liberty_bank";
-  const redirected = await startCompanionReplicaSet(shell, host, rsPort);
-  if (redirected) {
-    const newUrl = `mongodb://${host}:${rsPort}/${dbName}?replicaSet=rs0&retryWrites=true&w=majority`;
-    process.env.DATABASE_URL = newUrl;
-    delete process.env.MONGO_URL; // force buildDatabaseUrl() to use DATABASE_URL
-    console.log(`[start] Redirected database → companion replica set on port ${rsPort}.`);
-  } else {
-    console.warn("[start] All replica-set strategies failed. Writes will fail with P2031.");
-  }
+  // Step 3c (companion MongoDB on alternate port) was REMOVED.
+  // It redirected DATABASE_URL to a fresh empty MongoDB, causing login failures
+  // because reset-admin and other external scripts still pointed at the original DB.
+  // All app writes use $runCommandRaw which bypasses P2031, so a replica set is
+  // not required for normal operation. prisma db push / seed may fail in background
+  // but those are already non-fatal.
+  console.warn("[start] MongoDB is standalone and could not be converted to a replica set.");
+  console.warn("[start] App will continue using the original MongoDB URL — $runCommandRaw bypasses P2031.");
 }
 
 async function tryServiceRestart() {
