@@ -314,11 +314,30 @@ async function waitForPrimary(shell, host, port, timeoutMs) {
 
 await ensureReplicaSet();
 
+// Params that Prisma's MongoDB connector rejects at startup (e.g. timeoutms is a
+// legacy alias the current driver no longer accepts in the connection string).
+const MONGO_REJECTED_PARAMS = ["timeoutms", "timeout"];
+
+function cleanMongoUrl(raw, dbName) {
+  const url = new URL(raw);
+  for (const p of MONGO_REJECTED_PARAMS) url.searchParams.delete(p);
+  if (dbName) url.pathname = `/${dbName}`;
+  if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
+  if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
+  return url.toString();
+}
+
 function buildDatabaseUrl() {
   const explicit = process.env.DATABASE_URL?.trim();
+  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
+
   if (explicit) {
     if (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://")) {
-      return explicit;
+      const clean = cleanMongoUrl(explicit, dbName);
+      if (clean !== explicit) {
+        console.log("[start] Removed invalid params from DATABASE_URL (e.g. timeoutms).");
+      }
+      return clean;
     }
     const proto = explicit.split("://")[0] || "(empty)";
     console.error(
@@ -326,17 +345,21 @@ function buildDatabaseUrl() {
         "Falling back to MONGO_URL. In Emergent, update the DATABASE_URL secret to a MongoDB connection string."
     );
   }
+
   const base = process.env.MONGO_URL?.trim();
-  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
   if (!base) return null;
-  const url = new URL(base);
-  url.pathname = `/${dbName}`;
-  if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
-  if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
-  return url.toString();
+  return cleanMongoUrl(base, dbName);
 }
 
 const dbUrl = buildDatabaseUrl();
+
+// Patch process.env.DATABASE_URL NOW — before spawning the Next.js child process.
+// Without this the child inherits the original (bad) DATABASE_URL from the platform
+// (e.g. postgresql://...) and every Prisma call inside Next.js fails at runtime.
+if (dbUrl) {
+  process.env.DATABASE_URL = dbUrl;
+  console.log("[start] process.env.DATABASE_URL set to resolved MongoDB URL.");
+}
 
 // Startup environment validation — catches misconfigured production secrets early.
 {

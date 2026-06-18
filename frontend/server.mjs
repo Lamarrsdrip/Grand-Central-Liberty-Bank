@@ -12,26 +12,46 @@ const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 let prisma;
 
+// Params that Prisma's MongoDB connector rejects at startup (e.g. timeoutms is a
+// legacy alias the current driver no longer accepts in the connection string).
+const MONGO_REJECTED_PARAMS = ["timeoutms", "timeout"];
+
+function cleanMongoUrl(raw, dbName) {
+  const url = new URL(raw);
+  for (const p of MONGO_REJECTED_PARAMS) url.searchParams.delete(p);
+  if (dbName) url.pathname = `/${dbName}`;
+  if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
+  if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
+  return url.toString();
+}
+
 function buildDatabaseUrl() {
   const explicit = process.env.DATABASE_URL?.trim();
+  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
+
   if (explicit) {
     if (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://")) {
-      return explicit;
+      const clean = cleanMongoUrl(explicit, dbName);
+      if (clean !== explicit) {
+        process.env.DATABASE_URL = clean;
+        console.log("[server] Removed invalid params from DATABASE_URL (e.g. timeoutms).");
+      }
+      return clean;
     }
     const proto = explicit.split("://")[0] || "(empty)";
     console.error(
       `[server] DATABASE_URL uses protocol "${proto}://" — expected "mongodb://" or "mongodb+srv://". ` +
-        "Falling back to MONGO_URL. Set DATABASE_URL to a valid MongoDB connection string."
+        "Overwriting process.env.DATABASE_URL with MONGO_URL for this session."
     );
   }
+
   const base = process.env.MONGO_URL?.trim();
   if (!base) return null;
-  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
-  const url = new URL(base);
-  url.pathname = `/${dbName}`;
-  if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
-  if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
-  return url.toString();
+  const clean = cleanMongoUrl(base, dbName);
+  // Patch env so all downstream code reading process.env.DATABASE_URL gets a valid MongoDB URL.
+  process.env.DATABASE_URL = clean;
+  console.log("[server] DATABASE_URL patched from MONGO_URL for this session.");
+  return clean;
 }
 
 function getPrisma() {
