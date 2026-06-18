@@ -137,24 +137,14 @@ export async function getUnreadSupportReplyCount(userId: string) {
   });
 }
 
+function settled<T>(result: PromiseSettledResult<T>, fallback: T, label: string): T {
+  if (result.status === "fulfilled") return result.value;
+  console.error(`[admin-data] ${label} failed:`, result.reason);
+  return fallback;
+}
+
 export async function getAdminData() {
-  const [
-    users,
-    kycSubmissions,
-    transfers,
-    cards,
-    wallets,
-    tickets,
-    emailSettings,
-    bankSettings,
-    transferSettings,
-    announcements,
-    broadcasts,
-    auditLogs,
-    retirementAccounts,
-    retirementWithdrawals,
-    retirementFeeSettings
-  ] = await Promise.all([
+  const results = await Promise.allSettled([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -206,21 +196,33 @@ export async function getAdminData() {
     prisma.retirementFeeSetting.findUnique({ where: { id: 1 } })
   ]);
 
+  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14] = results;
+
+  const defaultBankSettings = {
+    id: 1, bankName: "Grand Central Liberty Bank", bankAddress: "200 Liberty Plaza, New York, NY",
+    supportEmail: "support@gclbank.com", supportPhone: "+1 (800) 555-0199",
+    websiteUrl: "https://grandcentrallibertybank.com", defaultLocale: "en",
+    supportedLocales: ["en"] as string[], welcomeBonusEnabled: true, welcomeBonusAmount: 500,
+    terms: "Grand Central Liberty Bank terms are managed by the bank operations team.",
+    privacyPolicy: "Grand Central Liberty Bank privacy policy is managed by the bank operations team.",
+    updatedAt: new Date()
+  };
+
   return {
-    users,
-    kycSubmissions,
-    transfers,
-    cards,
-    wallets,
-    tickets,
-    emailSettings,
-    bankSettings,
-    transferSettings: transferSettings ?? defaultTransferSettings,
-    announcements,
-    broadcasts,
-    auditLogs,
-    retirementAccounts,
-    retirementWithdrawals,
-    retirementFeeSettings: retirementFeeSettings ?? defaultRetirementFeeSettings
+    users:               settled(r0,  [], "users"),
+    kycSubmissions:      settled(r1,  [], "kycSubmissions"),
+    transfers:           settled(r2,  [], "transfers"),
+    cards:               settled(r3,  [], "cards"),
+    wallets:             settled(r4,  [], "wallets"),
+    tickets:             settled(r5,  [], "tickets"),
+    emailSettings:       settled(r6,  null, "emailSettings"),
+    bankSettings:        settled(r7,  defaultBankSettings, "bankSettings"),
+    transferSettings:    (settled(r8,  null, "transferSettings")) ?? defaultTransferSettings,
+    announcements:       settled(r9,  [], "announcements"),
+    broadcasts:          settled(r10, [], "broadcasts"),
+    auditLogs:           settled(r11, [], "auditLogs"),
+    retirementAccounts:  settled(r12, [], "retirementAccounts"),
+    retirementWithdrawals: settled(r13, [], "retirementWithdrawals"),
+    retirementFeeSettings: (settled(r14, null, "retirementFeeSettings")) ?? defaultRetirementFeeSettings
   };
 }
