@@ -201,8 +201,6 @@ async function main() {
   await ensureRetirementContribution(retirementAccount.id, "Employer Match", "Morgan Holdings match", 600, 52.12, new Date("2026-06-01"));
   await ensureRetirementContribution(retirementAccount.id, "Employee", "Payroll contribution", 1500, 118.75, new Date("2026-05-01"));
   await ensureRetirementWithdrawal(retirementAccount.id, client.id, admin.id);
-  await ensureTransferRequest(client.id, checking.id);
-  await ensureSupportTicket(client.id, admin.id);
   await ensureAnnouncement(admin.id);
 
   try {
@@ -347,56 +345,6 @@ async function ensureRetirementWithdrawal(retirementAccountId: string, userId: s
     }
   });
   return withdrawal;
-}
-
-async function ensureTransferRequest(userId: string, fromAccountId: string) {
-  const existing = await prisma.transferRequest.findFirst({
-    where: { userId, fromAccountId, beneficiaryName: "Olivia Bennett", amount: 5000 }
-  });
-  if (existing) return existing;
-  return prisma.transferRequest.create({
-    data: {
-      userId,
-      fromAccountId,
-      type: "INTERNATIONAL",
-      beneficiaryName: "Olivia Bennett",
-      beneficiaryBank: "Liberty Correspondent Bank",
-      beneficiaryAccount: "9044558800",
-      ibanSwift: "LIBCUS33",
-      amount: 5000,
-      currency: "USD",
-      purpose: "Investment funding",
-      status: "SUBMITTED"
-    }
-  });
-}
-
-async function ensureSupportTicket(userId: string, adminId: string) {
-  const existing = await prisma.supportTicket.findFirst({ where: { userId, subject: "Wire transfer review" } });
-  if (existing) return existing;
-  const ticket = await prisma.supportTicket.create({
-    data: {
-      userId,
-      assignedAdminId: adminId,
-      subject: "Wire transfer review",
-      status: "ACTIVE"
-    }
-  });
-  await prisma.supportMessage.create({
-    data: {
-      ticketId: ticket.id,
-      senderId: adminId,
-      body: "Hello Alexander. I can help verify the wire transfer you initiated."
-    }
-  });
-  await prisma.supportMessage.create({
-    data: {
-      ticketId: ticket.id,
-      senderId: userId,
-      body: "I need help with the international wire transfer I initiated."
-    }
-  });
-  return ticket;
 }
 
 async function ensureAnnouncement(adminId: string) {

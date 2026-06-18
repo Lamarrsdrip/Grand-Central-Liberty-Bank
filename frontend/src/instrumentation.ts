@@ -59,6 +59,7 @@ export async function register() {
   // Seed admin user — runs on every startup, no-ops if already present.
   if (dbUrl) {
     await seedAdminUser(dbUrl);
+    await purgeFakeSeedData(dbUrl);
   }
 }
 
@@ -143,5 +144,54 @@ async function seedAdminUser(dbUrl: string) {
     }
   } catch (err) {
     console.error("[instrumentation] Admin seed failed (non-fatal):", err);
+  }
+}
+
+async function purgeFakeSeedData(dbUrl: string) {
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient({ datasourceUrl: dbUrl });
+
+    try {
+      // Delete the hardcoded "Olivia Bennett" transfer injected by the old seed.
+      // Identified by the specific account number — will never match a real transfer.
+      const delTransfer = await prisma.$runCommandRaw({
+        delete: "TransferRequest",
+        deletes: [{ q: { beneficiaryAccount: "9044558800", beneficiaryName: "Olivia Bennett" }, limit: 0 }],
+        writeConcern: { w: 1 }
+      }) as { n?: number };
+
+      if ((delTransfer?.n ?? 0) > 0) {
+        console.log(`[instrumentation] Purged ${delTransfer.n} fake seed transfer(s) (Olivia Bennett).`);
+      }
+
+      // Delete the seeded "Wire transfer review" support ticket and its messages.
+      // Identified by the exact subject and the "Hello Alexander" ghost message.
+      const seedTickets = await prisma.supportTicket.findMany({
+        where: { subject: "Wire transfer review" },
+        select: { id: true, messages: { select: { id: true, body: true } } }
+      });
+
+      for (const ticket of seedTickets) {
+        const hasSeedMessage = ticket.messages.some((m) => m.body.includes("Hello Alexander"));
+        if (!hasSeedMessage) continue;
+
+        await prisma.$runCommandRaw({
+          delete: "SupportMessage",
+          deletes: [{ q: { ticketId: { $oid: ticket.id } }, limit: 0 }],
+          writeConcern: { w: 1 }
+        });
+        await prisma.$runCommandRaw({
+          delete: "SupportTicket",
+          deletes: [{ q: { _id: { $oid: ticket.id } }, limit: 1 }],
+          writeConcern: { w: 1 }
+        });
+        console.log(`[instrumentation] Purged fake seed support ticket (Wire transfer review / ${ticket.id}).`);
+      }
+    } finally {
+      await prisma.$disconnect();
+    }
+  } catch (err) {
+    console.error("[instrumentation] Seed data purge failed (non-fatal):", err);
   }
 }
