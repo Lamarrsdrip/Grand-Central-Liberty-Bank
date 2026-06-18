@@ -78,7 +78,11 @@ function getPrisma() {
   return prisma;
 }
 
-const BUILD_FINGERPRINT = "2026-06-18T-bootstrap-admin-seed";
+const BUILD_FINGERPRINT = "2026-06-18T-instrumentation-admin-seed";
+
+// Eagerly resolve the MongoDB URL before app.prepare() so that
+// instrumentation.ts can read PRISMA_DATABASE_URL when it runs inside prepare().
+buildDatabaseUrl();
 
 function sendHealth(res) {
   res.writeHead(200, { "content-type": "application/json; charset=utf-8" });

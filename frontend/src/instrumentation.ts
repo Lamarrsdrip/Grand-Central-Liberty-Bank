@@ -2,11 +2,9 @@
  * Next.js instrumentation hook — runs once when the server process initialises,
  * before any route module is imported or evaluated.
  *
- * We use this to write PRISMA_DATABASE_URL (which schema.prisma reads) from
- * MONGO_URL before the Prisma generated client is loaded, so the correct
- * MongoDB URL is captured at module-evaluation time.
- *
- * This is the earliest possible hook in the Next.js lifecycle.
+ * Responsibilities:
+ *  1. Write PRISMA_DATABASE_URL from MONGO_URL before the Prisma client loads.
+ *  2. Seed the admin user if they don't exist in the database yet.
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -16,8 +14,6 @@ export async function register() {
   const isMongo = (s: string) =>
     s.startsWith("mongodb://") || s.startsWith("mongodb+srv://");
 
-  // Strip a single query param by name, case-insensitively, using regex on the
-  // raw string. More reliable than URLSearchParams.delete() for mixed-case names.
   function stripParam(str: string, name: string): string {
     const re = new RegExp(`([?&])${name}=[^&]*`, "gi");
     const s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
@@ -36,25 +32,116 @@ export async function register() {
     return url.toString();
   }
 
+  let dbUrl: string | null = null;
+
   try {
     const explicit = process.env.DATABASE_URL?.trim();
     if (explicit && isMongo(explicit)) {
-      process.env.PRISMA_DATABASE_URL = buildClean(explicit);
+      dbUrl = buildClean(explicit);
+      process.env.PRISMA_DATABASE_URL = dbUrl;
       console.log("[instrumentation] PRISMA_DATABASE_URL set from DATABASE_URL.");
-      return;
+    } else {
+      const base = process.env.MONGO_URL?.trim();
+      if (base && isMongo(base)) {
+        dbUrl = buildClean(base);
+        process.env.PRISMA_DATABASE_URL = dbUrl;
+        console.log("[instrumentation] PRISMA_DATABASE_URL set from MONGO_URL.");
+      } else {
+        console.error(
+          "[instrumentation] Could not build PRISMA_DATABASE_URL — neither DATABASE_URL nor MONGO_URL is a valid MongoDB DSN."
+        );
+      }
     }
-
-    const base = process.env.MONGO_URL?.trim();
-    if (base && isMongo(base)) {
-      process.env.PRISMA_DATABASE_URL = buildClean(base);
-      console.log("[instrumentation] PRISMA_DATABASE_URL set from MONGO_URL.");
-      return;
-    }
-
-    console.error(
-      "[instrumentation] Could not build PRISMA_DATABASE_URL — neither DATABASE_URL nor MONGO_URL is a valid MongoDB DSN."
-    );
   } catch (err) {
     console.error("[instrumentation] Failed to build PRISMA_DATABASE_URL:", err);
+  }
+
+  // Seed admin user — runs on every startup, no-ops if already present.
+  if (dbUrl) {
+    await seedAdminUser(dbUrl);
+  }
+}
+
+async function seedAdminUser(dbUrl: string) {
+  const adminEmail = (
+    process.env.SEED_ADMIN_EMAIL || "admin@gclbank.local"
+  ).toLowerCase().trim();
+  const adminPassword =
+    process.env.SEED_ADMIN_PASSWORD || "AdminPassphrase!2026";
+
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const { randomBytes } = await import("node:crypto");
+    const bcrypt = (await import("bcryptjs")).default;
+
+    // Create a dedicated client with the URL we just set — bypasses singleton timing.
+    const prisma = new PrismaClient({ datasourceUrl: dbUrl });
+
+    try {
+      const existing = await prisma.user.findUnique({
+        where: { email: adminEmail },
+        select: { id: true }
+      });
+
+      if (existing) {
+        console.log(`[instrumentation] Admin user found (${adminEmail}) — skipping seed.`);
+        return;
+      }
+
+      console.log(`[instrumentation] Admin user not found — creating ${adminEmail}...`);
+
+      const passwordHash = await bcrypt.hash(adminPassword, 12);
+      const userId = randomBytes(12).toString("hex");
+      const now = new Date().toISOString();
+
+      const result = await prisma.$runCommandRaw({
+        insert: "User",
+        documents: [
+          {
+            _id: { $oid: userId },
+            firstName: "Avery",
+            lastName: "Sterling",
+            email: adminEmail,
+            phone: "+12025550199",
+            country: "United States",
+            address: "200 Liberty Plaza, New York, NY",
+            dateOfBirth: { $date: "1984-02-14T00:00:00.000Z" },
+            passwordHash,
+            role: "ADMIN",
+            status: "ACTIVE",
+            twoFactorEnabled: false,
+            preferredLocale: "en",
+            themePreference: "system",
+            emailVerifiedAt: { $date: now },
+            createdAt: { $date: now },
+            updatedAt: { $date: now }
+          }
+        ],
+        writeConcern: { w: 1 }
+      }) as { ok?: number; n?: number };
+
+      if (result?.ok !== 1 || (result?.n ?? 0) < 1) {
+        console.error("[instrumentation] Admin insert command returned unexpected result:", JSON.stringify(result));
+        return;
+      }
+
+      // Verify it's readable immediately
+      const created = await prisma.user.findUnique({
+        where: { email: adminEmail },
+        select: { id: true, role: true, status: true }
+      });
+
+      if (!created) {
+        console.error("[instrumentation] Admin insert succeeded but findUnique returned null — check collection.");
+        return;
+      }
+
+      console.log(`[instrumentation] ✓ Admin seeded: ${adminEmail} role=${created.role} status=${created.status}`);
+      console.log(`[instrumentation] ✓ Password set to: ${adminPassword === "AdminPassphrase!2026" ? "(default)" : "(from SEED_ADMIN_PASSWORD)"}`);
+    } finally {
+      await prisma.$disconnect();
+    }
+  } catch (err) {
+    console.error("[instrumentation] Admin seed failed (non-fatal):", err);
   }
 }
