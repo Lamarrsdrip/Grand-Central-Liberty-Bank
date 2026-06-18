@@ -64,12 +64,10 @@ process.env.PRISMA_DATABASE_URL = dbUrl;
 
 // ── Credentials ──────────────────────────────────────────────────────────────
 const adminEmail    = (process.argv[2] || process.env.SEED_ADMIN_EMAIL || "admin@gclbank.local").toLowerCase().trim();
-const adminPassword = process.argv[3] || process.env.SEED_ADMIN_PASSWORD;
+const adminPassword = process.argv[3] || process.env.SEED_ADMIN_PASSWORD || "AdminPassphrase!2026";
 
-if (!adminPassword) {
-  console.error("ERROR: Provide password as second arg or SEED_ADMIN_PASSWORD env var.");
-  console.error("  node scripts/reset-admin.mjs admin@gclbank.local 'AdminPassphrase!2026'");
-  process.exit(1);
+if (adminPassword === "AdminPassphrase!2026" && !process.argv[3] && !process.env.SEED_ADMIN_PASSWORD) {
+  console.warn("[reset-admin] WARNING: Using default password. Set SEED_ADMIN_PASSWORD env var to override.");
 }
 
 // ── Dynamic imports ──────────────────────────────────────────────────────────

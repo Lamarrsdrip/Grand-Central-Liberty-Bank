@@ -434,7 +434,22 @@ function startDatabaseBootstrap() {
   // Prisma CLI reads PRISMA_DATABASE_URL now (schema.prisma changed from DATABASE_URL).
   const cliEnv = { ...process.env, PRISMA_DATABASE_URL: dbUrl, DATABASE_URL: dbUrl };
 
+  // Admin credentials — set SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in Emergent secrets to override.
+  const seedEmail    = process.env.SEED_ADMIN_EMAIL    || "admin@gclbank.local";
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD || "AdminPassphrase!2026";
+  const adminEnv = { ...cliEnv, SEED_ADMIN_EMAIL: seedEmail, SEED_ADMIN_PASSWORD: seedPassword };
+
   setTimeout(async () => {
+    // Seed admin first — uses $runCommandRaw so it works without a replica set.
+    // Runs with cliEnv so DATABASE_URL is always the MongoDB the app reads from,
+    // regardless of what MONGO_URL / DATABASE_URL the caller's shell has.
+    await runBackgroundCommand(
+      "seed-admin",
+      "node",
+      ["scripts/reset-admin.mjs", seedEmail, seedPassword],
+      adminEnv
+    );
+
     const pushed = await runBackgroundCommand(
       "prisma db push",
       "npx",

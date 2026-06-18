@@ -78,7 +78,7 @@ function getPrisma() {
   return prisma;
 }
 
-const BUILD_FINGERPRINT = "2026-06-18T-login-debug";
+const BUILD_FINGERPRINT = "2026-06-18T-bootstrap-admin-seed";
 
 function sendHealth(res) {
   res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
