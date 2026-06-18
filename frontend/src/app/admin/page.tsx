@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import {
+  AdminNotificationForm,
   AnnouncementForm,
+  AnnouncementToggleControl,
   AdminSupportCenter,
   BankSettingsForm,
   BalanceAdjustmentForm,
+  BeneficiaryDeleteControl,
   BroadcastForm,
   CardDecisionControl,
   EmailSettingsForm,
@@ -47,40 +50,29 @@ export default async function AdminPage({
   const pendingTransfers = data.transfers.filter((item) => item.status === "SUBMITTED" || item.status === "UNDER_REVIEW").length;
   const openTickets = data.tickets.filter((item) => item.status !== "CLOSED").length;
   const pendingRetirement = data.retirementWithdrawals.filter((item) => item.status === "SUBMITTED" || item.status === "UNDER_REVIEW").length;
+  const activeAnnouncements = data.announcements.filter((a) => a.active).length;
+
   const retirementFeeSettings = {
     ...data.retirementFeeSettings,
     feePercentage: Number(data.retirementFeeSettings.feePercentage)
   };
+
   const visibleUsers = userQuery
-    ? data.users.filter((accountUser) =>
-        [
-          accountUser.firstName,
-          accountUser.lastName,
-          accountUser.email,
-          accountUser.phone,
-          accountUser.country,
-          accountUser.address
-        ].some((value) => value.toLowerCase().includes(userQuery))
+    ? data.users.filter((u) =>
+        [u.firstName, u.lastName, u.email, u.phone, u.country, u.address].some(
+          (v) => v.toLowerCase().includes(userQuery)
+        )
       )
     : data.users;
+
   const supportTickets = data.tickets.map((ticket) => ({
     id: ticket.id,
     subject: ticket.subject,
     status: ticket.status,
     priority: ticket.priority,
-    user: {
-      id: ticket.user.id,
-      firstName: ticket.user.firstName,
-      lastName: ticket.user.lastName,
-      email: ticket.user.email
-    },
+    user: { id: ticket.user.id, firstName: ticket.user.firstName, lastName: ticket.user.lastName, email: ticket.user.email },
     assignedAdmin: ticket.assignedAdmin
-      ? {
-          id: ticket.assignedAdmin.id,
-          firstName: ticket.assignedAdmin.firstName,
-          lastName: ticket.assignedAdmin.lastName,
-          email: ticket.assignedAdmin.email
-        }
+      ? { id: ticket.assignedAdmin.id, firstName: ticket.assignedAdmin.firstName, lastName: ticket.assignedAdmin.lastName, email: ticket.assignedAdmin.email }
       : null,
     messages: ticket.messages.map((message) => ({
       id: message.id,
@@ -92,14 +84,20 @@ export default async function AdminPage({
       senderRole: message.sender.role
     }))
   }));
+
   const moduleLinks = [
     ["Overview", "#overview"],
     ["Users", "#users"],
+    ["Accounts", "#accounts"],
     ["KYC", "#kyc"],
     ["Transfers", "#transfers"],
+    ["Beneficiaries", "#beneficiaries"],
+    ["Cards", "#cards"],
     ["401(k)", "#retirement"],
     ["Wallets", "#wallets"],
     ["Support", "#support"],
+    ["Notifications", "#notifications"],
+    ["Email", "#email"],
     ["Settings", "#settings"],
     ["Audit", "#audit"]
   ];
@@ -107,31 +105,31 @@ export default async function AdminPage({
   return (
     <ProtectedShell adminOnly>
       <div className="grid gap-6">
+        {/* Header */}
         <section className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#111827] via-[#0d1713] to-[#101827] p-5 shadow-2xl lg:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.3em] text-emerald-300/70">Banking Operations</p>
               <h1 className="mt-2 text-3xl font-black text-white lg:text-4xl">Admin Command Center</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
-                Review customers, compliance, money movement, support conversations, crypto infrastructure, and audit trails from one responsive operations desk.
-              </p>
+              <p className="mt-1 text-sm text-white/45">Grand Central Liberty Bank · full platform control</p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[34rem]">
-              {[
+              {([
                 ["KYC", pendingKyc],
                 ["Transfers", pendingTransfers],
                 ["401(k)", pendingRetirement],
                 ["Support", openTickets]
-              ].map(([label, value]) => (
+              ] as [string, number][]).map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-white/10 bg-white/7 p-4">
                   <p className="text-2xl font-black text-white">{value}</p>
-                  <p className="text-xs font-bold uppercase tracking-wider text-white/40">{label}</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-white/40">{label} pending</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
+        {/* Navigation */}
         <nav className="sticky top-0 z-10 -mx-4 overflow-x-auto border-y border-white/8 bg-[#0b0f18]/90 px-4 py-3 backdrop-blur-xl lg:top-[4.5rem] lg:mx-0 lg:rounded-2xl lg:border">
           <div className="flex min-w-max gap-2">
             {moduleLinks.map(([label, href]) => (
@@ -142,97 +140,106 @@ export default async function AdminPage({
           </div>
         </nav>
 
-        <section id="overview" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {[
-            ["Users", data.users.length, "Registered banking profiles"],
-            ["KYC Queue", pendingKyc, "Manual verification reviews"],
-            ["Transfer Reviews", pendingTransfers, "Submitted transfer requests"],
-            ["401(k) Reviews", pendingRetirement, "Retirement withdrawal queue"],
-            ["Active Support", openTickets, "Open tickets and chats"]
-          ].map(([title, value, description]) => (
+        {/* Overview */}
+        <section id="overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+          {([
+            ["Total Users", data.users.length, "Registered profiles"],
+            ["KYC Pending", pendingKyc, "Awaiting review"],
+            ["Transfer Reviews", pendingTransfers, "Require decision"],
+            ["Withdrawal Reviews", pendingRetirement, "401(k) queue"],
+            ["Open Support", openTickets, "Active tickets"],
+            ["Live Banners", activeAnnouncements, "Published announcements"]
+          ] as [string, number, string][]).map(([title, value, description]) => (
             <Card key={title} className="border-white/10 bg-white/5">
-              <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">{title}</CardTitle>
+                <CardDescription className="text-xs">{description}</CardDescription>
               </CardHeader>
               <CardContent><p className="text-3xl font-black text-white">{value}</p></CardContent>
             </Card>
           ))}
         </section>
 
+        {/* Users */}
         <section id="users">
           <Card>
             <CardHeader>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <CardTitle>Users</CardTitle>
-                  <CardDescription>Edit profiles, freeze, unfreeze, suspend, and activate accounts with recorded reasons.</CardDescription>
+                  <CardDescription>Edit profiles, freeze, unfreeze, suspend, and activate accounts.</CardDescription>
                 </div>
                 <form className="flex w-full gap-2 lg:w-[28rem]" action="/admin#users">
-                  <Input name="q" placeholder="Search users, email, phone..." defaultValue={params?.q ?? ""} />
+                  <Input name="q" placeholder="Search by name, email, phone..." defaultValue={params?.q ?? ""} />
                   <Button type="submit">Search</Button>
                   {userQuery ? <Button asChild variant="outline"><a href="/admin#users">Clear</a></Button> : null}
                 </form>
               </div>
             </CardHeader>
             <CardContent className="grid gap-4">
-              {visibleUsers.map((accountUser) => (
-                <div key={accountUser.id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
+              {visibleUsers.map((u) => (
+                <div key={u.id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
                   <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
                     <div className="min-w-0">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
-                          <p className="truncate text-lg font-black text-white">{accountUser.firstName} {accountUser.lastName}</p>
-                          <p className="truncate text-sm text-muted-foreground">{accountUser.email} · {accountUser.phone}</p>
+                          <p className="truncate text-lg font-black text-white">{u.firstName} {u.lastName}</p>
+                          <p className="truncate text-sm text-muted-foreground">{u.email} · {u.phone}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <StatusBadge status={accountUser.kycSubmissions[0]?.status ?? "PENDING"} />
-                          <StatusBadge status={accountUser.status} />
+                          <StatusBadge status={u.kycSubmissions[0]?.status ?? "PENDING"} />
+                          <StatusBadge status={u.status} />
                         </div>
                       </div>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="mt-4 grid gap-3 sm:grid-cols-4">
                         <div className="rounded-2xl bg-black/20 p-3">
-                          <p className="text-xs font-bold text-white/35">Total balances</p>
-                          <p className="mt-1 font-black text-white">{formatCurrency(accountUser.accounts.reduce((sum, account) => sum + Number(account.balance), 0))}</p>
+                          <p className="text-xs font-bold text-white/35">Total balance</p>
+                          <p className="mt-1 font-black text-white">{formatCurrency(u.accounts.reduce((sum, a) => sum + Number(a.balance), 0))}</p>
                         </div>
                         <div className="rounded-2xl bg-black/20 p-3">
                           <p className="text-xs font-bold text-white/35">Country</p>
-                          <p className="mt-1 font-black text-white">{accountUser.country}</p>
+                          <p className="mt-1 font-black text-white">{u.country || "—"}</p>
                         </div>
                         <div className="rounded-2xl bg-black/20 p-3">
                           <p className="text-xs font-bold text-white/35">Accounts</p>
-                          <p className="mt-1 font-black text-white">{accountUser.accounts.length}</p>
+                          <p className="mt-1 font-black text-white">{u.accounts.length}</p>
+                        </div>
+                        <div className="rounded-2xl bg-black/20 p-3">
+                          <p className="text-xs font-bold text-white/35">Joined</p>
+                          <p className="mt-1 font-black text-white">{formatDate(u.createdAt)}</p>
                         </div>
                       </div>
                       <div className="mt-4">
-                        <UserProfileEditControl user={accountUser} />
+                        <UserProfileEditControl user={u} />
                       </div>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <p className="mb-3 text-sm font-black text-white">Status control</p>
-                      <UserStatusControl userId={accountUser.id} />
+                      <p className="mb-3 text-sm font-black text-white">Account control</p>
+                      <UserStatusControl userId={u.id} />
                     </div>
                   </div>
                 </div>
               ))}
-              {!visibleUsers.length ? (
-                <p className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm font-semibold text-muted-foreground">
+              {!visibleUsers.length && (
+                <p className="rounded-2xl border border-white/10 p-5 text-sm font-semibold text-muted-foreground">
                   No users match that search.
                 </p>
-              ) : null}
+              )}
             </CardContent>
           </Card>
         </section>
 
+        {/* Balance Adjustment */}
         <section id="accounts">
           <BalanceAdjustmentForm users={data.users} />
         </section>
 
+        {/* KYC */}
         <section id="kyc">
           <Card>
             <CardHeader>
               <CardTitle>KYC Review Queue</CardTitle>
-              <CardDescription>Manual approval, rejection, document requests, and verification history.</CardDescription>
+              <CardDescription>Approve, reject, or request additional documents for identity verification submissions.</CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
@@ -240,32 +247,187 @@ export default async function AdminPage({
                   <TableRow>
                     <TableHead>Customer</TableHead>
                     <TableHead>Document</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead>Submitted</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Decision</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.kycSubmissions.map((submission) => (
                     <TableRow key={submission.id}>
-                      <TableCell>{submission.user.firstName} {submission.user.lastName}</TableCell>
+                      <TableCell>
+                        <p className="font-bold">{submission.user.firstName} {submission.user.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{submission.user.email}</p>
+                      </TableCell>
                       <TableCell>{submission.documentType}</TableCell>
-                      <TableCell><StatusBadge status={submission.status} /></TableCell>
                       <TableCell>{formatDate(submission.createdAt)}</TableCell>
+                      <TableCell><StatusBadge status={submission.status} /></TableCell>
                       <TableCell className="min-w-96"><KycDecisionControl id={submission.id} /></TableCell>
                     </TableRow>
                   ))}
+                  {!data.kycSubmissions.length && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No KYC submissions yet.</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </section>
 
-        <section id="wallets" className="grid gap-5 xl:grid-cols-[1fr_28rem]">
-          <WalletManagementPanel wallets={data.wallets} />
-          <WalletForm />
+        {/* Transfers */}
+        <section id="transfers" className="grid gap-5">
+          <TransferSettingsForm settings={data.transferSettings} />
+          <Card>
+            <CardHeader>
+              <CardTitle>Transfer Requests</CardTitle>
+              <CardDescription>Full details for each transfer — approve, reject, or flag for review.</CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Beneficiary</TableHead>
+                    <TableHead>Bank / Account</TableHead>
+                    <TableHead>Country</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Purpose</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Decision</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.transfers.map((transfer) => (
+                    <TableRow key={transfer.id}>
+                      <TableCell>
+                        <p className="font-bold whitespace-nowrap">{transfer.user.firstName} {transfer.user.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{transfer.user.email}</p>
+                      </TableCell>
+                      <TableCell className="font-semibold whitespace-nowrap">{transfer.beneficiaryName || "—"}</TableCell>
+                      <TableCell>
+                        {transfer.beneficiaryBank ? (
+                          <>
+                            <p className="text-sm font-semibold">{transfer.beneficiaryBank}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{transfer.beneficiaryAccount || "—"}</p>
+                            {transfer.ibanSwift ? <p className="text-xs text-muted-foreground">SWIFT: {transfer.ibanSwift}</p> : null}
+                          </>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{transfer.recipientCountry || "—"}</TableCell>
+                      <TableCell className="font-black whitespace-nowrap">{formatCurrency(Number(transfer.amount), transfer.currency)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs whitespace-nowrap">{transfer.type}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-32 truncate text-sm">{transfer.purpose || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground text-xs">{formatDate(transfer.createdAt)}</TableCell>
+                      <TableCell><StatusBadge status={transfer.status} /></TableCell>
+                      <TableCell className="min-w-96"><TransferDecisionControl id={transfer.id} /></TableCell>
+                    </TableRow>
+                  ))}
+                  {!data.transfers.length && (
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">No transfer requests yet.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </section>
 
+        {/* Saved Beneficiaries */}
+        <section id="beneficiaries">
+          <Card>
+            <CardHeader>
+              <CardTitle>Saved Beneficiaries</CardTitle>
+              <CardDescription>All user-saved payment recipients across the platform. Remove any suspicious or incorrect entries.</CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account holder</TableHead>
+                    <TableHead>Beneficiary name</TableHead>
+                    <TableHead>Nickname</TableHead>
+                    <TableHead>Bank</TableHead>
+                    <TableHead>Account / IBAN</TableHead>
+                    <TableHead>SWIFT / Routing</TableHead>
+                    <TableHead>Country</TableHead>
+                    <TableHead>Currency</TableHead>
+                    <TableHead>Saved</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.savedBeneficiaries.map((b) => (
+                    <TableRow key={b.id}>
+                      <TableCell>
+                        <p className="font-bold whitespace-nowrap">{b.user.firstName} {b.user.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{b.user.email}</p>
+                      </TableCell>
+                      <TableCell className="font-semibold">{b.recipientName}</TableCell>
+                      <TableCell className="text-muted-foreground">{b.nickname || "—"}</TableCell>
+                      <TableCell>{b.bankName}</TableCell>
+                      <TableCell className="font-mono text-xs">{b.accountNumber}</TableCell>
+                      <TableCell className="font-mono text-xs">{b.routingSwift || "—"}</TableCell>
+                      <TableCell>{b.recipientCountry}</TableCell>
+                      <TableCell>{b.currency}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(b.createdAt)}</TableCell>
+                      <TableCell><BeneficiaryDeleteControl id={b.id} /></TableCell>
+                    </TableRow>
+                  ))}
+                  {!data.savedBeneficiaries.length && (
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">No saved beneficiaries yet.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Cards */}
+        <section id="cards">
+          <Card>
+            <CardHeader>
+              <CardTitle>Card Applications</CardTitle>
+              <CardDescription>Review and decide on Classic, Gold, Platinum, and Signature card applications.</CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Card type</TableHead>
+                    <TableHead>Annual income</TableHead>
+                    <TableHead>Applied</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Decision</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.cards.map((application) => (
+                    <TableRow key={application.id}>
+                      <TableCell>
+                        <p className="font-bold">{application.user.firstName} {application.user.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{application.user.email}</p>
+                      </TableCell>
+                      <TableCell className="font-semibold">{application.type}</TableCell>
+                      <TableCell>{formatCurrency(Number(application.annualIncome))}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(application.createdAt)}</TableCell>
+                      <TableCell><StatusBadge status={application.status} /></TableCell>
+                      <TableCell className="min-w-96"><CardDecisionControl id={application.id} /></TableCell>
+                    </TableRow>
+                  ))}
+                  {!data.cards.length && (
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No card applications yet.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Retirement */}
         <section id="retirement" className="grid gap-5">
           <RetirementFeeSettingsForm settings={retirementFeeSettings} />
           <Card>
@@ -280,20 +442,26 @@ export default async function AdminPage({
                     <TableHead>Customer</TableHead>
                     <TableHead>Account</TableHead>
                     <TableHead>Balance</TableHead>
-                    <TableHead>Eligibility</TableHead>
+                    <TableHead>Withdrawal eligibility</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.retirementAccounts.map((account) => (
                     <TableRow key={account.id}>
-                      <TableCell>{account.user.firstName} {account.user.lastName}</TableCell>
-                      <TableCell>401(k) •••• {account.accountNumber.slice(-4)}</TableCell>
-                      <TableCell>{formatCurrency(Number(account.balance))}</TableCell>
+                      <TableCell>
+                        <p className="font-bold">{account.user.firstName} {account.user.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{account.user.email}</p>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">401(k) •••• {account.accountNumber.slice(-4)}</TableCell>
+                      <TableCell className="font-black">{formatCurrency(Number(account.balance))}</TableCell>
                       <TableCell>{account.withdrawalEligibilityStatus}</TableCell>
                       <TableCell><StatusBadge status={account.status} /></TableCell>
                     </TableRow>
                   ))}
+                  {!data.retirementAccounts.length && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No retirement accounts yet.</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -301,13 +469,14 @@ export default async function AdminPage({
           <Card>
             <CardHeader>
               <CardTitle>401(k) Withdrawal Review</CardTitle>
-              <CardDescription>Approve, reject, request more documents, and add internal compliance notes. No automatic money movement occurs.</CardDescription>
+              <CardDescription>Approve, reject, or request documents. No automatic money movement occurs — all decisions are manual.</CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Reason</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Fee</TableHead>
                     <TableHead>Status</TableHead>
@@ -319,146 +488,115 @@ export default async function AdminPage({
                     <TableRow key={withdrawal.id}>
                       <TableCell>
                         <p className="font-bold">{withdrawal.user.firstName} {withdrawal.user.lastName}</p>
-                        <p className="text-xs text-muted-foreground">{withdrawal.reason}</p>
+                        <p className="text-xs text-muted-foreground">{withdrawal.user.email}</p>
                       </TableCell>
-                      <TableCell>{formatCurrency(Number(withdrawal.amount), withdrawal.currency)}</TableCell>
+                      <TableCell className="max-w-40 truncate text-sm">{withdrawal.reason}</TableCell>
+                      <TableCell className="font-black">{formatCurrency(Number(withdrawal.amount), withdrawal.currency)}</TableCell>
                       <TableCell>
-                        <p className="font-semibold">{withdrawal.feeEnabled ? formatCurrency(Number(withdrawal.feeAmount)) : "Disabled"}</p>
+                        <p className="font-semibold">{withdrawal.feeEnabled ? formatCurrency(Number(withdrawal.feeAmount)) : "Waived"}</p>
                         <p className="text-xs text-muted-foreground">{withdrawal.paymentMethod.replaceAll("_", " ")}</p>
                       </TableCell>
                       <TableCell><StatusBadge status={withdrawal.status} /></TableCell>
                       <TableCell className="min-w-96"><RetirementWithdrawalDecisionControl id={withdrawal.id} /></TableCell>
                     </TableRow>
                   ))}
+                  {!data.retirementWithdrawals.length && (
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No withdrawal requests yet.</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </section>
 
-        <section id="transfers" className="grid gap-5">
-          <TransferSettingsForm settings={data.transferSettings} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Transfer Requests</CardTitle>
-              <CardDescription>Admin review for internal, domestic, and international transfers.</CardDescription>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Beneficiary</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Decision</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.transfers.map((transfer) => (
-                    <TableRow key={transfer.id}>
-                      <TableCell>{transfer.user.firstName} {transfer.user.lastName}</TableCell>
-                      <TableCell>{transfer.beneficiaryName}</TableCell>
-                      <TableCell>{formatCurrency(Number(transfer.amount), transfer.currency)}</TableCell>
-                      <TableCell><StatusBadge status={transfer.status} /></TableCell>
-                      <TableCell className="min-w-96"><TransferDecisionControl id={transfer.id} /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        {/* Wallets */}
+        <section id="wallets" className="grid gap-5 xl:grid-cols-[1fr_28rem]">
+          <WalletManagementPanel wallets={data.wallets} />
+          <WalletForm />
         </section>
 
-        <section id="cards">
-          <Card>
-            <CardHeader>
-              <CardTitle>Card Applications</CardTitle>
-              <CardDescription>Classic, Gold, Platinum, and Signature card review.</CardDescription>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Card</TableHead>
-                    <TableHead>Income</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Decision</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.cards.map((application) => (
-                    <TableRow key={application.id}>
-                      <TableCell>{application.user.firstName} {application.user.lastName}</TableCell>
-                      <TableCell>{application.type}</TableCell>
-                      <TableCell>{formatCurrency(Number(application.annualIncome))}</TableCell>
-                      <TableCell><StatusBadge status={application.status} /></TableCell>
-                      <TableCell className="min-w-96"><CardDecisionControl id={application.id} /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </section>
-
+        {/* Support */}
         <section id="support">
           <AdminSupportCenter tickets={supportTickets} adminId={user.id} />
         </section>
 
+        {/* Notifications */}
+        <section id="notifications" className="grid gap-5 xl:grid-cols-2">
+          <div className="grid gap-5">
+            <AdminNotificationForm users={data.users} />
+            <AnnouncementForm />
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Announcement Banners</CardTitle>
+              <CardDescription>Toggle visibility or delete banners shown to users and admins.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {data.announcements.map((announcement) => (
+                <div key={announcement.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0">
+                      <p className="font-black text-white">{announcement.title}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{announcement.body}</p>
+                      <p className="text-xs text-white/35 mt-2">
+                        {announcement.tone} · {announcement.audience ?? "All"} · {announcement.locale.toUpperCase()}
+                      </p>
+                    </div>
+                    <Badge variant={announcement.active ? "success" : "secondary"} className="shrink-0">
+                      {announcement.active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <div className="mt-3">
+                    <AnnouncementToggleControl id={announcement.id} active={announcement.active} />
+                  </div>
+                </div>
+              ))}
+              {!data.announcements.length && (
+                <p className="rounded-2xl border border-white/10 p-5 text-sm text-muted-foreground">No banners published yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Email */}
         <section id="email" className="grid gap-5 xl:grid-cols-2">
           <EmailSettingsForm settings={data.emailSettings ? { ...data.emailSettings, appPasswordEncrypted: data.emailSettings.appPasswordEncrypted ? "configured" : null } : null} />
           <Card>
             <CardHeader>
               <CardTitle>Email Operations</CardTitle>
-              <CardDescription>Test SMTP and review broadcast tracking.</CardDescription>
+              <CardDescription>Send test emails and track broadcast history.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5">
               <TestEmailForm />
               <BroadcastForm />
               <div className="grid gap-2">
                 {data.broadcasts.map((broadcast) => (
-                  <div key={broadcast.id} className="rounded-md border p-3">
+                  <div key={broadcast.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
                     <p className="font-bold">{broadcast.subject}</p>
-                    <p className="text-xs text-muted-foreground">{broadcast.status} · Sent {broadcast.sentCount} · Failed {broadcast.failedCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {broadcast.status} · Sent: {broadcast.sentCount} · Failed: {broadcast.failedCount} · {formatDate(broadcast.createdAt)}
+                    </p>
                   </div>
                 ))}
+                {!data.broadcasts.length && (
+                  <p className="text-sm text-muted-foreground">No broadcasts sent yet.</p>
+                )}
               </div>
             </CardContent>
           </Card>
         </section>
 
-        <section id="notifications" className="grid gap-5 xl:grid-cols-2">
-          <AnnouncementForm />
-          <Card>
-            <CardHeader>
-              <CardTitle>Announcement Banners</CardTitle>
-              <CardDescription>Current user and admin banners.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {data.announcements.map((announcement) => (
-                <div key={announcement.id} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-black">{announcement.title}</p>
-                    <Badge variant={announcement.active ? "success" : "secondary"}>{announcement.active ? "Active" : "Inactive"}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{announcement.body}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-
+        {/* Settings */}
         <section id="settings">
           <BankSettingsForm settings={data.bankSettings} />
         </section>
 
+        {/* Audit Logs */}
         <section id="audit">
           <Card>
             <CardHeader>
               <CardTitle>Audit Logs</CardTitle>
-              <CardDescription>Every admin action and key user security event is recorded.</CardDescription>
+              <CardDescription>Every admin action and key user security event, most recent first.</CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
@@ -468,17 +606,22 @@ export default async function AdminPage({
                     <TableHead>Actor</TableHead>
                     <TableHead>Action</TableHead>
                     <TableHead>Entity</TableHead>
+                    <TableHead>IP</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.auditLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell>{formatDate(log.createdAt)}</TableCell>
-                      <TableCell>{log.actor?.email ?? "System"}</TableCell>
-                      <TableCell className="font-semibold">{log.action}</TableCell>
-                      <TableCell>{log.entity} {log.entityId ? `· ${log.entityId.slice(0, 8)}` : ""}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(log.createdAt)}</TableCell>
+                      <TableCell className="text-sm">{log.actor?.email ?? "System"}</TableCell>
+                      <TableCell className="font-semibold text-sm">{log.action}</TableCell>
+                      <TableCell className="text-sm">{log.entity}{log.entityId ? ` · ${log.entityId.slice(0, 8)}` : ""}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{log.ip ?? "—"}</TableCell>
                     </TableRow>
                   ))}
+                  {!data.auditLogs.length && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No audit log entries yet.</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

@@ -193,10 +193,15 @@ export async function getAdminData() {
         notes: { orderBy: { createdAt: "desc" }, include: { author: true } }
       }
     }),
-    prisma.retirementFeeSetting.findUnique({ where: { id: 1 } })
+    prisma.retirementFeeSetting.findUnique({ where: { id: 1 } }),
+    prisma.savedBeneficiary.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
+    })
   ]);
 
-  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14] = results;
+  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15] = results;
 
   const defaultBankSettings = {
     id: 1, bankName: "Grand Central Liberty Bank", bankAddress: "200 Liberty Plaza, New York, NY",
@@ -223,6 +228,7 @@ export async function getAdminData() {
     auditLogs:           settled(r11, [], "auditLogs"),
     retirementAccounts:  settled(r12, [], "retirementAccounts"),
     retirementWithdrawals: settled(r13, [], "retirementWithdrawals"),
-    retirementFeeSettings: (settled(r14, null, "retirementFeeSettings")) ?? defaultRetirementFeeSettings
+    retirementFeeSettings: (settled(r14, null, "retirementFeeSettings")) ?? defaultRetirementFeeSettings,
+    savedBeneficiaries:   settled(r15, [], "savedBeneficiaries")
   };
 }

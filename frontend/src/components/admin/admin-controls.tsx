@@ -752,3 +752,92 @@ export function AnnouncementForm() {
     </Card>
   );
 }
+
+export function AnnouncementToggleControl({ id, active }: { id: string; active: boolean }) {
+  return (
+    <div className="flex gap-2">
+      <AdminJsonForm
+        endpoint={`/api/admin/announcements/${id}`}
+        method="PATCH"
+        buttonLabel={active ? "Deactivate" : "Activate"}
+        buttonVariant={active ? "outline" : "default"}
+      >
+        <input type="hidden" name="active" value={String(!active)} />
+      </AdminJsonForm>
+      <AdminJsonForm
+        endpoint={`/api/admin/announcements/${id}`}
+        method="DELETE"
+        buttonLabel="Delete"
+        buttonVariant="destructive"
+        confirmMessage="Permanently delete this announcement banner?"
+      >
+        <span />
+      </AdminJsonForm>
+    </div>
+  );
+}
+
+export function AdminNotificationForm({
+  users
+}: {
+  users: Array<{ id: string; firstName: string; lastName: string; email: string }>;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Send Notification</CardTitle>
+        <CardDescription>Push an in-app notification to a specific user or every user.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <AdminJsonForm endpoint="/api/admin/notify" method="POST" buttonLabel="Send notification">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field>
+              <Label>Target</Label>
+              <Select name="target" defaultValue="USER">
+                <option value="USER">Specific user</option>
+                <option value="ALL">All users</option>
+              </Select>
+            </Field>
+            <Field>
+              <Label>User</Label>
+              <Select name="userId">
+                <option value="">— all users —</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.firstName} {u.lastName} · {u.email}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field>
+              <Label>Type</Label>
+              <Select name="type" defaultValue="SYSTEM">
+                <option value="SYSTEM">System</option>
+                <option value="KYC_APPROVED">KYC Approved</option>
+                <option value="KYC_REJECTED">KYC Rejected</option>
+                <option value="TRANSFER_SUBMITTED">Transfer Update</option>
+                <option value="ACCOUNT_FROZEN">Account Frozen</option>
+                <option value="ACCOUNT_UNFROZEN">Account Unfrozen</option>
+                <option value="LOGIN_ALERT">Login Alert</option>
+              </Select>
+            </Field>
+            <Field><Label>Title</Label><Input name="title" required placeholder="e.g. Your account has been updated" /></Field>
+            <Field className="sm:col-span-2"><Label>Message body</Label><Textarea name="body" required placeholder="Full notification text shown to the user" /></Field>
+          </div>
+        </AdminJsonForm>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function BeneficiaryDeleteControl({ id }: { id: string }) {
+  return (
+    <AdminJsonForm
+      endpoint={`/api/admin/beneficiaries/${id}`}
+      method="DELETE"
+      buttonLabel="Remove"
+      buttonVariant="destructive"
+      confirmMessage="Remove this saved beneficiary? The user will no longer see it."
+    >
+      <span />
+    </AdminJsonForm>
+  );
+}
