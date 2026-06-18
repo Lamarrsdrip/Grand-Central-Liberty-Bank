@@ -23,7 +23,7 @@ export function LoginForm() {
     <Card>
       <CardHeader>
         <CardTitle>Secure Sign In</CardTitle>
-        <CardDescription>Access personal banking or the admin command center.</CardDescription>
+        <CardDescription>Access your secure digital banking account.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
