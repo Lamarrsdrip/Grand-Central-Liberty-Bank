@@ -314,16 +314,20 @@ async function waitForPrimary(shell, host, port, timeoutMs) {
 
 await ensureReplicaSet();
 
-// Params that Prisma's MongoDB connector rejects at startup (e.g. timeoutms is a
-// legacy alias the current driver no longer accepts in the connection string).
+// Params that Prisma's MongoDB connector rejects.
 const MONGO_REJECTED_PARAMS = ["timeoutms", "timeout"];
 
+// Strip a query param by name, case-insensitively, via regex on the raw string.
+function stripParam(str, name) {
+  const re = new RegExp(`([?&])${name}=[^&]*`, "gi");
+  let s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
+  return s.replace(/\?&/g, "?").replace(/&&+/g, "&").replace(/[?&]$/, "");
+}
+
 function cleanMongoUrl(raw, dbName) {
-  const url = new URL(raw);
-  // Case-insensitive delete — Emergent's MONGO_URL uses timeoutMS (camelCase)
-  for (const key of Array.from(url.searchParams.keys())) {
-    if (MONGO_REJECTED_PARAMS.includes(key.toLowerCase())) url.searchParams.delete(key);
-  }
+  let str = raw;
+  for (const p of MONGO_REJECTED_PARAMS) str = stripParam(str, p);
+  const url = new URL(str);
   if (dbName) url.pathname = `/${dbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
   if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");

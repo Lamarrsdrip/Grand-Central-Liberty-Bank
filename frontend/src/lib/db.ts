@@ -16,7 +16,7 @@ function getPrismaClient() {
   const url = buildMongoDatabaseUrl();
 
   prismaClient = new PrismaClient({
-    datasources: { db: { url } },
+    datasourceUrl: url,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"]
   });
 

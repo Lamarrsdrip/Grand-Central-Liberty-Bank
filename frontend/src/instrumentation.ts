@@ -16,12 +16,18 @@ export async function register() {
   const isMongo = (s: string) =>
     s.startsWith("mongodb://") || s.startsWith("mongodb+srv://");
 
+  // Strip a single query param by name, case-insensitively, using regex on the
+  // raw string. More reliable than URLSearchParams.delete() for mixed-case names.
+  function stripParam(str: string, name: string): string {
+    const re = new RegExp(`([?&])${name}=[^&]*`, "gi");
+    let s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
+    return s.replace(/\?&/g, "?").replace(/&&+/g, "&").replace(/[?&]$/, "");
+  }
+
   function buildClean(raw: string): string {
-    const url = new URL(raw);
-    // Case-insensitive delete — Emergent's MONGO_URL uses timeoutMS (camelCase)
-    for (const key of Array.from(url.searchParams.keys())) {
-      if (REJECTED.includes(key.toLowerCase())) url.searchParams.delete(key);
-    }
+    let str = raw;
+    for (const p of REJECTED) str = stripParam(str, p);
+    const url = new URL(str);
     if (dbName) url.pathname = `/${dbName}`;
     if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
     if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");

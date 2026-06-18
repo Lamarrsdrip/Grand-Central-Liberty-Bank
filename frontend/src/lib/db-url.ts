@@ -12,18 +12,30 @@
  *  2. MONGO_URL + DB_NAME — the Emergent platform's native MongoDB secrets
  */
 
+// Query params that Prisma's MongoDB connector rejects.
+// timeoutms / timeoutMS are legacy aliases rejected by the current driver.
 const REJECTED_PARAMS = ["timeoutms", "timeout"];
 
 function isMongoDsn(s: string): boolean {
   return s.startsWith("mongodb://") || s.startsWith("mongodb+srv://");
 }
 
+// Strip a single query param by name, case-insensitively, using regex on the
+// raw string. This is more reliable than URLSearchParams.delete() which is
+// case-sensitive and can miss params like timeoutMS when searching for timeoutms.
+function stripParam(str: string, name: string): string {
+  const re = new RegExp(`([?&])${name}=[^&]*`, "gi");
+  let s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
+  // Fix up ?& → ? and trailing ? / &
+  return s.replace(/\?&/g, "?").replace(/&&+/g, "&").replace(/[?&]$/, "");
+}
+
 function cleanMongoUrl(raw: string, dbName: string): string {
-  const url = new URL(raw);
-  // Case-insensitive delete — Emergent's MONGO_URL uses timeoutMS (camelCase)
-  for (const key of Array.from(url.searchParams.keys())) {
-    if (REJECTED_PARAMS.includes(key.toLowerCase())) url.searchParams.delete(key);
-  }
+  // Strip banned params from the raw string before URL parsing
+  let str = raw;
+  for (const p of REJECTED_PARAMS) str = stripParam(str, p);
+
+  const url = new URL(str);
   if (dbName) url.pathname = `/${dbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
   if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
@@ -38,9 +50,6 @@ export function buildMongoDatabaseUrl(): string {
 
   if (explicit && isMongoDsn(explicit)) {
     clean = cleanMongoUrl(explicit, dbName);
-    if (clean !== explicit) {
-      console.log("[db-url] Removed invalid params from DATABASE_URL (e.g. timeoutms).");
-    }
   } else {
     if (explicit) {
       const proto = explicit.split("://")[0] || "(empty)";
