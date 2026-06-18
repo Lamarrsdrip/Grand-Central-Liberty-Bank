@@ -7,6 +7,7 @@ import { accountLabel } from "@/components/banking/finance";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { DepositSection } from "@/components/banking/deposit-section";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,9 @@ export default async function AccountsPage() {
             <AccountCard key={account.id} account={account} index={i} />
           ))}
         </div>
+
+        {/* Deposit options */}
+        <DepositSection accounts={data.accounts} wallets={data.wallets} />
 
         {/* Add account */}
         <Link href="/support?message=I%20would%20like%20to%20open%20a%20new%20Grand%20Central%20Liberty%20Bank%20account." className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-white/10 rounded-2xl py-5 text-white/40 hover:text-white/70 hover:border-white/20 transition">

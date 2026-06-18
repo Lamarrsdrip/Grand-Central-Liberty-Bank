@@ -24,7 +24,9 @@ export async function secureFetch(path: string, init: RequestInit = {}) {
   const response = await fetch(new URL(path, window.location.origin), { ...init, headers });
   const data = await readJson(response);
   if (!response.ok) {
-    throw new Error(data.error ?? response.statusText);
+    const err = new Error(data.error ?? response.statusText) as Error & { issues?: Array<{ path: string[]; message: string }> };
+    if (Array.isArray(data.issues)) err.issues = data.issues;
+    throw err;
   }
 
   return data;

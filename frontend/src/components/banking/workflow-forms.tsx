@@ -533,7 +533,7 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
       <Card>
         <CardHeader>
           <CardTitle>Live Chat</CardTitle>
-          <CardDescription>{activeTicket ? `${activeTicket.subject} · ${activeTicket.status}` : "Open a ticket to begin."}</CardDescription>
+          <CardDescription>{activeTicket ? `${activeTicket.subject} · ${activeTicket.status}` : "Chat with support — send a message to start."}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="min-h-80 max-h-[28rem] overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -550,63 +550,73 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
                 ) : null}
               </div>
             ))}
-            {!activeTicket?.messages.length ? (
+            {!activeTicket?.messages.length && activeTicket ? (
               <p className="py-16 text-center text-sm font-semibold text-muted-foreground">No messages yet.</p>
+            ) : !activeTicket ? (
+              <p className="py-16 text-center text-sm font-semibold text-muted-foreground">Type a message below to start chatting with our support team.</p>
             ) : null}
           </div>
-          {activeTicket ? (
-            <form
-              className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                if (!message.trim() && !messageFile) {
-                  return;
-                }
-                setBusy(true);
-                const text = message.trim() || "Attachment uploaded";
-                try {
-                  const attachmentUrl = messageFile ? await uploadFile(messageFile, "support-attachments") : undefined;
-                  if (socket?.connected && !attachmentUrl) {
-                    await new Promise<void>((resolve, reject) => {
-                      socket.emit(
-                        "send_support_message",
-                        { ticketId: activeTicket.id, body: text },
-                        (response: { error?: string; message?: Ticket["messages"][number] }) => {
-                          if (response?.error) {
-                            reject(new Error(response.error));
-                            return;
-                          }
-                          if (response?.message) {
-                            setTickets((current) => appendTicketMessage(current, activeTicket.id, response.message!));
-                          }
-                          resolve();
-                        }
-                      );
-                    });
-                  } else {
-                    const data = await secureFetch("/api/support/messages", {
-                      method: "POST",
-                      body: JSON.stringify({ ticketId: activeTicket.id, body: text, attachmentUrl })
-                    });
-                    setTickets((current) => appendTicketMessage(current, activeTicket.id, data.message));
-                  }
+          <form
+            className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!message.trim() && !messageFile) return;
+              setBusy(true);
+              const text = message.trim() || "Attachment uploaded";
+              try {
+                let ticketId = activeTicket?.id;
+                if (!ticketId) {
+                  const subject = text.length > 60 ? text.slice(0, 57) + "..." : text;
+                  const data = await secureFetch("/api/support/tickets", {
+                    method: "POST",
+                    body: JSON.stringify({ subject, body: text })
+                  });
+                  setTickets((current) => [data.ticket, ...current]);
+                  setActiveId(data.ticket.id);
+                  ticketId = data.ticket.id;
                   setMessage("");
                   setMessageFile(null);
                   event.currentTarget.reset();
-                } catch (error) {
-                  window.alert(error instanceof Error ? error.message : "Message failed. Please try again.");
-                } finally {
-                  setBusy(false);
+                  return;
                 }
-              }}
-            >
-              <Input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Type your message..." />
-              <Input className="sm:w-56" type="file" onChange={(event) => setMessageFile(event.target.files?.[0] ?? null)} />
-              <Button type="submit" size="icon" aria-label="Send message" disabled={busy}>
-                <Send data-icon="inline-start" />
-              </Button>
-            </form>
-          ) : null}
+                const attachmentUrl = messageFile ? await uploadFile(messageFile, "support-attachments") : undefined;
+                if (socket?.connected && !attachmentUrl) {
+                  await new Promise<void>((resolve, reject) => {
+                    socket!.emit(
+                      "send_support_message",
+                      { ticketId, body: text },
+                      (response: { error?: string; message?: Ticket["messages"][number] }) => {
+                        if (response?.error) { reject(new Error(response.error)); return; }
+                        if (response?.message) {
+                          setTickets((current) => appendTicketMessage(current, ticketId!, response.message!));
+                        }
+                        resolve();
+                      }
+                    );
+                  });
+                } else {
+                  const data = await secureFetch("/api/support/messages", {
+                    method: "POST",
+                    body: JSON.stringify({ ticketId, body: text, attachmentUrl })
+                  });
+                  setTickets((current) => appendTicketMessage(current, ticketId!, data.message));
+                }
+                setMessage("");
+                setMessageFile(null);
+                event.currentTarget.reset();
+              } catch (error) {
+                window.alert(error instanceof Error ? error.message : "Message failed. Please try again.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Input value={message} onChange={(event) => setMessage(event.target.value)} placeholder={activeTicket ? "Type your message..." : "Type a message to start a conversation..."} />
+            <Input className="sm:w-56" type="file" onChange={(event) => setMessageFile(event.target.files?.[0] ?? null)} />
+            <Button type="submit" size="icon" aria-label="Send message" disabled={busy}>
+              <Send data-icon="inline-start" />
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

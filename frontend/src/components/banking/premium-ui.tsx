@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -269,9 +270,38 @@ const accountCardStyles: Record<string, string> = {
   CRYPTO: "account-card-business",
 };
 
+const GCLB_ROUTING = "026009593";
+const GCLB_SWIFT   = "GCLBUS33";
+const GCLB_BANK    = "Grand Central Liberty Bank";
+const GCLB_ADDRESS = "200 Liberty Plaza, New York, NY 10006";
+
+function CopyText({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      title={`Copy ${label}`}
+      className="group flex items-center gap-1 text-left"
+      onClick={async () => {
+        await navigator.clipboard.writeText(value).catch(() => null);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1400);
+      }}
+    >
+      <span className="font-mono text-xs text-white/70 group-hover:text-white transition">{value}</span>
+      <span className={`text-[0.6rem] font-bold ml-1 ${copied ? "text-green" : "text-white/20 group-hover:text-white/50"}`}>
+        {copied ? "✓" : "copy"}
+      </span>
+    </button>
+  );
+}
+
 export function AccountCard({ account }: { account: FinanceAccount; index?: number }) {
+  const [showDetails, setShowDetails] = useState(false);
   const cardClass = accountCardStyles[account.type] ?? "account-card-checking";
   const typeLabel = accountLabel(account.type).toUpperCase();
+  const isCrypto = account.type === "CRYPTO";
+
   return (
     <div className={cn("rounded-2xl p-5 border border-white/10 text-white", cardClass)}>
       <div className="flex items-start justify-between mb-6">
@@ -283,20 +313,77 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
           {account.status === "FROZEN" && (
             <span className="text-xs font-bold text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded-full">Frozen</span>
           )}
+          <span className="text-[0.6rem] font-bold uppercase text-white/30 border border-white/10 rounded px-1.5 py-0.5">{account.currency}</span>
         </div>
       </div>
+
       <p className="text-2xl font-black tracking-tight">{money(account.balance, account.currency)}</p>
-      <p className="text-xs text-white/40 mt-0.5">Available Balance</p>
+      <p className="text-xs text-white/40 mt-0.5">Available {money(account.availableBalance ?? account.balance, account.currency)}</p>
+
+      {/* Always-visible account number */}
       <div className="mt-4 flex items-center gap-2">
-        <span className="text-xs text-white/30">•••• {account.accountNumber.slice(-4)}</span>
-        <span className="text-white/20">·</span>
-        <span className="text-xs text-white/30">IBAN US98 GCLB</span>
+        <span className="text-[0.65rem] text-white/30 font-semibold">Acct</span>
+        <CopyText value={account.accountNumber} label="account number" />
       </div>
+
+      {/* Expandable deposit details */}
+      <button
+        type="button"
+        className="mt-3 text-[0.65rem] font-bold text-white/40 hover:text-white/70 transition"
+        onClick={() => setShowDetails((v) => !v)}
+      >
+        {showDetails ? "▲ Hide account details" : "▼ Show deposit details"}
+      </button>
+
+      {showDetails && (
+        <div className="mt-3 rounded-xl bg-black/30 border border-white/8 p-3 space-y-2.5">
+          <p className="text-[0.6rem] font-black uppercase tracking-widest text-white/30 mb-2">Account Details</p>
+          <div className="grid gap-2 text-xs">
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-white/40 shrink-0">Bank</span>
+              <span className="font-semibold text-right text-white/80">{GCLB_BANK}</span>
+            </div>
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-white/40 shrink-0">Address</span>
+              <span className="font-semibold text-right text-white/70 text-[0.65rem]">{GCLB_ADDRESS}</span>
+            </div>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-white/40 shrink-0">Account #</span>
+              <CopyText value={account.accountNumber} label="account number" />
+            </div>
+            {!isCrypto && (
+              <>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-white/40 shrink-0">Routing #</span>
+                  <CopyText value={GCLB_ROUTING} label="routing number" />
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-white/40 shrink-0">SWIFT/BIC</span>
+                  <CopyText value={GCLB_SWIFT} label="SWIFT code" />
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-white/40 shrink-0">IBAN</span>
+                  <CopyText value={`US98 GCLB ${account.accountNumber.slice(0,4)} ${account.accountNumber.slice(4)}`} label="IBAN" />
+                </div>
+              </>
+            )}
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-white/40 shrink-0">Currency</span>
+              <span className="font-bold text-white/80">{account.currency}</span>
+            </div>
+            {isCrypto && (
+              <Link href="/crypto" className="mt-1 block text-center text-[0.65rem] font-bold text-green hover:text-green-dim border border-green/20 rounded-lg py-1.5 transition">
+                View crypto deposit addresses →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 flex gap-2">
         <Link href="/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20account." className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Freeze</Link>
         <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Statements</Link>
         <Link href="/profile" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Manage</Link>
-        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Activity</Link>
       </div>
     </div>
   );

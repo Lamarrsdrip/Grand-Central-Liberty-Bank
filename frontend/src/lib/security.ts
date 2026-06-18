@@ -42,7 +42,13 @@ export function apiError(error: unknown) {
 
   if (error instanceof z.ZodError) {
     return NextResponse.json(
-      { error: "Validation failed", issues: error.issues.map((issue) => issue.message) },
+      {
+        error: "Validation failed",
+        issues: error.issues.map((issue) => ({
+          path: issue.path as string[],
+          message: issue.message
+        }))
+      },
       { status: 400 }
     );
   }

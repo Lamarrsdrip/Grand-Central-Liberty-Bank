@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, Input, Label, Select } from "@/components/ui/input";
 import { secureFetch } from "@/lib/client-api";
+import { COUNTRIES } from "@/lib/countries";
 
 function Status({ message }: { message: string }) {
   return message ? <p className="rounded-md bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground">{message}</p> : null;
@@ -77,9 +78,29 @@ export function LoginForm() {
   );
 }
 
+type FieldErrors = Record<string, string>;
+
+function FieldError({ errors, field }: { errors: FieldErrors; field: string }) {
+  return errors[field] ? (
+    <p className="mt-1 text-xs font-semibold text-red-400">{errors[field]}</p>
+  ) : null;
+}
+
+function parseFieldErrors(error: unknown): FieldErrors {
+  const issues = (error as { issues?: Array<{ path: string[]; message: string }> })?.issues;
+  if (!Array.isArray(issues)) return {};
+  const errs: FieldErrors = {};
+  for (const issue of issues) {
+    const key = issue.path?.[0] ?? "_";
+    errs[key] = issue.message;
+  }
+  return errs;
+}
+
 export function RegisterForm() {
   const router = useRouter();
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
 
   return (
@@ -95,6 +116,7 @@ export function RegisterForm() {
             event.preventDefault();
             setLoading(true);
             setMessage("");
+            setFieldErrors({});
             const form = new FormData(event.currentTarget);
             try {
               await secureFetch("/api/auth/register", {
@@ -104,7 +126,12 @@ export function RegisterForm() {
               router.push("/dashboard");
               router.refresh();
             } catch (error) {
-              setMessage(error instanceof Error ? error.message : "Registration failed.");
+              const parsed = parseFieldErrors(error);
+              if (Object.keys(parsed).length > 0) {
+                setFieldErrors(parsed);
+              } else {
+                setMessage(error instanceof Error ? error.message : "Registration failed.");
+              }
             } finally {
               setLoading(false);
             }
@@ -114,42 +141,47 @@ export function RegisterForm() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field>
               <Label htmlFor="firstName">First name</Label>
-              <Input id="firstName" name="firstName" required />
+              <Input id="firstName" name="firstName" autoComplete="given-name" required />
+              <FieldError errors={fieldErrors} field="firstName" />
             </Field>
             <Field>
               <Label htmlFor="lastName">Last name</Label>
-              <Input id="lastName" name="lastName" required />
+              <Input id="lastName" name="lastName" autoComplete="family-name" required />
+              <FieldError errors={fieldErrors} field="lastName" />
             </Field>
             <Field>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" required />
+              <Input id="email" name="email" type="email" autoComplete="email" required />
+              <FieldError errors={fieldErrors} field="email" />
             </Field>
             <Field>
               <Label htmlFor="phone">Phone number</Label>
-              <Input id="phone" name="phone" required />
+              <Input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="+1 555 000 0000" required />
+              <FieldError errors={fieldErrors} field="phone" />
             </Field>
             <Field>
               <Label htmlFor="country">Country</Label>
               <Select id="country" name="country" required defaultValue="United States">
-                <option>United States</option>
-                <option>United Kingdom</option>
-                <option>Canada</option>
-                <option>Nigeria</option>
-                <option>France</option>
-                <option>Spain</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
               </Select>
+              <FieldError errors={fieldErrors} field="country" />
             </Field>
             <Field>
               <Label htmlFor="dateOfBirth">Date of birth</Label>
-              <Input id="dateOfBirth" name="dateOfBirth" type="date" required />
+              <Input id="dateOfBirth" name="dateOfBirth" type="date" autoComplete="bday" required />
+              <FieldError errors={fieldErrors} field="dateOfBirth" />
             </Field>
             <Field className="sm:col-span-2">
               <Label htmlFor="address">Address</Label>
-              <Input id="address" name="address" required />
+              <Input id="address" name="address" autoComplete="street-address" placeholder="123 Main St, City, State" required />
+              <FieldError errors={fieldErrors} field="address" />
             </Field>
             <Field className="sm:col-span-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" minLength={12} required />
+              <Label htmlFor="password">Password <span className="text-white/30 font-normal">(min 8 characters)</span></Label>
+              <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
+              <FieldError errors={fieldErrors} field="password" />
             </Field>
           </div>
           <Button disabled={loading}>{loading ? "Creating account..." : "Create secure account"}</Button>

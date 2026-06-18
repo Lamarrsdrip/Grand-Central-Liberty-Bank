@@ -1,14 +1,23 @@
 import { z } from "zod";
 
 export const registrationSchema = z.object({
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  email: z.string().email(),
-  phone: z.string().min(7),
-  country: z.string().min(2),
-  address: z.string().min(8),
-  dateOfBirth: z.string().min(8),
-  password: z.string().min(12)
+  firstName: z.string().trim().min(1, "First name is required").max(60),
+  lastName: z.string().trim().min(1, "Last name is required").max(60),
+  email: z.string().trim().email("Enter a valid email address"),
+  // Accept international formats: +, spaces, dashes, parentheses, 6–20 digits
+  phone: z
+    .string()
+    .trim()
+    .min(6, "Phone number must be at least 6 digits")
+    .max(30, "Phone number is too long")
+    .regex(/^[+\d][\d\s\-().]{4,}$/, "Enter a valid phone number"),
+  country: z.string().min(1, "Select your country"),
+  address: z.string().trim().min(5, "Enter your full address").max(200),
+  dateOfBirth: z.string().min(8, "Date of birth is required"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128, "Password is too long")
 });
 
 export const loginSchema = z.object({
@@ -28,7 +37,7 @@ export const cardApplicationSchema = z.object({
   occupation: z.string().min(2),
   annualIncome: z.coerce.number().positive(),
   employer: z.string().min(2),
-  address: z.string().min(8),
+  address: z.string().min(5),
   governmentIdUrl: z.string().min(1)
 });
 
@@ -59,5 +68,5 @@ export const messageSchema = z.object({
 export const retirementWithdrawalSchema = z.object({
   retirementAccountId: z.string().min(1),
   amount: z.coerce.number().positive(),
-  reason: z.string().min(8)
+  reason: z.string().min(5)
 });
