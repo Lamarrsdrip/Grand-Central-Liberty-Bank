@@ -25,7 +25,7 @@ function isMongoDsn(s: string): boolean {
 // case-sensitive and can miss params like timeoutMS when searching for timeoutms.
 function stripParam(str: string, name: string): string {
   const re = new RegExp(`([?&])${name}=[^&]*`, "gi");
-  let s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
+  const s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
   // Fix up ?& → ? and trailing ? / &
   return s.replace(/\?&/g, "?").replace(/&&+/g, "&").replace(/[?&]$/, "");
 }

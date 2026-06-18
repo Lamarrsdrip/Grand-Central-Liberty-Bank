@@ -20,7 +20,7 @@ export async function register() {
   // raw string. More reliable than URLSearchParams.delete() for mixed-case names.
   function stripParam(str: string, name: string): string {
     const re = new RegExp(`([?&])${name}=[^&]*`, "gi");
-    let s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
+    const s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
     return s.replace(/\?&/g, "?").replace(/&&+/g, "&").replace(/[?&]$/, "");
   }
 
