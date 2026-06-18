@@ -21,6 +21,7 @@
     "@aws-sdk/client-s3": "latest",
     "@prisma/client": "6.19.3",
     "@radix-ui/react-slot": "latest",
+    "@tailwindcss/postcss": "latest",
     "bcryptjs": "latest",
     "class-variance-authority": "latest",
     "clsx": "latest",
@@ -36,11 +37,11 @@
     "socket.io-client": "latest",
     "speakeasy": "latest",
     "tailwind-merge": "latest",
+    "tailwindcss": "4.3.1",
     "tsx": "latest",
     "zod": "latest"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "latest",
     "@testing-library/jest-dom": "latest",
     "@types/node": "latest",
     "@types/nodemailer": "latest",
@@ -51,7 +52,6 @@
     "eslint": "latest",
     "eslint-config-next": "15.5.19",
     "playwright": "^1.61.0",
-    "tailwindcss": "4.3.1",
     "typescript": "latest",
     "vitest": "latest"
   },
