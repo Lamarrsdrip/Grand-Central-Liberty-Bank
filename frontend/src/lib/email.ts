@@ -4,11 +4,14 @@ import { prisma } from "@/lib/db";
 
 function key() {
   const raw = process.env.SETTINGS_MASTER_KEY;
-  if (!raw) {
-    return null;
+  if (raw) {
+    const buffer = Buffer.from(raw, "base64");
+    if (buffer.length === 32) return buffer;
   }
-  const buffer = Buffer.from(raw, "base64");
-  return buffer.length === 32 ? buffer : null;
+  // Derive a stable 32-byte key from JWT_SECRET when SETTINGS_MASTER_KEY is absent.
+  // This lets email settings be saved without requiring an extra env var.
+  const seed = process.env.JWT_SECRET ?? "grand-central-liberty-bank-default-key";
+  return crypto.createHash("sha256").update(seed).digest();
 }
 
 export function encryptSecret(secret: string) {
@@ -43,14 +46,26 @@ export function decryptSecret(value?: string | null) {
 }
 
 export async function getEmailConfig() {
-  const setting = await prisma.emailSetting.findUnique({ where: { id: 1 } });
+  let setting: { smtpHost: string; smtpPort: number; smtpSecure: boolean; gmailAddress: string | null; appPasswordEncrypted: string | null; senderName: string } | null = null;
+  try {
+    setting = await prisma.emailSetting.findUnique({ where: { id: 1 } });
+  } catch {
+    // DB might not be ready; fall through to env vars
+  }
+
+  let decryptedPass: string | null = null;
+  try {
+    decryptedPass = decryptSecret(setting?.appPasswordEncrypted);
+  } catch {
+    // Key mismatch or missing — fall back to env var
+  }
 
   return {
     host: setting?.smtpHost ?? process.env.SMTP_HOST ?? "smtp.gmail.com",
     port: setting?.smtpPort ?? Number(process.env.SMTP_PORT ?? 465),
     secure: setting?.smtpSecure ?? process.env.SMTP_SECURE !== "false",
-    user: setting?.gmailAddress ?? process.env.SMTP_GMAIL_ADDRESS,
-    pass: decryptSecret(setting?.appPasswordEncrypted) ?? process.env.SMTP_GMAIL_APP_PASSWORD,
+    user: setting?.gmailAddress ?? process.env.SMTP_GMAIL_ADDRESS ?? process.env.SMTP_USER,
+    pass: decryptedPass ?? process.env.SMTP_GMAIL_APP_PASSWORD ?? process.env.SMTP_PASS,
     senderName: setting?.senderName ?? process.env.SMTP_SENDER_NAME ?? "Grand Central Liberty Bank"
   };
 }
@@ -58,29 +73,44 @@ export async function getEmailConfig() {
 export async function sendEmail(input: { to: string | string[]; subject: string; html: string; text?: string }) {
   const config = await getEmailConfig();
   if (!config.user || !config.pass) {
+    console.warn("[email] SMTP credentials not configured — skipping email to", input.to);
     return {
       skipped: true,
       message: "SMTP credentials are not configured."
     };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: {
-      user: config.user,
-      pass: config.pass
-    }
-  });
+  const isGmail = config.host.includes("gmail");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transportOptions: any = isGmail
+    ? {
+        service: "gmail",
+        auth: { user: config.user, pass: config.pass },
+        tls: { rejectUnauthorized: false }
+      }
+    : {
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        auth: { user: config.user, pass: config.pass },
+        tls: { rejectUnauthorized: false }
+      };
 
-  const result = await transporter.sendMail({
-    from: `"${config.senderName}" <${config.user}>`,
-    to: Array.isArray(input.to) ? input.to.join(",") : input.to,
-    subject: input.subject,
-    html: input.html,
-    text: input.text
-  });
+  const transporter = nodemailer.createTransport(transportOptions);
 
-  return { skipped: false, messageId: result.messageId };
+  try {
+    const result = await transporter.sendMail({
+      from: `"${config.senderName}" <${config.user}>`,
+      to: Array.isArray(input.to) ? input.to.join(",") : input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text
+    });
+    console.log("[email] sent", result.messageId, "to", input.to);
+    return { skipped: false, messageId: result.messageId };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("[email] send failed:", msg);
+    throw new Error(`Email delivery failed: ${msg}`);
+  }
 }

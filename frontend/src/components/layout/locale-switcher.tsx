@@ -15,9 +15,8 @@ export function LocaleSwitcher({ value }: { value: string }) {
       defaultValue={value}
       onChange={async (event) => {
         const next = event.target.value;
-        // Mirror the choice into the cookie so server-rendered pages and the
-        // auto-detection middleware respect it on subsequent visits.
         document.cookie = `gclb_locale=${next}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+        window.dispatchEvent(new CustomEvent("locale-changed", { detail: next }));
         await secureFetch("/api/user/preferences", {
           method: "PATCH",
           body: JSON.stringify({ preferredLocale: next })

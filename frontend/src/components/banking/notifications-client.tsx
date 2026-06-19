@@ -79,19 +79,21 @@ export function NotificationsClient({
   const unread = items.filter((n) => !n.readAt).length;
 
   return (
-    <div>
+    <div className="space-y-4">
       {showMarkAll && unread > 0 && (
-        <button
-          onClick={markAllRead}
-          disabled={markingAll}
-          className="flex items-center gap-1.5 text-xs font-bold text-green hover:text-green-dim transition disabled:opacity-50"
-        >
-          <CheckCheck className="size-3.5" />
-          {markingAll ? "Marking…" : "Mark all read"}
-        </button>
+        <div className="flex justify-end">
+          <button
+            onClick={markAllRead}
+            disabled={markingAll}
+            className="flex items-center gap-1.5 text-xs font-bold text-green hover:text-green-dim transition disabled:opacity-50"
+          >
+            <CheckCheck className="size-3.5" />
+            {markingAll ? "Marking…" : "Mark all read"}
+          </button>
+        </div>
       )}
 
-      <div className="space-y-2 mt-4">
+      <div className="space-y-2">
         {items.map((n) => {
           const Icon = TYPE_ICON[n.type] ?? Bell;
           const colorClass = TYPE_COLOR[n.type] ?? "bg-white/8 text-white/40";

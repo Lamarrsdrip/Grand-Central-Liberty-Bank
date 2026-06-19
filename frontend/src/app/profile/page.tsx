@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { Fingerprint, LockKeyhole, UserRound } from "lucide-react";
+import { Fingerprint, Globe, LockKeyhole, UserRound } from "lucide-react";
 import { KycForm, ProfileForm } from "@/components/banking/workflow-forms";
 import { StatusBadge } from "@/components/banking/status-badge";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { PageHeader } from "@/components/banking/premium-ui";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { CurrencySwitcher } from "@/components/layout/currency-switcher";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
@@ -81,6 +83,22 @@ export default async function ProfilePage() {
             <CardContent className="grid gap-3">
               <div className="flex items-center justify-between"><span className="font-semibold">Email</span><StatusBadge status={data.user.emailVerifiedAt ? "APPROVED" : "PENDING"} /></div>
               <div className="flex items-center justify-between"><span className="font-semibold">2FA</span><StatusBadge status={data.user.twoFactorEnabled ? "ACTIVE" : "PENDING"} /></div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Globe className="size-4" /> Language &amp; Currency</CardTitle>
+              <CardDescription>Set your preferred display language and currency. Changes apply immediately across the app.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="grid gap-1.5">
+                <p className="text-sm font-semibold text-white/70">Display language</p>
+                <LocaleSwitcher value={data.user.preferredLocale ?? "en"} />
+              </div>
+              <div className="grid gap-1.5">
+                <p className="text-sm font-semibold text-white/70">Display currency</p>
+                <CurrencySwitcher value={(data.user as { preferredCurrency?: string }).preferredCurrency ?? "USD"} />
+              </div>
             </CardContent>
           </Card>
         </div>

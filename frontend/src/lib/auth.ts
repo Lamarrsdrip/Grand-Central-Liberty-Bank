@@ -23,6 +23,7 @@ export type AuthenticatedUser = {
   role: Role;
   status: UserStatus;
   preferredLocale: string;
+  preferredCurrency: string;
   themePreference: string;
 };
 
@@ -167,6 +168,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
             role: true,
             status: true,
             preferredLocale: true,
+            preferredCurrency: true,
             themePreference: true
           }
         }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Bell, BellOff, CheckCheck } from "lucide-react";
+import { BellOff } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { NotificationsClient } from "@/components/banking/notifications-client";
 import { getCurrentUser } from "@/lib/auth";
@@ -22,16 +22,11 @@ export default async function NotificationsPage() {
   return (
     <ProtectedShell>
       <div className="max-w-2xl mx-auto space-y-5 fade-up">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-black text-white">Notifications</h1>
-            <p className="text-sm text-white/50 mt-1">
-              {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
-            </p>
-          </div>
-          {unreadCount > 0 && (
-            <NotificationsClient notifications={notifications} showMarkAll />
-          )}
+        <div>
+          <h1 className="text-3xl font-black text-white">Notifications</h1>
+          <p className="text-sm text-white/50 mt-1">
+            {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+          </p>
         </div>
 
         {notifications.length === 0 ? (
@@ -43,7 +38,7 @@ export default async function NotificationsPage() {
             <p className="text-sm text-white/40 mt-1">We&apos;ll notify you about account activity and updates here.</p>
           </div>
         ) : (
-          <NotificationsClient notifications={notifications} />
+          <NotificationsClient notifications={notifications} showMarkAll={unreadCount > 0} />
         )}
       </div>
     </ProtectedShell>

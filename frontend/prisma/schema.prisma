@@ -172,6 +172,7 @@ model User {
   twoFactorSecret    String?
   twoFactorEnabled   Boolean           @default(false)
   preferredLocale    String            @default("en")
+  preferredCurrency  String            @default("USD")
   themePreference    String            @default("system")
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt

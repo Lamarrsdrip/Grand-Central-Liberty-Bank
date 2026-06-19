@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, Input, Label, Select } from "@/components/ui/input";
 import { secureFetch } from "@/lib/client-api";
 import { COUNTRIES } from "@/lib/countries";
+import { SUPPORTED_LOCALES, LOCALE_LABELS } from "@/lib/locales";
+import { SUPPORTED_CURRENCIES } from "@/components/layout/currency-switcher";
 
 function Status({ message }: { message: string }) {
   return message ? <p className="rounded-md bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground">{message}</p> : null;
@@ -182,6 +184,22 @@ export function RegisterForm() {
               <Label htmlFor="password">Password <span className="text-white/30 font-normal">(min 8 characters)</span></Label>
               <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
               <FieldError errors={fieldErrors} field="password" />
+            </Field>
+            <Field>
+              <Label htmlFor="preferredLocale">Preferred language</Label>
+              <Select id="preferredLocale" name="preferredLocale" defaultValue="en">
+                {SUPPORTED_LOCALES.map((code) => (
+                  <option key={code} value={code}>{LOCALE_LABELS[code]}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field>
+              <Label htmlFor="preferredCurrency">Preferred currency</Label>
+              <Select id="preferredCurrency" name="preferredCurrency" defaultValue="USD">
+                {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </Select>
             </Field>
           </div>
           <Button disabled={loading}>{loading ? "Creating account..." : "Create secure account"}</Button>

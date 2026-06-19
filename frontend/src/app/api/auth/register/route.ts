@@ -30,6 +30,7 @@ async function createUserRecord(input: {
   dateOfBirth: Date;
   passwordHash: string;
   preferredLocale: string;
+  preferredCurrency?: string;
 }) {
   const userId = randomBytes(12).toString("hex");
   const now = new Date();
@@ -50,6 +51,7 @@ async function createUserRecord(input: {
         status: "ACTIVE",
         twoFactorEnabled: false,
         preferredLocale: input.preferredLocale,
+        preferredCurrency: input.preferredCurrency ?? "USD",
         themePreference: "system",
         createdAt: { $date: now.toISOString() },
         updatedAt: { $date: now.toISOString() }
@@ -298,7 +300,9 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     const headerStore = await headers();
     const cookieLocale = cookieStore.get(LOCALE_COOKIE)?.value;
-    const detectedLocale = isSupportedLocale(cookieLocale)
+    const detectedLocale = isSupportedLocale(input.preferredLocale)
+      ? input.preferredLocale
+      : isSupportedLocale(cookieLocale)
       ? cookieLocale
       : detectLocaleFromAcceptLanguage(headerStore.get("accept-language")) ?? DEFAULT_LOCALE;
 
@@ -311,7 +315,8 @@ export async function POST(request: NextRequest) {
       address: input.address,
       dateOfBirth: new Date(input.dateOfBirth),
       passwordHash: await hashPassword(input.password),
-      preferredLocale: detectedLocale
+      preferredLocale: detectedLocale,
+      preferredCurrency: input.preferredCurrency ?? "USD",
     });
 
     const { ip, userAgent } = await requestIpAndAgent();

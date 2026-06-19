@@ -7,12 +7,13 @@ import {
 } from "lucide-react";
 import { Role } from "@prisma/client";
 import { LogoutButton } from "@/components/layout/logout-button";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { initials } from "@/lib/utils";
 
 type User = {
   id: string; firstName: string; lastName: string;
   email: string; role: Role;
-  preferredLocale: string; themePreference: string;
+  preferredLocale: string; preferredCurrency: string; themePreference: string;
 };
 
 const userNav = [
@@ -126,13 +127,13 @@ export function AppShell({
             <p className="text-lg font-black text-white">{user.firstName} {user.lastName}</p>
           </div>
           <div className="flex items-center gap-2">
+            <div className="w-36">
+              <LocaleSwitcher value={user.preferredLocale} />
+            </div>
             <Link href="/support" className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Search support">
               <Search className="size-4" />
             </Link>
-            <Link href="/wallet" className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Open wallet QR">
-              <QrCode className="size-4" />
-            </Link>
-            <Link href="/profile" className="relative size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Notifications">
+            <Link href="/notifications" className="relative size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Notifications">
               <Bell className="size-4" />
               {announcements.length > 0 ? (
                 <span className="absolute -top-0.5 -right-0.5 size-4 flex items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-black text-white">{announcements.length}</span>

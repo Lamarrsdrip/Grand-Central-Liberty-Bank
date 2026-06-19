@@ -17,7 +17,9 @@ export const registrationSchema = z.object({
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
-    .max(128, "Password is too long")
+    .max(128, "Password is too long"),
+  preferredLocale: z.string().min(2).max(10).optional(),
+  preferredCurrency: z.string().min(2).max(5).optional(),
 });
 
 export const loginSchema = z.object({
@@ -53,7 +55,8 @@ export const transferSchema = z.object({
   currency: z.string().min(1, "Currency is required").default("USD"),
   purpose: z.string().trim().min(2, "Transfer purpose is required"),
   saveBeneficiary: z.boolean().optional().default(false),
-  beneficiaryNickname: z.string().trim().optional()
+  beneficiaryNickname: z.string().trim().optional(),
+  recipientAddress: z.string().trim().optional(),
 });
 
 export const beneficiarySchema = z.object({

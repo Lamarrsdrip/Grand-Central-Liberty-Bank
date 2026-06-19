@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
   ChevronLeft, ChevronRight, Building2, ShieldCheck, Delete, Check,
   AlertTriangle, User, CreditCard, Globe, Bookmark, Clock, X, Send,
-  ArrowRight, Wallet,
+  ArrowRight, Wallet, MapPin, Hash,
 } from "lucide-react";
 import { secureFetch } from "@/lib/client-api";
 import { formatCurrency, initials } from "@/lib/utils";
@@ -36,29 +36,35 @@ type TransferResult = {
   beneficiary: string; reference: string; reason: string;
 };
 type FieldErrors = Partial<Record<string, string>>;
-type WizardStep = 1 | 2 | 3 | 4; // 1=Recipient 2=Options 3=Amount 4=Confirm
-// "result" is shown after submit, outside the wizard
+type TransferType = "DOMESTIC" | "INTERNATIONAL" | "INTERNAL";
+// Steps: 1=Type, 2=Recipient, 3=Options, 4=Amount, 5=Confirm
+type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
 const CURRENCIES = [
   "USD","EUR","GBP","CAD","AUD","JPY","CHF","CNY","HKD","SGD","MXN","BRL","NGN","INR","ZAR",
+  "KRW","TRY","RUB","SEK","NOK","DKK","PLN","THB","MYR","PHP","IDR","AED","EGP","KES","GHS",
 ];
 const COUNTRIES = [
   "United States","United Kingdom","Canada","Australia","Germany","France",
   "Netherlands","Switzerland","Japan","China","Hong Kong","Singapore",
   "Mexico","Brazil","Nigeria","India","South Africa","United Arab Emirates",
+  "Ghana","Kenya","South Korea","Turkey","Indonesia","Malaysia","Philippines",
+  "Thailand","Vietnam","Egypt","Pakistan","Bangladesh","Saudi Arabia",
   "New Zealand","Spain","Italy","Sweden","Norway","Denmark","Belgium",
-  "Portugal","Ireland","Austria","Poland","Czech Republic","Other",
+  "Portugal","Ireland","Austria","Poland","Czech Republic","Romania","Ukraine",
+  "Israel","Morocco","Ethiopia","Tanzania","Uganda","Rwanda","Other",
 ];
 const AVATAR_PALETTE = [
   "#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#06b6d4","#f97316","#84cc16",
 ];
 const STEP_LABELS: Record<WizardStep, string> = {
-  1: "Recipient", 2: "Options", 3: "Amount", 4: "Confirm",
+  1: "Type", 2: "Recipient", 3: "Options", 4: "Amount", 5: "Confirm",
 };
+const TOTAL_STEPS = 5;
 
-/* ─── Tiny helpers ───────────────────────────────────────────────────────── */
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
 
 function avatarColor(name: string) {
   let h = 0;
@@ -121,13 +127,9 @@ function SelectInput({
   );
 }
 
-/* ─── Step header ────────────────────────────────────────────────────────── */
+/* ─── Step Progress Header ───────────────────────────────────────────────── */
 
-function StepHeader({
-  step, onBack,
-}: {
-  step: WizardStep; onBack?: () => void;
-}) {
+function StepHeader({ step, onBack }: { step: WizardStep; onBack?: () => void }) {
   return (
     <div className="flex items-center gap-3 mb-6">
       <button
@@ -138,9 +140,8 @@ function StepHeader({
         <ChevronLeft className="size-5" />
       </button>
 
-      {/* Progress dots */}
-      <div className="flex-1 flex items-center gap-1.5">
-        {([1, 2, 3, 4] as WizardStep[]).map((n) => (
+      <div className="flex-1 flex items-center gap-1">
+        {([1, 2, 3, 4, 5] as WizardStep[]).map((n) => (
           <div
             key={n}
             className={`h-1 flex-1 rounded-full transition-all duration-300 ${
@@ -151,13 +152,13 @@ function StepHeader({
       </div>
 
       <span className="text-[11px] font-black text-white/35 shrink-0 tabular-nums">
-        {step} / 4
+        {step} / {TOTAL_STEPS}
       </span>
     </div>
   );
 }
 
-/* ─── Quick-pick recipients strip ───────────────────────────────────────── */
+/* ─── Quick-pick recipients ──────────────────────────────────────────────── */
 
 function RecipientStrip({
   beneficiaries, recentRecipients, onPick, onDelete, deletingId,
@@ -242,7 +243,6 @@ function RecipientStrip({
         </>
       )}
 
-      {/* Divider */}
       <div className="flex items-center gap-3 mt-3 mb-5">
         <div className="flex-1 h-px bg-white/8" />
         <span className="text-[11px] text-white/30 font-semibold">or enter new details</span>
@@ -253,7 +253,7 @@ function RecipientStrip({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Main export
+   Main TransferFlow component
 ═══════════════════════════════════════════════════════════════════════════ */
 
 export function TransferFlow({
@@ -276,26 +276,33 @@ export function TransferFlow({
     setStep(target);
   }
 
-  /* ── Form state — Step 1: Recipient ────────────────────────────────── */
+  /* ── Form state ─────────────────────────────────────────────────────── */
+
+  // Step 1: Transfer type
+  const [transferType, setTransferType] = useState<TransferType>("DOMESTIC");
+  const [transferMethod, setTransferMethod] = useState<"BANK" | "CRYPTO">("BANK");
+
+  // Step 2: Recipient details (vary by transfer type)
   const [recipientName, setRecipientName] = useState("");
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
-  const [routingSwift, setRoutingSwift] = useState("");
+  const [routingNumber, setRoutingNumber] = useState("");   // domestic routing
+  const [swiftBic, setSwiftBic] = useState("");             // international SWIFT
+  const [iban, setIban] = useState("");                      // international IBAN
+  const [recipientAddress, setRecipientAddress] = useState(""); // international address
   const [recipientCountry, setRecipientCountry] = useState("United States");
   const [currency, setCurrency] = useState("USD");
   const [saveBeneficiary, setSaveBeneficiary] = useState(false);
   const [beneficiaryNickname, setBeneficiaryNickname] = useState("");
 
-  /* ── Form state — Step 2: Options ──────────────────────────────────── */
+  // Step 3: Transfer options
   const [fromAccountId, setFromAccountId] = useState(accounts[0]?.id ?? "");
-  const [transferType, setTransferType] = useState<"DOMESTIC" | "INTERNATIONAL" | "INTERNAL">("DOMESTIC");
-  const [transferMethod, setTransferMethod] = useState<"BANK" | "CRYPTO">("BANK");
   const [purpose, setPurpose] = useState("");
 
-  /* ── Form state — Step 3: Amount ───────────────────────────────────── */
+  // Step 4: Amount
   const [amount, setAmount] = useState("0");
 
-  /* ── UI state ───────────────────────────────────────────────────────── */
+  // UI state
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<TransferResult | null>(null);
@@ -305,8 +312,9 @@ export function TransferFlow({
   /* ── Derived ────────────────────────────────────────────────────────── */
   const numericAmount = parseFloat(amount.replace(/,/g, "")) || 0;
   const fromAccount = accounts.find((a) => a.id === fromAccountId);
-  const insufficientFunds =
-    Boolean(fromAccount && numericAmount > 0 && numericAmount > fromAccount.availableBalance);
+  const insufficientFunds = Boolean(fromAccount && numericAmount > 0 && numericAmount > fromAccount.availableBalance);
+  const isIntl = transferType === "INTERNATIONAL";
+  const isDomestic = transferType === "DOMESTIC";
 
   /* ── Keypad ─────────────────────────────────────────────────────────── */
   function pressKey(key: string) {
@@ -335,44 +343,44 @@ export function TransferFlow({
     setRecipientName(name);
     setBankName(b.bankName);
     setAccountNumber(b.accountNumber);
-    setRoutingSwift(b.routingSwift ?? "");
+    const rs = b.routingSwift ?? "";
+    // Heuristic: SWIFT is 8 or 11 alphanumeric chars; routing is 9 digits
+    if (/^\d{9}$/.test(rs)) { setRoutingNumber(rs); setSwiftBic(""); }
+    else { setSwiftBic(rs); setRoutingNumber(""); }
     setRecipientCountry(b.recipientCountry || "United States");
     setCurrency(b.currency || "USD");
     setErrors({});
-    // Jump straight to Step 2 when picking a saved recipient
-    go(2, "fwd");
+    go(3, "fwd"); // jump to options
   }
 
   async function deleteBeneficiary(id: string) {
     setDeletingId(id);
     try {
-      await secureFetch("/api/beneficiaries", {
-        method: "DELETE",
-        body: JSON.stringify({ id }),
-      });
+      await secureFetch("/api/beneficiaries", { method: "DELETE", body: JSON.stringify({ id }) });
       setBeneficiaries((prev) => prev.filter((b) => b.id !== id));
     } catch { /* non-fatal */ }
     setDeletingId(null);
   }
 
-  /* ── Step-level validation ──────────────────────────────────────────── */
-  function validateStep1(): FieldErrors {
+  /* ── Validation ─────────────────────────────────────────────────────── */
+  function validateStep2(): FieldErrors {
     const e: FieldErrors = {};
     if (!recipientName.trim() || recipientName.trim().length < 2)
       e.recipientName = "Recipient full name is required";
     if (!bankName.trim()) e.bankName = "Bank name is required";
     if (!accountNumber.trim() || accountNumber.trim().length < 4)
-      e.accountNumber = "Account number / IBAN required (min 4 chars)";
+      e.accountNumber = isIntl ? "Account number or IBAN is required (min 4 chars)" : "Account number is required (min 4 chars)";
     if (!recipientCountry) e.recipientCountry = "Country is required";
+    if (isIntl && !currency) e.currency = "Currency is required";
     return e;
   }
-  function validateStep2(): FieldErrors {
+  function validateStep3(): FieldErrors {
     const e: FieldErrors = {};
     if (!fromAccountId) e.fromAccountId = "Select a source account";
     if (!purpose.trim() || purpose.trim().length < 2) e.purpose = "Purpose is required";
     return e;
   }
-  function validateStep3(): FieldErrors {
+  function validateStep4(): FieldErrors {
     const e: FieldErrors = {};
     if (numericAmount <= 0) e.amount = "Enter an amount greater than 0";
     if (insufficientFunds)
@@ -381,9 +389,9 @@ export function TransferFlow({
   }
 
   function nextStep1() {
-    const e = validateStep1();
-    setErrors(e);
-    if (!Object.keys(e).length) go(2, "fwd");
+    // Step 1 validation: just need a type selected (always true) and method
+    if (transferMethod === "CRYPTO") return; // handled by notice
+    go(2, "fwd");
   }
   function nextStep2() {
     const e = validateStep2();
@@ -395,11 +403,21 @@ export function TransferFlow({
     setErrors(e);
     if (!Object.keys(e).length) go(4, "fwd");
   }
+  function nextStep4() {
+    const e = validateStep4();
+    setErrors(e);
+    if (!Object.keys(e).length) go(5, "fwd");
+  }
 
   /* ── Submit ──────────────────────────────────────────────────────────── */
   async function submit() {
     setSubmitting(true);
     try {
+      // Consolidate routing / swift into the ibanSwift field the API expects
+      const ibanSwift = isIntl
+        ? (swiftBic.trim() || iban.trim() || undefined)
+        : (routingNumber.trim() || undefined);
+
       const data = await secureFetch("/api/transfers", {
         method: "POST",
         body: JSON.stringify({
@@ -407,26 +425,28 @@ export function TransferFlow({
           type: transferType,
           beneficiaryName: recipientName.trim(),
           beneficiaryBank: bankName.trim(),
-          beneficiaryAccount: accountNumber.trim(),
-          ibanSwift: routingSwift.trim() || undefined,
+          beneficiaryAccount: (isIntl && iban.trim()) ? iban.trim() : accountNumber.trim(),
+          ibanSwift,
           recipientCountry,
           amount: numericAmount,
           currency,
           purpose: purpose.trim(),
           saveBeneficiary,
           beneficiaryNickname: beneficiaryNickname.trim() || undefined,
+          recipientAddress: recipientAddress.trim() || undefined,
         }),
       });
 
       if (saveBeneficiary) {
+        const rs = isIntl ? (swiftBic.trim() || iban.trim()) : routingNumber.trim();
         setBeneficiaries((prev) => [
           {
             id: data.transfer?.id ?? String(Date.now()),
             nickname: beneficiaryNickname.trim() || null,
             recipientName: recipientName.trim(),
             bankName: bankName.trim(),
-            accountNumber: accountNumber.trim(),
-            routingSwift: routingSwift.trim(),
+            accountNumber: (isIntl && iban.trim()) ? iban.trim() : accountNumber.trim(),
+            routingSwift: rs,
             recipientCountry,
             currency,
           },
@@ -464,28 +484,26 @@ export function TransferFlow({
   }
 
   function resetFlow() {
-    setAmount("0");
-    setRecipientName(""); setBankName(""); setAccountNumber("");
-    setRoutingSwift(""); setRecipientCountry("United States");
-    setCurrency("USD"); setPurpose(""); setSaveBeneficiary(false);
-    setBeneficiaryNickname(""); setErrors({}); setResult(null);
-    setShowResult(false);
+    setAmount("0"); setRecipientName(""); setBankName(""); setAccountNumber("");
+    setRoutingNumber(""); setSwiftBic(""); setIban(""); setRecipientAddress("");
+    setRecipientCountry("United States"); setCurrency("USD"); setPurpose("");
+    setSaveBeneficiary(false); setBeneficiaryNickname(""); setErrors({});
+    setResult(null); setShowResult(false);
     setSlideDir("back"); setAnimKey((k) => k + 1); setStep(1);
   }
 
-  /* ── Slide style ─────────────────────────────────────────────────────── */
   const slide: React.CSSProperties = {
     animation: `${slideDir === "fwd" ? "tfFwd" : "tfBack"} 0.22s ease both`,
   };
 
   /* ═══════════════════════════════════════════════════════════════════
-     RESULT SCREEN
+     RESULT / CONFIRMATION SCREEN
   ════════════════════════════════════════════════════════════════════ */
   if (showResult) {
     const isOk = result?.state !== "failed";
     const Icon = isOk ? Check : AlertTriangle;
     const supportMsg = result
-      ? `Transfer of ${formatCurrency(result.amount)} to ${result.beneficiary} — ${result.reason}\nRef: ${result.reference}`
+      ? `Transfer of ${formatCurrency(result.amount, currency)} to ${result.beneficiary} — ${result.reason}\nRef: ${result.reference}`
       : "";
 
     return (
@@ -498,6 +516,7 @@ export function TransferFlow({
           <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isOk ? "bg-emerald-400/15" : "bg-red-500/15"}`}>
             <Icon className={`size-8 ${isOk ? "text-emerald-400" : "text-red-300"}`} />
           </div>
+          <p className="text-[10px] font-black tracking-widest text-white/30 uppercase mb-1">Step 5 of 5 — Confirmation</p>
           <h2 className="text-xl font-black text-white">
             {isOk ? "Transfer Under Review" : "Transfer Not Submitted"}
           </h2>
@@ -509,7 +528,7 @@ export function TransferFlow({
           <div className="mt-5 bg-white/5 rounded-2xl p-4 text-left space-y-2">
             {(
               [
-                ["Amount", formatCurrency(result?.amount ?? 0)],
+                ["Amount", formatCurrency(result?.amount ?? 0, currency)],
                 ["To", result?.beneficiary ?? ""],
                 ["Currency", currency],
                 ["Type", transferType === "INTERNATIONAL" ? "International" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"],
@@ -542,7 +561,7 @@ export function TransferFlow({
   }
 
   /* ═══════════════════════════════════════════════════════════════════
-     WIZARD STEPS
+     WIZARD
   ════════════════════════════════════════════════════════════════════ */
   return (
     <>
@@ -553,14 +572,103 @@ export function TransferFlow({
 
       <div key={animKey} style={slide} className="card-dark p-5 mb-20 lg:mb-6">
 
-        {/* ── STEP 1 — Recipient Details ─────────────────────────────────── */}
+        {/* ─── STEP 1 — Transfer Type ────────────────────────────────────── */}
         {step === 1 && (
           <>
             <StepHeader step={1} />
-            <h2 className="text-lg font-black text-white mb-0.5">Recipient Details</h2>
-            <p className="text-xs text-white/40 mb-5">Who are you sending money to?</p>
+            <h2 className="text-lg font-black text-white mb-0.5">Transfer Type</h2>
+            <p className="text-xs text-white/40 mb-5">Choose how you want to send money.</p>
 
-            {/* Quick-pick saved / recent */}
+            <div className="space-y-4">
+              {/* Transfer method */}
+              <div>
+                <FL>Transfer method</FL>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["BANK", "CRYPTO"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setTransferMethod(m)}
+                      className={`flex items-center gap-2.5 rounded-xl px-4 py-3 border text-sm font-bold transition ${transferMethod === m ? "bg-emerald-400/12 border-emerald-400/40 text-emerald-300" : "bg-white/5 border-white/8 text-white/50 hover:bg-white/8 hover:text-white"}`}
+                    >
+                      {m === "BANK" ? <Building2 className="size-4 shrink-0" /> : <Wallet className="size-4 shrink-0" />}
+                      {m === "BANK" ? "Bank Transfer" : "Crypto"}
+                    </button>
+                  ))}
+                </div>
+
+                {transferMethod === "CRYPTO" && (
+                  <div className="mt-3 bg-amber-400/8 border border-amber-400/20 rounded-xl px-4 py-3">
+                    <p className="text-xs font-semibold text-amber-300 mb-1">Crypto transfers use your Wallet</p>
+                    <p className="text-xs text-white/50 mb-2.5">
+                      To send cryptocurrency, go to your Crypto Wallet and use the send/deposit instructions there.
+                    </p>
+                    <Link href="/wallet" className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-400 hover:text-emerald-300 transition">
+                      Go to Crypto Wallet <ArrowRight className="size-3.5" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {transferMethod === "BANK" && (
+                <div>
+                  <FL>Transfer type</FL>
+                  <div className="space-y-2">
+                    {(
+                      [
+                        ["DOMESTIC", "Domestic", "Send to a bank account in the same country using account number and routing number."],
+                        ["INTERNATIONAL", "International (Wire)", "Send internationally using SWIFT/BIC code, IBAN, and recipient address."],
+                        ["INTERNAL", "Same Bank", "Transfer between accounts within Grand Central Liberty Bank instantly."],
+                      ] as [TransferType, string, string][]
+                    ).map(([type, label, desc]) => (
+                      <button
+                        key={type}
+                        onClick={() => setTransferType(type)}
+                        className={`w-full text-left flex items-start gap-3 rounded-2xl p-4 border transition ${transferType === type ? "bg-emerald-400/10 border-emerald-400/30" : "bg-white/4 border-white/8 hover:bg-white/7"}`}
+                      >
+                        <div className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${transferType === type ? "border-emerald-400 bg-emerald-400" : "border-white/25"}`}>
+                          {transferType === type && <Check className="size-3 text-black" />}
+                        </div>
+                        <div>
+                          <p className={`text-sm font-black ${transferType === type ? "text-white" : "text-white/70"}`}>{label}</p>
+                          <p className="text-xs text-white/40 mt-0.5 leading-relaxed">{desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {transferMethod === "BANK" && (
+              <button
+                onClick={nextStep1}
+                className="mt-5 w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
+              >
+                Next — Recipient Details
+                <ChevronRight className="size-5" />
+              </button>
+            )}
+          </>
+        )}
+
+        {/* ─── STEP 2 — Recipient Details (dynamic by type) ─────────────── */}
+        {step === 2 && (
+          <>
+            <StepHeader step={2} onBack={() => go(1, "back")} />
+            <h2 className="text-lg font-black text-white mb-0.5">Recipient Details</h2>
+            <p className="text-xs text-white/40 mb-1">
+              {transferType === "INTERNATIONAL"
+                ? "International wire transfer — please provide all required banking details."
+                : transferType === "INTERNAL"
+                ? "Transfer within Grand Central Liberty Bank."
+                : "Domestic bank transfer."}
+            </p>
+            <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/6 border border-white/10 px-3 py-1">
+              <span className="text-[10px] font-black text-white/40 uppercase tracking-wider">
+                {transferType === "INTERNATIONAL" ? "International Wire" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"}
+              </span>
+            </div>
+
             <RecipientStrip
               beneficiaries={beneficiaries}
               recentRecipients={recentRecipients}
@@ -569,69 +677,113 @@ export function TransferFlow({
               deletingId={deletingId}
             />
 
-            {/* Form */}
             <div className="space-y-3">
+              {/* COMMON: Recipient Name */}
               <div>
                 <FL>Recipient full name</FL>
-                <TextInput
-                  value={recipientName} onChange={setRecipientName}
-                  placeholder="e.g. Jane Smith"
-                  icon={<User className="size-4" />}
-                />
+                <TextInput value={recipientName} onChange={setRecipientName} placeholder="e.g. Jane Smith" icon={<User className="size-4" />} />
                 <FE msg={errors.recipientName} />
               </div>
 
-              <div>
-                <FL>Bank name</FL>
-                <TextInput
-                  value={bankName} onChange={setBankName}
-                  placeholder="e.g. Chase Bank"
-                  icon={<Building2 className="size-4" />}
-                />
-                <FE msg={errors.bankName} />
-              </div>
-
-              <div>
-                <FL>Account number / IBAN</FL>
-                <TextInput
-                  value={accountNumber} onChange={setAccountNumber}
-                  placeholder="Account number or IBAN"
-                  icon={<CreditCard className="size-4" />}
-                  mono
-                />
-                <FE msg={errors.accountNumber} />
-              </div>
-
-              <div>
-                <FL>Routing / SWIFT / BIC / Sort Code <span className="normal-case font-normal text-white/25">(optional)</span></FL>
-                <TextInput
-                  value={routingSwift} onChange={setRoutingSwift}
-                  placeholder="e.g. CHASUS33 or 021000021"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              {/* COMMON: Bank Name (not for same-bank) */}
+              {transferType !== "INTERNAL" && (
                 <div>
-                  <FL>Country</FL>
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/30 pointer-events-none z-10" />
-                    <select
-                      value={recipientCountry} onChange={(e) => setRecipientCountry(e.target.value)}
-                      className="w-full bg-white/6 border border-white/10 rounded-xl pl-10 pr-3 py-3 text-sm text-white outline-none focus:border-emerald-400/50 transition appearance-none"
-                      style={{ colorScheme: "dark" }}
-                    >
-                      {COUNTRIES.map((c) => (
-                        <option key={c} value={c} className="bg-[#161c28]">{c}</option>
-                      ))}
-                    </select>
+                  <FL>Bank name</FL>
+                  <TextInput value={bankName} onChange={setBankName} placeholder="e.g. Chase Bank" icon={<Building2 className="size-4" />} />
+                  <FE msg={errors.bankName} />
+                </div>
+              )}
+
+              {/* DOMESTIC: Account Number + Routing Number */}
+              {isDomestic && (
+                <>
+                  <div>
+                    <FL>Account number</FL>
+                    <TextInput value={accountNumber} onChange={setAccountNumber} placeholder="e.g. 1234567890" icon={<CreditCard className="size-4" />} mono />
+                    <FE msg={errors.accountNumber} />
                   </div>
-                  <FE msg={errors.recipientCountry} />
-                </div>
+                  <div>
+                    <FL>Routing number <span className="normal-case font-normal text-white/25">(optional)</span></FL>
+                    <TextInput value={routingNumber} onChange={setRoutingNumber} placeholder="e.g. 021000021" icon={<Hash className="size-4" />} mono />
+                  </div>
+                </>
+              )}
+
+              {/* INTERNATIONAL: IBAN + SWIFT + Address + Country + Currency */}
+              {isIntl && (
+                <>
+                  <div>
+                    <FL>IBAN <span className="normal-case font-normal text-white/25">(where applicable)</span></FL>
+                    <TextInput value={iban} onChange={setIban} placeholder="e.g. GB29 NWBK 6016 1331 9268 19" icon={<CreditCard className="size-4" />} mono />
+                    <FE msg={errors.accountNumber} />
+                  </div>
+                  <div>
+                    <FL>Account number <span className="normal-case font-normal text-white/25">(if no IBAN)</span></FL>
+                    <TextInput value={accountNumber} onChange={setAccountNumber} placeholder="Account number" icon={<Hash className="size-4" />} mono />
+                  </div>
+                  <div>
+                    <FL>SWIFT / BIC code</FL>
+                    <TextInput value={swiftBic} onChange={setSwiftBic} placeholder="e.g. CHASUS33" icon={<Globe className="size-4" />} mono />
+                  </div>
+                  <div>
+                    <FL>Recipient address <span className="normal-case font-normal text-white/25">(required for some countries)</span></FL>
+                    <TextInput value={recipientAddress} onChange={setRecipientAddress} placeholder="Street, City, Country" icon={<MapPin className="size-4" />} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <FL>Country</FL>
+                      <div className="relative">
+                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/30 pointer-events-none z-10" />
+                        <select
+                          value={recipientCountry} onChange={(e) => setRecipientCountry(e.target.value)}
+                          className="w-full bg-white/6 border border-white/10 rounded-xl pl-10 pr-3 py-3 text-sm text-white outline-none focus:border-emerald-400/50 transition appearance-none"
+                          style={{ colorScheme: "dark" }}
+                        >
+                          {COUNTRIES.map((c) => <option key={c} value={c} className="bg-[#161c28]">{c}</option>)}
+                        </select>
+                      </div>
+                      <FE msg={errors.recipientCountry} />
+                    </div>
+                    <div>
+                      <FL>Currency</FL>
+                      <SelectInput value={currency} onChange={setCurrency} options={CURRENCIES} />
+                      <FE msg={errors.currency} />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* INTERNAL (same bank): Just account number */}
+              {transferType === "INTERNAL" && (
                 <div>
-                  <FL>Currency</FL>
-                  <SelectInput value={currency} onChange={setCurrency} options={CURRENCIES} />
+                  <FL>Account number</FL>
+                  <TextInput value={accountNumber} onChange={setAccountNumber} placeholder="Recipient's account number" icon={<CreditCard className="size-4" />} mono />
+                  <FE msg={errors.accountNumber} />
                 </div>
-              </div>
+              )}
+
+              {/* DOMESTIC: Country */}
+              {isDomestic && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FL>Country</FL>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/30 pointer-events-none z-10" />
+                      <select
+                        value={recipientCountry} onChange={(e) => setRecipientCountry(e.target.value)}
+                        className="w-full bg-white/6 border border-white/10 rounded-xl pl-10 pr-3 py-3 text-sm text-white outline-none focus:border-emerald-400/50 transition appearance-none"
+                        style={{ colorScheme: "dark" }}
+                      >
+                        {COUNTRIES.map((c) => <option key={c} value={c} className="bg-[#161c28]">{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <FL>Currency</FL>
+                    <SelectInput value={currency} onChange={setCurrency} options={CURRENCIES} />
+                  </div>
+                </div>
+              )}
 
               {/* Save as beneficiary */}
               <label className="flex items-start gap-3 cursor-pointer group pt-1">
@@ -649,16 +801,13 @@ export function TransferFlow({
               {saveBeneficiary && (
                 <div className="ml-8">
                   <FL>Nickname <span className="normal-case font-normal text-white/25">(optional)</span></FL>
-                  <TextInput
-                    value={beneficiaryNickname} onChange={setBeneficiaryNickname}
-                    placeholder="e.g. Mom, Landlord"
-                  />
+                  <TextInput value={beneficiaryNickname} onChange={setBeneficiaryNickname} placeholder="e.g. Mom, Landlord" />
                 </div>
               )}
             </div>
 
             <button
-              onClick={nextStep1}
+              onClick={nextStep2}
               className="mt-5 w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
             >
               Next — Transfer Options
@@ -667,128 +816,66 @@ export function TransferFlow({
           </>
         )}
 
-        {/* ── STEP 2 — Transfer Options ──────────────────────────────────── */}
-        {step === 2 && (
+        {/* ─── STEP 3 — Transfer Options ────────────────────────────────── */}
+        {step === 3 && (
           <>
-            <StepHeader step={2} onBack={() => go(1, "back")} />
+            <StepHeader step={3} onBack={() => go(2, "back")} />
             <h2 className="text-lg font-black text-white mb-0.5">Transfer Options</h2>
             <p className="text-xs text-white/40 mb-5">
               Sending to <span className="text-white font-semibold">{recipientName}</span>
             </p>
 
             <div className="space-y-4">
-              {/* Transfer method: Bank vs Crypto */}
+              {/* From account */}
               <div>
-                <FL>Transfer method</FL>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["BANK", "CRYPTO"] as const).map((m) => (
+                <FL>From account</FL>
+                <div className="space-y-2">
+                  {accounts.map((a) => (
                     <button
-                      key={m}
-                      onClick={() => setTransferMethod(m)}
-                      className={`flex items-center gap-2.5 rounded-xl px-4 py-3 border text-sm font-bold transition ${transferMethod === m ? "bg-emerald-400/12 border-emerald-400/40 text-emerald-300" : "bg-white/5 border-white/8 text-white/50 hover:bg-white/8 hover:text-white"}`}
+                      key={a.id}
+                      onClick={() => setFromAccountId(a.id)}
+                      className={`w-full flex items-center justify-between rounded-xl px-4 py-3 border text-left transition ${fromAccountId === a.id ? "bg-emerald-400/10 border-emerald-400/30" : "bg-white/5 border-white/8 hover:bg-white/8"}`}
                     >
-                      {m === "BANK"
-                        ? <Building2 className="size-4 shrink-0" />
-                        : <Wallet className="size-4 shrink-0" />
+                      <span>
+                        <span className="block text-sm font-black text-white">
+                          {accountLabel(a.type)} •••• {a.accountNumber.slice(-4)}
+                        </span>
+                        <span className="block text-xs text-white/40">
+                          {formatCurrency(a.availableBalance, a.currency)} available
+                        </span>
+                      </span>
+                      {fromAccountId === a.id
+                        ? <Check className="size-4 text-emerald-400 shrink-0" />
+                        : <ChevronRight className="size-4 text-white/25 shrink-0" />
                       }
-                      {m === "BANK" ? "Bank Transfer" : "Crypto Transfer"}
                     </button>
                   ))}
                 </div>
-
-                {/* Crypto redirect notice */}
-                {transferMethod === "CRYPTO" && (
-                  <div className="mt-3 bg-amber-400/8 border border-amber-400/20 rounded-xl px-4 py-3">
-                    <p className="text-xs font-semibold text-amber-300 mb-1">Crypto transfers use your Wallet</p>
-                    <p className="text-xs text-white/50 mb-2.5">
-                      To send cryptocurrency, go to your Crypto Wallet and follow the deposit or send instructions there.
-                    </p>
-                    <Link
-                      href="/wallet"
-                      className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-400 hover:text-emerald-300 transition"
-                    >
-                      Go to Crypto Wallet <ArrowRight className="size-3.5" />
-                    </Link>
-                  </div>
-                )}
+                <FE msg={errors.fromAccountId} />
               </div>
 
-              {/* Bank transfer options — only shown when BANK is selected */}
-              {transferMethod === "BANK" && (
-                <>
-                  {/* From account */}
-                  <div>
-                    <FL>From account</FL>
-                    <div className="space-y-2">
-                      {accounts.map((a) => (
-                        <button
-                          key={a.id}
-                          onClick={() => setFromAccountId(a.id)}
-                          className={`w-full flex items-center justify-between rounded-xl px-4 py-3 border text-left transition ${fromAccountId === a.id ? "bg-emerald-400/10 border-emerald-400/30" : "bg-white/5 border-white/8 hover:bg-white/8"}`}
-                        >
-                          <span>
-                            <span className="block text-sm font-black text-white">
-                              {accountLabel(a.type)} •••• {a.accountNumber.slice(-4)}
-                            </span>
-                            <span className="block text-xs text-white/40">
-                              {formatCurrency(a.availableBalance, a.currency)} available
-                            </span>
-                          </span>
-                          {fromAccountId === a.id
-                            ? <Check className="size-4 text-emerald-400 shrink-0" />
-                            : <ChevronRight className="size-4 text-white/25 shrink-0" />
-                          }
-                        </button>
-                      ))}
-                    </div>
-                    <FE msg={errors.fromAccountId} />
-                  </div>
-
-                  {/* Transfer type */}
-                  <div>
-                    <FL>Transfer type</FL>
-                    <div className="flex gap-2">
-                      {(["DOMESTIC", "INTERNATIONAL", "INTERNAL"] as const).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setTransferType(t)}
-                          className={`flex-1 py-2.5 rounded-xl text-xs font-black border transition ${transferType === t ? "bg-emerald-400/12 border-emerald-400/40 text-emerald-300" : "bg-white/5 border-white/8 text-white/45 hover:text-white hover:bg-white/8"}`}
-                        >
-                          {t === "INTERNAL" ? "Same Bank" : t === "INTERNATIONAL" ? "Intl." : "Domestic"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Purpose */}
-                  <div>
-                    <FL>Transfer purpose / note</FL>
-                    <TextInput
-                      value={purpose} onChange={setPurpose}
-                      placeholder="e.g. Invoice payment, Rent, Family support"
-                    />
-                    <FE msg={errors.purpose} />
-                  </div>
-                </>
-              )}
+              {/* Purpose */}
+              <div>
+                <FL>Transfer purpose / note</FL>
+                <TextInput value={purpose} onChange={setPurpose} placeholder="e.g. Invoice payment, Rent, Family support" />
+                <FE msg={errors.purpose} />
+              </div>
             </div>
 
-            {transferMethod === "BANK" && (
-              <button
-                onClick={nextStep2}
-                className="mt-5 w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
-              >
-                Next — Enter Amount
-                <ChevronRight className="size-5" />
-              </button>
-            )}
+            <button
+              onClick={nextStep3}
+              className="mt-5 w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
+            >
+              Next — Enter Amount
+              <ChevronRight className="size-5" />
+            </button>
           </>
         )}
 
-        {/* ── STEP 3 — Amount ────────────────────────────────────────────── */}
-        {step === 3 && (
+        {/* ─── STEP 4 — Amount ──────────────────────────────────────────── */}
+        {step === 4 && (
           <>
-            <StepHeader step={3} onBack={() => go(2, "back")} />
+            <StepHeader step={4} onBack={() => go(3, "back")} />
             <h2 className="text-lg font-black text-white mb-0.5">Enter Amount</h2>
             <p className="text-xs text-white/40 mb-5">
               {currency} · to <span className="text-white font-semibold">{recipientName}</span>
@@ -799,7 +886,7 @@ export function TransferFlow({
               <div>
                 <p className="text-xs font-bold text-white/30 mb-0.5 uppercase tracking-wider">{currency}</p>
                 <p className="text-4xl font-black text-white tracking-tight">
-                  {currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : ""}
+                  {currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "NGN" ? "₦" : currency === "JPY" ? "¥" : currency === "CNY" ? "¥" : currency === "INR" ? "₹" : currency === "BRL" ? "R$" : ""}
                   {amount}
                 </p>
               </div>
@@ -839,7 +926,7 @@ export function TransferFlow({
             </div>
 
             <button
-              onClick={nextStep3}
+              onClick={nextStep4}
               className="w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
             >
               Review Transfer
@@ -848,12 +935,12 @@ export function TransferFlow({
           </>
         )}
 
-        {/* ── STEP 4 — Confirm ───────────────────────────────────────────── */}
-        {step === 4 && (
+        {/* ─── STEP 5 — Review & Confirm ────────────────────────────────── */}
+        {step === 5 && (
           <>
-            <StepHeader step={4} onBack={() => go(3, "back")} />
-            <h2 className="text-lg font-black text-white mb-0.5">Confirm Transfer</h2>
-            <p className="text-xs text-white/40 mb-5">Review everything before submitting.</p>
+            <StepHeader step={5} onBack={() => go(4, "back")} />
+            <h2 className="text-lg font-black text-white mb-0.5">Review &amp; Confirm</h2>
+            <p className="text-xs text-white/40 mb-5">Please review all details carefully before confirming.</p>
 
             {/* Amount hero */}
             <div className="text-center bg-white/5 border border-white/8 rounded-2xl py-6 mb-5">
@@ -861,43 +948,43 @@ export function TransferFlow({
               <p className="text-4xl font-black text-white">{formatCurrency(numericAmount, currency)}</p>
               <p className="text-sm text-white/40 mt-1.5">
                 {currency} ·{" "}
-                {transferType === "INTERNATIONAL" ? "International" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"}
+                {transferType === "INTERNATIONAL" ? "International Wire" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"}
               </p>
             </div>
 
-            {/* Summary rows */}
+            {/* Summary */}
             <div className="space-y-2 mb-5">
-              {/* Recipient section header */}
               <p className="text-[11px] font-black uppercase tracking-wider text-white/30 pt-1">Recipient</p>
               {(
                 [
                   ["Name", recipientName],
-                  ["Bank", bankName],
-                  ["Account / IBAN", accountNumber],
-                  ...(routingSwift ? [["SWIFT / Routing", routingSwift] as [string, string]] : []),
+                  ...(transferType !== "INTERNAL" ? [["Bank", bankName] as [string, string]] : []),
+                  ...(isIntl && iban ? [["IBAN", iban] as [string, string]] : []),
+                  ...(!isIntl || !iban ? [["Account", accountNumber] as [string, string]] : []),
+                  ...(isIntl && swiftBic ? [["SWIFT / BIC", swiftBic] as [string, string]] : []),
+                  ...(isDomestic && routingNumber ? [["Routing", routingNumber] as [string, string]] : []),
+                  ...(isIntl && recipientAddress ? [["Address", recipientAddress] as [string, string]] : []),
                   ["Country", recipientCountry],
                 ] as [string, string][]
-              ).map(([label, val]) => (
+              ).filter(([, v]) => v).map(([label, val]) => (
                 <div key={label} className="flex items-start justify-between bg-white/4 rounded-xl px-3.5 py-2.5 gap-3">
                   <span className="text-white/40 text-xs shrink-0">{label}</span>
                   <span className="font-semibold text-white text-xs text-right break-all">{val}</span>
                 </div>
               ))}
 
-              <p className="text-[11px] font-black uppercase tracking-wider text-white/30 pt-2">Transfer</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-white/30 pt-2">Transfer Details</p>
               {(
                 [
                   ["From", fromAccount ? `${accountLabel(fromAccount.type)} •••• ${fromAccount.accountNumber.slice(-4)}` : ""],
-                  ["Type", transferType === "INTERNATIONAL" ? "International" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"],
+                  ["Type", transferType === "INTERNATIONAL" ? "International Wire" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"],
                   ["Purpose", purpose],
                   ["Fee", "None"],
                 ] as [string, string][]
               ).map(([label, val]) => (
                 <div key={label} className="flex items-start justify-between bg-white/4 rounded-xl px-3.5 py-2.5 gap-3">
                   <span className="text-white/40 text-xs shrink-0">{label}</span>
-                  <span className={`font-semibold text-xs text-right ${label === "Fee" ? "text-emerald-400" : "text-white"}`}>
-                    {val}
-                  </span>
+                  <span className={`font-semibold text-xs text-right ${label === "Fee" ? "text-emerald-400" : "text-white"}`}>{val}</span>
                 </div>
               ))}
 
