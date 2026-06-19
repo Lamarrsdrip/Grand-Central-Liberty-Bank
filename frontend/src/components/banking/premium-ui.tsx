@@ -31,6 +31,8 @@ import {
   money,
   compactMoney
 } from "@/components/banking/finance";
+import { useTranslations } from "@/components/layout/translation-provider";
+import { formatInCurrency, compactInCurrency } from "@/lib/currency";
 
 /* ── Re-export pure helpers so existing client imports keep working ─ */
 export { cryptoAssets, marketSignals, accountLabel, statusText, money, compactMoney };
@@ -128,26 +130,31 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
 
 /* ── Total Assets Card (matches screenshot) ─ */
 export function TotalAssetsCard({
-  total, available, items, todayChange = null
+  total, available, items, todayChange = null, currency = "USD"
 }: {
   total: number;
   available: number;
   items: Array<{ label: string; value: number; color: string }>;
   todayChange?: string | null;
+  currency?: string;
 }) {
+  const { t } = useTranslations();
   return (
     <div className="assets-hero p-5 sm:p-7 fade-up">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-white/50 uppercase tracking-wider">Total Assets</span>
+            <span className="text-xs font-bold text-white/50 uppercase tracking-wider">{t("dash_total_balance")}</span>
             <span className="text-xs text-white/30">◉</span>
+            {currency !== "USD" && (
+              <span className="text-[0.6rem] font-bold text-emerald-400/70 bg-emerald-400/10 px-1.5 py-0.5 rounded">{currency}</span>
+            )}
           </div>
           <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-none">
-            {money(total)}
+            {formatInCurrency(total, currency)}
           </h2>
           {todayChange && <p className="mt-2 text-sm font-semibold text-green">{todayChange} today</p>}
-          <p className="mt-1 text-xs font-bold text-white/35">Available now {money(available)}</p>
+          <p className="mt-1 text-xs font-bold text-white/35">{t("dash_available")} {formatInCurrency(available, currency)}</p>
         </div>
         <Link href="/accounts" className="text-xs font-bold text-white/40 hover:text-white/70 transition mt-1">
           Net Worth →
@@ -170,7 +177,7 @@ export function TotalAssetsCard({
             <div className={cn("size-2 rounded-full", item.color)} />
             <div>
               <p className="text-[0.65rem] font-semibold text-white/50 whitespace-nowrap">{item.label}</p>
-              <p className="text-xs font-black text-white whitespace-nowrap">{compactMoney(item.value)}</p>
+              <p className="text-xs font-black text-white whitespace-nowrap">{compactInCurrency(item.value, currency)}</p>
             </div>
           </div>
         ))}
@@ -180,16 +187,16 @@ export function TotalAssetsCard({
 }
 
 /* ── Quick Actions (matches screenshot exactly) ─ */
-const quickActions = [
-  { label: "Transfer",  href: "/transfers", bg: "#1a2a3a", icon: "↗" },
-  { label: "Pay Bills", href: "/transfers", bg: "#1a1a2a", icon: "📄" },
-  { label: "Deposit",   href: "/wallet",    bg: "#1a2a20", icon: "⬇" },
-  { label: "Send",      href: "/transfers", bg: "#2a1a1a", icon: "↑" },
-  { label: "Convert",   href: "/wallet",    bg: "#1a2520", icon: "⇄" },
-  { label: "More",      href: "/more",      bg: "#1a1a1a", icon: "⋯" },
-];
-
 export function QuickActions() {
+  const { t } = useTranslations();
+  const quickActions = [
+    { label: t("transfer_title") || "Transfer", href: "/transfers", bg: "#1a2a3a", icon: "↗" },
+    { label: "Pay Bills",                        href: "/transfers", bg: "#1a1a2a", icon: "📄" },
+    { label: t("dash_add_money") || "Deposit",  href: "/wallet",    bg: "#1a2a20", icon: "⬇" },
+    { label: t("dash_send_money") || "Send",    href: "/transfers", bg: "#2a1a1a", icon: "↑" },
+    { label: t("nav_wallet") || "Wallet",       href: "/wallet",    bg: "#1a2520", icon: "⇄" },
+    { label: t("nav_more") || "More",           href: "/more",      bg: "#1a1a1a", icon: "⋯" },
+  ];
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
       {quickActions.map((action) => (
@@ -467,6 +474,7 @@ export function CustomerTopBar({ user, notifCount = 0 }: {
   user: { firstName: string; lastName: string };
   notifCount?: number;
 }) {
+  const { t } = useTranslations();
   return (
     <div className="flex items-center justify-between fade-up">
       <div className="flex items-center gap-3">
@@ -474,7 +482,7 @@ export function CustomerTopBar({ user, notifCount = 0 }: {
           {initials(user.firstName, user.lastName)}
         </div>
         <div>
-          <p className="text-xs font-semibold text-white/40">Good morning</p>
+          <p className="text-xs font-semibold text-white/40">{t("dash_welcome")}</p>
           <div className="flex items-center gap-1.5">
             <p className="text-xl font-black text-white">{user.firstName}</p>
             <span className="size-2 rounded-full bg-green pulse-dot" />

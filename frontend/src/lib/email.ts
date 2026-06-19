@@ -60,12 +60,15 @@ export async function getEmailConfig() {
     // Key mismatch or missing — fall back to env var
   }
 
+  // Gmail App Passwords must have spaces removed — "abcd efgh" → "abcdefgh"
+  const stripSpaces = (s: string | null | undefined) => s?.replace(/\s/g, "") ?? null;
+
   return {
     host: setting?.smtpHost ?? process.env.SMTP_HOST ?? "smtp.gmail.com",
     port: setting?.smtpPort ?? Number(process.env.SMTP_PORT ?? 465),
     secure: setting?.smtpSecure ?? process.env.SMTP_SECURE !== "false",
     user: setting?.gmailAddress ?? process.env.SMTP_GMAIL_ADDRESS ?? process.env.SMTP_USER,
-    pass: decryptedPass ?? process.env.SMTP_GMAIL_APP_PASSWORD ?? process.env.SMTP_PASS,
+    pass: stripSpaces(decryptedPass) ?? stripSpaces(process.env.SMTP_GMAIL_APP_PASSWORD) ?? stripSpaces(process.env.SMTP_PASS),
     senderName: setting?.senderName ?? process.env.SMTP_SENDER_NAME ?? "Grand Central Liberty Bank"
   };
 }

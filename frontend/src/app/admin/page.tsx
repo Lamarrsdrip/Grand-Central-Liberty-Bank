@@ -34,10 +34,16 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+const TABS = [
+  "overview","users","accounts","kyc","transfers","beneficiaries",
+  "cards","retirement","wallets","support","notifications","email","settings","audit",
+] as const;
+type AdminTab = (typeof TABS)[number];
+
 export default async function AdminPage({
   searchParams
 }: {
-  searchParams?: Promise<{ q?: string }>;
+  searchParams?: Promise<{ q?: string; tab?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -45,6 +51,8 @@ export default async function AdminPage({
   const data = await getAdminData();
   const params = await searchParams;
   const userQuery = params?.q?.trim().toLowerCase() ?? "";
+  const rawTab = params?.tab ?? "overview";
+  const activeTab: AdminTab = (TABS as readonly string[]).includes(rawTab) ? (rawTab as AdminTab) : "overview";
 
   const pendingKyc = data.kycSubmissions.filter((item) => item.status === "PENDING" || item.status === "UNDER_REVIEW").length;
   const pendingTransfers = data.transfers.filter((item) => item.status === "SUBMITTED" || item.status === "UNDER_REVIEW").length;
@@ -85,21 +93,21 @@ export default async function AdminPage({
     }))
   }));
 
-  const moduleLinks = [
-    ["Overview", "#overview"],
-    ["Users", "#users"],
-    ["Accounts", "#accounts"],
-    ["KYC", "#kyc"],
-    ["Transfers", "#transfers"],
-    ["Beneficiaries", "#beneficiaries"],
-    ["Cards", "#cards"],
-    ["401(k)", "#retirement"],
-    ["Wallets", "#wallets"],
-    ["Support", "#support"],
-    ["Notifications", "#notifications"],
-    ["Email", "#email"],
-    ["Settings", "#settings"],
-    ["Audit", "#audit"]
+  const tabLinks: Array<[AdminTab, string, string?]> = [
+    ["overview",       "Overview"],
+    ["users",          "Users",        pendingKyc > 0 ? undefined : undefined],
+    ["accounts",       "Accounts"],
+    ["kyc",            "KYC",          pendingKyc > 0 ? String(pendingKyc) : undefined],
+    ["transfers",      "Transfers",    pendingTransfers > 0 ? String(pendingTransfers) : undefined],
+    ["beneficiaries",  "Beneficiaries"],
+    ["cards",          "Cards"],
+    ["retirement",     "401(k)",       pendingRetirement > 0 ? String(pendingRetirement) : undefined],
+    ["wallets",        "Wallets"],
+    ["support",        "Support",      openTickets > 0 ? String(openTickets) : undefined],
+    ["notifications",  "Notif."],
+    ["email",          "Email"],
+    ["settings",       "Settings"],
+    ["audit",          "Audit"],
   ];
 
   return (
@@ -129,19 +137,30 @@ export default async function AdminPage({
           </div>
         </section>
 
-        {/* Navigation */}
-        <nav className="sticky top-0 z-10 -mx-4 overflow-x-auto border-y border-white/8 bg-[#0b0f18]/90 px-4 py-3 backdrop-blur-xl lg:top-[4.5rem] lg:mx-0 lg:rounded-2xl lg:border">
-          <div className="flex min-w-max gap-2">
-            {moduleLinks.map(([label, href]) => (
-              <a key={href} href={href} className="rounded-full border border-white/10 bg-white/7 px-4 py-2 text-xs font-black text-white/65 transition hover:border-emerald-300/40 hover:bg-emerald-400/12 hover:text-white">
+        {/* Tab Navigation */}
+        <nav className="sticky top-0 z-10 -mx-4 border-y border-white/8 bg-[#0b0f18]/90 px-4 py-2.5 backdrop-blur-xl lg:top-[4.5rem] lg:mx-0 lg:rounded-2xl lg:border">
+          <div className="flex gap-1 overflow-x-auto scrollbar-none">
+            {tabLinks.map(([tab, label, badge]) => (
+              <a
+                key={tab}
+                href={`?tab=${tab}`}
+                className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-black transition ${
+                  activeTab === tab
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
+                    : "text-white/50 hover:text-white hover:bg-white/8"
+                }`}
+              >
                 {label}
+                {badge && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[0.55rem] font-black text-white">{badge}</span>
+                )}
               </a>
             ))}
           </div>
         </nav>
 
         {/* Overview */}
-        <section id="overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        {activeTab === "overview" && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           {([
             ["Total Users", data.users.length, "Registered profiles"],
             ["KYC Pending", pendingKyc, "Awaiting review"],
@@ -158,10 +177,10 @@ export default async function AdminPage({
               <CardContent><p className="text-3xl font-black text-white">{value}</p></CardContent>
             </Card>
           ))}
-        </section>
+        </section>}
 
         {/* Users */}
-        <section id="users">
+        {activeTab === "users" && <section>
           <Card>
             <CardHeader>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -169,10 +188,11 @@ export default async function AdminPage({
                   <CardTitle>Users</CardTitle>
                   <CardDescription>Edit profiles, freeze, unfreeze, suspend, and activate accounts.</CardDescription>
                 </div>
-                <form className="flex w-full gap-2 lg:w-[28rem]" action="/admin#users">
+                <form className="flex w-full gap-2 lg:w-[28rem]" action="/admin">
+                  <input type="hidden" name="tab" value="users" />
                   <Input name="q" placeholder="Search by name, email, phone..." defaultValue={params?.q ?? ""} />
                   <Button type="submit">Search</Button>
-                  {userQuery ? <Button asChild variant="outline"><a href="/admin#users">Clear</a></Button> : null}
+                  {userQuery ? <Button asChild variant="outline"><a href="/admin?tab=users">Clear</a></Button> : null}
                 </form>
               </div>
             </CardHeader>
@@ -227,15 +247,15 @@ export default async function AdminPage({
               )}
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Balance Adjustment */}
-        <section id="accounts">
+        {activeTab === "accounts" && <section>
           <BalanceAdjustmentForm users={data.users} />
-        </section>
+        </section>}
 
         {/* KYC */}
-        <section id="kyc">
+        {activeTab === "kyc" && <section>
           <Card>
             <CardHeader>
               <CardTitle>KYC Review Queue</CardTitle>
@@ -272,10 +292,10 @@ export default async function AdminPage({
               </Table>
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Transfers */}
-        <section id="transfers" className="grid gap-5">
+        {activeTab === "transfers" && <section className="grid gap-5">
           <TransferSettingsForm settings={data.transferSettings} />
           <Card>
             <CardHeader>
@@ -333,10 +353,10 @@ export default async function AdminPage({
               </Table>
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Saved Beneficiaries */}
-        <section id="beneficiaries">
+        {activeTab === "beneficiaries" && <section>
           <Card>
             <CardHeader>
               <CardTitle>Saved Beneficiaries</CardTitle>
@@ -383,10 +403,10 @@ export default async function AdminPage({
               </Table>
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Cards */}
-        <section id="cards">
+        {activeTab === "cards" && <section>
           <Card>
             <CardHeader>
               <CardTitle>Card Applications</CardTitle>
@@ -425,10 +445,10 @@ export default async function AdminPage({
               </Table>
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Retirement */}
-        <section id="retirement" className="grid gap-5">
+        {activeTab === "retirement" && <section className="grid gap-5">
           <RetirementFeeSettingsForm settings={retirementFeeSettings} />
           <Card>
             <CardHeader>
@@ -507,21 +527,21 @@ export default async function AdminPage({
               </Table>
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Wallets */}
-        <section id="wallets" className="grid gap-5 xl:grid-cols-[1fr_28rem]">
+        {activeTab === "wallets" && <section className="grid gap-5 xl:grid-cols-[1fr_28rem]">
           <WalletManagementPanel wallets={data.wallets} />
           <WalletForm />
-        </section>
+        </section>}
 
         {/* Support */}
-        <section id="support">
+        {activeTab === "support" && <section>
           <AdminSupportCenter tickets={supportTickets} adminId={user.id} />
-        </section>
+        </section>}
 
         {/* Notifications */}
-        <section id="notifications" className="grid gap-5 xl:grid-cols-2">
+        {activeTab === "notifications" && <section className="grid gap-5 xl:grid-cols-2">
           <div className="grid gap-5">
             <AdminNotificationForm users={data.users} />
             <AnnouncementForm />
@@ -556,10 +576,10 @@ export default async function AdminPage({
               )}
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Email */}
-        <section id="email" className="grid gap-5 xl:grid-cols-2">
+        {activeTab === "email" && <section className="grid gap-5 xl:grid-cols-2">
           <EmailSettingsForm settings={data.emailSettings ? { ...data.emailSettings, appPasswordEncrypted: data.emailSettings.appPasswordEncrypted ? "configured" : null } : null} />
           <Card>
             <CardHeader>
@@ -584,15 +604,15 @@ export default async function AdminPage({
               </div>
             </CardContent>
           </Card>
-        </section>
+        </section>}
 
         {/* Settings */}
-        <section id="settings">
+        {activeTab === "settings" && <section>
           <BankSettingsForm settings={data.bankSettings} />
-        </section>
+        </section>}
 
         {/* Audit Logs */}
-        <section id="audit">
+        {activeTab === "audit" && <section>
           <Card>
             <CardHeader>
               <CardTitle>Audit Logs</CardTitle>
@@ -626,7 +646,7 @@ export default async function AdminPage({
               </Table>
             </CardContent>
           </Card>
-        </section>
+        </section>}
       </div>
     </ProtectedShell>
   );

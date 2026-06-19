@@ -8,10 +8,11 @@ import {
   MarketStrip, MiniChart, QuickActions,
   TotalAssetsCard, TransactionCards
 } from "@/components/banking/premium-ui";
-import { money } from "@/components/banking/finance";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
+import { getServerTranslations } from "@/lib/i18n/server-locale";
+import { formatInCurrency } from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const data = await getUserDashboardData(user.id);
+  const { tx } = getServerTranslations(user.preferredLocale);
+  const pCurrency = user.preferredCurrency ?? "USD";
 
   const accountTotal   = data.accounts.reduce((s, a) => s + Number(a.balance), 0);
   const available      = data.accounts.reduce((s, a) => s + Number(a.availableBalance), 0);
@@ -78,14 +81,15 @@ export default async function DashboardPage() {
           available={available}
           items={wealthItems}
           todayChange={null}
+          currency={user.preferredCurrency ?? "USD"}
         />
 
         {selectedBalance ? (
           <Link href={selectedBalance.href} className="card-dark block p-5 transition hover:bg-white/6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-white/40">Selected Account Balance</p>
-                <p className="mt-1 text-3xl font-black text-white">{money(selectedBalance.balance, selectedBalance.currency)}</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-white/40">{tx.dash_accounts}</p>
+                <p className="mt-1 text-3xl font-black text-white">{formatInCurrency(Number(selectedBalance.balance), pCurrency)}</p>
                 <p className="mt-1 text-sm text-white/40">{selectedBalance.label} · {selectedBalance.detail}</p>
               </div>
               <ArrowRight className="size-5 text-green" />
@@ -104,7 +108,7 @@ export default async function DashboardPage() {
           <div className="card-dark p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="font-black text-white">Recent Transactions</h3>
+                <h3 className="font-black text-white">{tx.dash_recent_transactions}</h3>
               </div>
               <div className="flex items-center gap-1">
                 {["All","Income","Spend"].map((tab, i) => (
@@ -135,8 +139,8 @@ export default async function DashboardPage() {
         {/* ── Accounts row ─────────────── */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-black text-white">Accounts</h3>
-            <Link href="/accounts" className="text-xs font-bold text-green hover:text-green-dim transition">View all →</Link>
+            <h3 className="font-black text-white">{tx.nav_accounts}</h3>
+            <Link href="/accounts" className="text-xs font-bold text-green hover:text-green-dim transition">{tx.dash_view_all} →</Link>
           </div>
           <div className="flex gap-4 overflow-x-auto scrollbar-none pb-1">
             {data.accounts.slice(0, 4).map((account, i) => (
@@ -169,7 +173,7 @@ export default async function DashboardPage() {
               <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Crypto</p>
               <span className="text-xs font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{data.wallets.length} networks</span>
             </div>
-            <p className="text-xl font-black text-white">{money(crypto)}</p>
+            <p className="text-xl font-black text-white">{formatInCurrency(crypto, pCurrency)}</p>
             <div className="mt-2 flex items-center justify-between gap-2">
               <p className="text-xs text-white/30">{data.wallets.length} active networks</p>
               <div className="flex -space-x-2">
@@ -187,7 +191,7 @@ export default async function DashboardPage() {
               <p className="text-xs font-bold text-white/40 uppercase tracking-wider">401(k)</p>
               <span className="text-xs font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{data.retirementAccounts.length > 0 ? "Active" : "Inactive"}</span>
             </div>
-            <p className="text-xl font-black text-white">{money(retirementTotal)}</p>
+            <p className="text-xl font-black text-white">{formatInCurrency(retirementTotal, pCurrency)}</p>
             <p className="text-xs text-white/30 mt-0.5">
               {primaryRetirement?.investmentGrowthPlaceholder ?? "Projected growth active"}
             </p>

@@ -2,12 +2,14 @@ import Link from "next/link";
 import {
   BadgeDollarSign, Bell, Bitcoin, Building2, CreditCard,
   Headphones, Home, Landmark, LineChart,
-  QrCode, Search, Send, Settings2, ShieldCheck,
+  Search, Send, Settings2, ShieldCheck,
   UserCircle, WalletCards, ArrowLeftRight, MoreHorizontal
 } from "lucide-react";
 import { Role } from "@prisma/client";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { TranslationProvider } from "@/components/layout/translation-provider";
+import { getServerTranslations } from "@/lib/i18n/server-locale";
 import { initials } from "@/lib/utils";
 
 type User = {
@@ -16,40 +18,19 @@ type User = {
   preferredLocale: string; preferredCurrency: string; themePreference: string;
 };
 
-const userNav = [
-  { href: "/dashboard", label: "Home",        icon: Home          },
-  { href: "/accounts",  label: "Accounts",    icon: Landmark      },
-  { href: "/wallet",    label: "Wallet",      icon: WalletCards   },
-  { href: "/transfers", label: "Payments",    icon: Send          },
-  { href: "/cards",     label: "Cards",       icon: CreditCard    },
-  { href: "/retirement",label: "Invest",      icon: LineChart     },
-  { href: "/crypto",    label: "Crypto",      icon: Bitcoin       },
-  { href: "/profile",   label: "Profile",     icon: UserCircle    },
-  { href: "/support",   label: "Support",     icon: Headphones    },
-] as const;
-
 const adminNav = [
-  { href: "/admin#overview",   label: "Dashboard", icon: Home          },
-  { href: "/admin#users",      label: "Users",     icon: UserCircle    },
-  { href: "/admin#accounts",   label: "Accounts",  icon: Landmark      },
-  { href: "/admin#kyc",        label: "KYC",       icon: ShieldCheck   },
-  { href: "/admin#wallets",    label: "Wallets",   icon: WalletCards   },
-  { href: "/admin#retirement", label: "401(k)",    icon: LineChart     },
-  { href: "/admin#transfers",  label: "Transfers", icon: BadgeDollarSign},
-  { href: "/admin#cards",      label: "Cards",     icon: CreditCard    },
-  { href: "/admin#support",    label: "Support",   icon: Headphones    },
-  { href: "/admin#settings",   label: "Settings",  icon: Settings2     },
+  { href: "/admin?tab=overview",   label: "Dashboard", icon: Home          },
+  { href: "/admin?tab=users",      label: "Users",     icon: UserCircle    },
+  { href: "/admin?tab=accounts",   label: "Accounts",  icon: Landmark      },
+  { href: "/admin?tab=kyc",        label: "KYC",       icon: ShieldCheck   },
+  { href: "/admin?tab=wallets",    label: "Wallets",   icon: WalletCards   },
+  { href: "/admin?tab=retirement", label: "401(k)",    icon: LineChart     },
+  { href: "/admin?tab=transfers",  label: "Transfers", icon: BadgeDollarSign},
+  { href: "/admin?tab=cards",      label: "Cards",     icon: CreditCard    },
+  { href: "/admin?tab=support",    label: "Support",   icon: Headphones    },
+  { href: "/admin?tab=settings",   label: "Settings",  icon: Settings2     },
 ] as const;
 
-// Bottom nav for mobile (5 items like screenshot)
-type MobileNavItem = { href: string; label: string; icon: typeof Home; center?: boolean };
-const mobileNav: MobileNavItem[] = [
-  { href: "/dashboard", label: "Home",     icon: Home       },
-  { href: "/accounts",  label: "Accounts", icon: Landmark   },
-  { href: "/transfers", label: "",         icon: ArrowLeftRight, center: true },
-  { href: "/wallet",    label: "Wallet",   icon: WalletCards },
-  { href: "/more",      label: "More",     icon: MoreHorizontal },
-];
 
 export function AppShell({
   user, announcements, children
@@ -58,9 +39,23 @@ export function AppShell({
   announcements: Array<{ id: string; title: string; body: string; tone: string; href: string | null }>;
   children: React.ReactNode;
 }) {
+  const { tx } = getServerTranslations(user.preferredLocale);
+
+  const userNav = [
+    { href: "/dashboard",  label: tx.nav_home,          icon: Home          },
+    { href: "/accounts",   label: tx.nav_accounts,      icon: Landmark      },
+    { href: "/wallet",     label: tx.nav_wallet,        icon: WalletCards   },
+    { href: "/transfers",  label: tx.nav_payments,      icon: Send          },
+    { href: "/cards",      label: tx.nav_cards,         icon: CreditCard    },
+    { href: "/retirement", label: tx.nav_invest,        icon: LineChart     },
+    { href: "/crypto",     label: tx.nav_crypto,        icon: Bitcoin       },
+    { href: "/profile",    label: tx.nav_profile,       icon: UserCircle    },
+    { href: "/support",    label: tx.nav_support,       icon: Headphones    },
+  ];
   const nav = user.role === "ADMIN" ? adminNav : userNav;
 
   return (
+    <TranslationProvider initialLocale={user.preferredLocale}>
     <div className="app-bg min-h-screen flex">
       {/* ── Desktop Sidebar ───────────────────── */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col sidebar-glass z-30">
@@ -123,7 +118,7 @@ export function AppShell({
         {/* Desktop top bar */}
         <header className="hidden lg:flex sticky top-0 z-20 items-center justify-between px-8 py-4 bg-[#0b0f18]/90 backdrop-blur-xl border-b border-white/5">
           <div>
-            <p className="text-xs text-white/30 font-semibold">Welcome back</p>
+            <p className="text-xs text-white/30 font-semibold">{tx.dash_welcome}</p>
             <p className="text-lg font-black text-white">{user.firstName} {user.lastName}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -167,7 +162,13 @@ export function AppShell({
       {/* ── Mobile bottom nav ─────────────────── */}
       {user.role !== "ADMIN" && (
         <nav className="bottom-nav lg:hidden">
-          {mobileNav.map((item) => {
+          {[
+            { href: "/dashboard", label: tx.nav_home,     icon: Home       },
+            { href: "/accounts",  label: tx.nav_accounts, icon: Landmark   },
+            { href: "/transfers", label: "",               icon: ArrowLeftRight, center: true },
+            { href: "/wallet",    label: tx.nav_wallet,   icon: WalletCards },
+            { href: "/more",      label: tx.nav_more,     icon: MoreHorizontal },
+          ].map((item) => {
             const Icon = item.icon;
             if (item.center) {
               return (
@@ -188,5 +189,6 @@ export function AppShell({
         </nav>
       )}
     </div>
+    </TranslationProvider>
   );
 }
