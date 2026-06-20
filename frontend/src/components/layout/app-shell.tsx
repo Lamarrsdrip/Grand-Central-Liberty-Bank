@@ -19,16 +19,17 @@ type User = {
 };
 
 const adminNav = [
-  { href: "/admin?tab=overview",   label: "Dashboard", icon: Home          },
-  { href: "/admin?tab=users",      label: "Users",     icon: UserCircle    },
-  { href: "/admin?tab=accounts",   label: "Accounts",  icon: Landmark      },
-  { href: "/admin?tab=kyc",        label: "KYC",       icon: ShieldCheck   },
-  { href: "/admin?tab=wallets",    label: "Wallets",   icon: WalletCards   },
-  { href: "/admin?tab=retirement", label: "401(k)",    icon: LineChart     },
-  { href: "/admin?tab=transfers",  label: "Transfers", icon: BadgeDollarSign},
-  { href: "/admin?tab=cards",      label: "Cards",     icon: CreditCard    },
-  { href: "/admin?tab=support",    label: "Support",   icon: Headphones    },
-  { href: "/admin?tab=settings",   label: "Settings",  icon: Settings2     },
+  { href: "/admin?tab=overview",        label: "Dashboard",   icon: Home          },
+  { href: "/admin?tab=users",           label: "Users",       icon: UserCircle    },
+  { href: "/admin?tab=accounts",        label: "Accounts",    icon: Landmark      },
+  { href: "/admin?tab=kyc",             label: "KYC",         icon: ShieldCheck   },
+  { href: "/admin?tab=crypto-balances", label: "Crypto Bal.", icon: Bitcoin       },
+  { href: "/admin?tab=wallets",         label: "Wallets",     icon: WalletCards   },
+  { href: "/admin?tab=retirement",      label: "401(k)",      icon: LineChart     },
+  { href: "/admin?tab=transfers",       label: "Transfers",   icon: BadgeDollarSign},
+  { href: "/admin?tab=cards",           label: "Cards",       icon: CreditCard    },
+  { href: "/admin?tab=support",         label: "Support",     icon: Headphones    },
+  { href: "/admin?tab=settings",        label: "Settings",    icon: Settings2     },
 ] as const;
 
 

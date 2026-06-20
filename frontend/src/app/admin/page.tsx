@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import {
   AdminNotificationForm,
+  AdminCryptoTopupControl,
   AnnouncementForm,
   AnnouncementToggleControl,
   AdminSupportCenter,
@@ -11,6 +12,7 @@ import {
   CardDecisionControl,
   EmailSettingsForm,
   KycDecisionControl,
+  KycDocumentViewer,
   RetirementFeeSettingsForm,
   RetirementWithdrawalDecisionControl,
   TestEmailForm,
@@ -35,7 +37,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  "overview","users","accounts","kyc","transfers","beneficiaries",
+  "overview","users","accounts","kyc","crypto-balances","transfers","beneficiaries",
   "cards","retirement","wallets","support","notifications","email","settings","audit",
 ] as const;
 type AdminTab = (typeof TABS)[number];
@@ -98,6 +100,7 @@ export default async function AdminPage({
     ["users",          "Users",        pendingKyc > 0 ? undefined : undefined],
     ["accounts",       "Accounts"],
     ["kyc",            "KYC",          pendingKyc > 0 ? String(pendingKyc) : undefined],
+    ["crypto-balances","Crypto Bal."],
     ["transfers",      "Transfers",    pendingTransfers > 0 ? String(pendingTransfers) : undefined],
     ["beneficiaries",  "Beneficiaries"],
     ["cards",          "Cards"],
@@ -177,6 +180,19 @@ export default async function AdminPage({
               <CardContent><p className="text-3xl font-black text-white">{value}</p></CardContent>
             </Card>
           ))}
+        </section>}
+
+        {/* Crypto Balances */}
+        {activeTab === "crypto-balances" && <section>
+          <Card>
+            <CardHeader>
+              <CardTitle>Crypto Balance Management</CardTitle>
+              <CardDescription>Top up or adjust a user&apos;s crypto asset balance. All changes are logged and create audit records.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdminCryptoTopupControl users={data.users.map(u => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email }))} />
+            </CardContent>
+          </Card>
         </section>}
 
         {/* Users */}
@@ -269,6 +285,7 @@ export default async function AdminPage({
                     <TableHead>Document</TableHead>
                     <TableHead>Submitted</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Documents</TableHead>
                     <TableHead>Decision</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -282,11 +299,23 @@ export default async function AdminPage({
                       <TableCell>{submission.documentType}</TableCell>
                       <TableCell>{formatDate(submission.createdAt)}</TableCell>
                       <TableCell><StatusBadge status={submission.status} /></TableCell>
+                      <TableCell>
+                        <KycDocumentViewer submission={{
+                          id: submission.id,
+                          documentType: submission.documentType,
+                          documentUrl: submission.documentUrl,
+                          selfieUrl: submission.selfieUrl,
+                          user: { firstName: submission.user.firstName, lastName: submission.user.lastName, email: submission.user.email, country: submission.user.country },
+                          status: submission.status,
+                          createdAt: submission.createdAt,
+                          rejectionReason: submission.rejectionReason
+                        }} />
+                      </TableCell>
                       <TableCell className="min-w-96"><KycDecisionControl id={submission.id} /></TableCell>
                     </TableRow>
                   ))}
                   {!data.kycSubmissions.length && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No KYC submissions yet.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No KYC submissions yet.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

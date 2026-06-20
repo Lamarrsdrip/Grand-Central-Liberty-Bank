@@ -777,6 +777,163 @@ export function AnnouncementToggleControl({ id, active }: { id: string; active: 
   );
 }
 
+export function AdminCryptoTopupControl({ users }: { users: Array<{ id: string; firstName: string; lastName: string; email: string }> }) {
+  const router = useRouter();
+  const [userId, setUserId] = useState("");
+  const [symbol, setSymbol] = useState("BTC");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [balances, setBalances] = useState<Array<{ symbol: string; balance: number }>>([]);
+
+  const loadBalances = async (uid: string) => {
+    if (!uid) { setBalances([]); return; }
+    try {
+      const data = await secureFetch(`/api/admin/users/${uid}/crypto-balance`);
+      setBalances(data.balances ?? []);
+    } catch { setBalances([]); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId || !amount || !reason) { setMessage("All fields required."); return; }
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed === 0) { setMessage("Enter a valid non-zero amount (negative to subtract)."); return; }
+    setBusy(true); setMessage("");
+    try {
+      const result = await secureFetch(`/api/admin/users/${userId}/crypto-balance`, {
+        method: "POST",
+        body: JSON.stringify({ symbol, amount: parsed, reason })
+      });
+      setMessage(`Done. New balance: ${result.newBalance} ${symbol}`);
+      setAmount(""); setReason("");
+      loadBalances(userId);
+      router.refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed.");
+    } finally { setBusy(false); }
+  };
+
+  const SYMBOLS = ["BTC", "ETH", "USDT", "USDC", "SOL", "BNB", "XRP", "DOGE", "ADA", "LTC", "AVAX"];
+
+  return (
+    <form className="grid gap-3" onSubmit={handleSubmit}>
+      <Notice message={message} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">User</label>
+          <select
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={userId}
+            onChange={e => { setUserId(e.target.value); loadBalances(e.target.value); }}
+            required
+          >
+            <option value="">Select user…</option>
+            {users.map(u => (
+              <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset</label>
+          <select
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={symbol}
+            onChange={e => setSymbol(e.target.value)}
+          >
+            {SYMBOLS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+      {balances.length > 0 && (
+        <div className="rounded-md bg-secondary px-3 py-2 text-sm">
+          <span className="font-semibold">Current balances: </span>
+          {balances.map(b => `${b.symbol}: ${b.balance}`).join("  ·  ")}
+        </div>
+      )}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount (negative to subtract)</label>
+          <input
+            type="number"
+            step="any"
+            placeholder="e.g. 0.5 or -0.1"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            required
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reason / note (required)</label>
+          <input
+            type="text"
+            placeholder="Admin correction, deposit confirmed, etc."
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            required
+            minLength={5}
+          />
+        </div>
+      </div>
+      <Button size="sm" disabled={busy}>{busy ? "Processing…" : "Apply crypto adjustment"}</Button>
+    </form>
+  );
+}
+
+export function KycDocumentViewer({ submission }: {
+  submission: {
+    id: string;
+    documentType: string;
+    documentUrl: string;
+    selfieUrl: string;
+    user: { firstName: string; lastName: string; email: string; country: string };
+    status: string;
+    createdAt: Date | string;
+    rejectionReason?: string | null;
+  }
+}) {
+  const [open, setOpen] = useState(false);
+
+  const isImage = (url: string) => /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  const fileKey = (url: string) => {
+    if (url.startsWith("/api/files/")) return url;
+    if (url.startsWith("/")) return `/api/files${url}`;
+    return `/api/files/${url}`;
+  };
+
+  if (!open) {
+    return (
+      <button
+        className="text-xs underline text-blue-400 hover:text-blue-300"
+        onClick={() => setOpen(true)}
+      >
+        View documents
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-secondary/40 p-4 grid gap-4">
+      <div className="flex items-center justify-between">
+        <p className="font-semibold text-sm">
+          {submission.user.firstName} {submission.user.lastName} · {submission.user.email} · {submission.user.country}
+        </p>
+        <button className="text-xs text-muted-foreground" onClick={() => setOpen(false)}>Close ✕</button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <DocPanel label={`ID Document (${submission.documentType})`} url={fileKey(submission.documentUrl)} isImage={isImage(submission.documentUrl)} />
+        <DocPanel label="Selfie" url={fileKey(submission.selfieUrl)} isImage={isImage(submission.selfieUrl)} />
+      </div>
+      {submission.rejectionReason && (
+        <p className="text-xs text-red-400">Rejection reason: {submission.rejectionReason}</p>
+      )}
+    </div>
+  );
+}
+
 export function AdminNotificationForm({
   users
 }: {
@@ -841,3 +998,37 @@ export function BeneficiaryDeleteControl({ id }: { id: string }) {
     </AdminJsonForm>
   );
 }
+
+function DocPanel({ label, url, isImage }: { label: string; url: string; isImage: boolean }) {
+  const [error, setError] = useState(false);
+  return (
+    <div className="grid gap-2">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+      {error ? (
+        <div className="rounded-md bg-secondary flex items-center justify-center h-32 text-sm text-muted-foreground">File unavailable</div>
+      ) : isImage ? (
+        <img
+          src={url}
+          alt={label}
+          className="rounded-md object-contain max-h-56 bg-black/30 w-full"
+          onError={() => setError(true)}
+        />
+      ) : (
+        <div className="rounded-md bg-secondary flex items-center justify-center h-24 text-sm">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">Open document</a>
+        </div>
+      )}
+      {!error && (
+        <a
+          href={`${url}?dl=1`}
+          download
+          className="text-xs text-blue-400 underline"
+        >
+          Download
+        </a>
+      )}
+    </div>
+  );
+}
+
+

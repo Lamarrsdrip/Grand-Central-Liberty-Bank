@@ -154,6 +154,8 @@ enum NotificationType {
   PASSWORD_CHANGED
   EMAIL_VERIFICATION
   SYSTEM
+  SWAP_COMPLETED
+  CRYPTO_BALANCE_ADJUSTED
 }
 
 model User {
@@ -198,6 +200,8 @@ model User {
   retirementWithdrawalRequests RetirementWithdrawalRequest[] @relation("RetirementWithdrawalUser")
   retirementWithdrawalReviews RetirementWithdrawalRequest[] @relation("RetirementWithdrawalReviewer")
   retirementNotes RetirementWithdrawalNote[] @relation("RetirementNoteAuthor")
+  cryptoBalances      UserCryptoBalance[]
+  swapTransactions    SwapTransaction[]
 }
 
 model Session {
@@ -583,4 +587,32 @@ model EmailVerificationToken {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime @default(now())
+}
+
+model UserCryptoBalance {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  symbol    String
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, symbol])
+}
+
+model SwapTransaction {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+  fromAsset    String
+  toAsset      String
+  fromAmount   Float
+  toAmount     Float
+  rate         Float
+  feeAmount    Float
+  feeCurrency  String
+  status       String   @default("COMPLETED")
+  reference    String   @unique
+  createdAt    DateTime @default(now())
 }
