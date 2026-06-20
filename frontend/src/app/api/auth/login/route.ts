@@ -7,6 +7,54 @@ import { createSession, requestIpAndAgent, sessionCookieName, verifyPassword } f
 import { prisma } from "@/lib/db";
 import { assertRateLimit } from "@/lib/security";
 import { loginSchema } from "@/lib/validators";
+import type { Role, UserStatus } from "@prisma/client";
+
+// Raw MongoDB user document shape returned by $runCommandRaw.
+type RawUserDoc = {
+  _id: { $oid: string } | string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  status: string;
+  passwordHash: string;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string | null;
+  preferredLocale?: string;
+  preferredCurrency?: string;
+  themePreference?: string;
+};
+
+// Convert a raw MongoDB document to a Prisma-compatible user shape.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function userFromRaw(doc: RawUserDoc): any {
+  const rawId = doc._id;
+  const id =
+    typeof rawId === "object" && rawId !== null && "$oid" in rawId
+      ? rawId.$oid
+      : String(rawId);
+  return {
+    id,
+    email: doc.email,
+    firstName: doc.firstName,
+    lastName: doc.lastName,
+    role: doc.role as Role,
+    status: doc.status as UserStatus,
+    passwordHash: doc.passwordHash,
+    twoFactorEnabled: Boolean(doc.twoFactorEnabled),
+    twoFactorSecret: doc.twoFactorSecret ?? null,
+    preferredLocale: doc.preferredLocale ?? "en",
+    preferredCurrency: doc.preferredCurrency ?? "USD",
+    themePreference: doc.themePreference ?? "system",
+    emailVerifiedAt: null as Date | null,
+    phone: "",
+    country: "",
+    address: "",
+    dateOfBirth: new Date(0),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
 
 async function recordLoginAttempt(input: {
   userId?: string;
@@ -38,31 +86,75 @@ export async function POST(request: NextRequest) {
     assertRateLimit(request, "login", 25);
     const input = loginSchema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
-    const lookupEmail = input.email.toLowerCase();
-    const user = await prisma.user.findUnique({ where: { email: lookupEmail } });
+    const lookupEmail = input.email.trim().toLowerCase();
 
-    // Temporary debug — BUILD:2026-06-18T-instrumentation-seed
-    console.error("[login:debug] BUILD=2026-06-18T-instrumentation-seed email=%s found=%s role=%s status=%s hashPrefix=%s",
+    // ── Primary lookup: Prisma ORM ────────────────────────────────────────────
+    let user = await prisma.user.findUnique({ where: { email: lookupEmail } }).catch((err: Error) => {
+      console.error("[login] prisma.user.findUnique error:", err.message);
+      return null;
+    });
+
+    // ── Fallback: $runCommandRaw direct MongoDB query ─────────────────────────
+    // If Prisma ORM returns null (e.g. due to DB-URL mismatch, stale client, or
+    // a Prisma unique-index lookup bug), re-try with a raw find command which
+    // bypasses the ORM layer entirely. This also works on standalone MongoDB.
+    if (!user) {
+      const rawResult = await prisma.$runCommandRaw({
+        find: "User",
+        filter: { email: lookupEmail },
+        limit: 1,
+      }).catch((err: Error) => {
+        console.error("[login] $runCommandRaw fallback error:", err.message);
+        return null;
+      }) as { cursor?: { firstBatch?: RawUserDoc[] } } | null;
+
+      const rawDoc = rawResult?.cursor?.firstBatch?.[0];
+
+      if (rawDoc) {
+        console.error(
+          "[login:debug] Prisma findUnique returned null; raw query found user. " +
+          "db_email=%s role=%s status=%s hash_prefix=%s",
+          rawDoc.email,
+          rawDoc.role,
+          rawDoc.status,
+          rawDoc.passwordHash ? rawDoc.passwordHash.slice(0, 7) : "MISSING"
+        );
+        user = userFromRaw(rawDoc);
+      } else {
+        console.error("[login:debug] NOT FOUND by Prisma or raw query. email=%s", lookupEmail);
+      }
+    }
+
+    console.error(
+      "[login:debug] email=%s found=%s role=%s status=%s hash_prefix=%s",
       lookupEmail,
-      user ? "yes" : "no",
+      user ? "YES" : "NO",
       user?.role ?? "n/a",
       user?.status ?? "n/a",
       user?.passwordHash ? user.passwordHash.slice(0, 7) : "MISSING"
     );
 
-    const passwordValid = user ? await verifyPassword(input.password, user.passwordHash) : false;
+    const passwordValid = user
+      ? await verifyPassword(input.password, user.passwordHash)
+      : false;
 
     console.error("[login:debug] passwordValid=%s", passwordValid);
 
     void recordLoginAttempt({
-        userId: user?.id,
-        email: lookupEmail,
-        ip,
-        userAgent,
-        success: Boolean(user && passwordValid)
-      }).catch((error) => console.error("[auth] login history failed:", error));
+      userId: user?.id,
+      email: lookupEmail,
+      ip,
+      userAgent,
+      success: Boolean(user && passwordValid),
+    }).catch((error) => console.error("[auth] login history failed:", error));
 
-    if (!user || !passwordValid) {
+    if (!user) {
+      console.error("[login:debug] REJECT: user not found for email=%s", lookupEmail);
+      throw new Response("Invalid credentials.", { status: 401 });
+    }
+    if (!passwordValid) {
+      console.error("[login:debug] REJECT: password mismatch for email=%s hash_prefix=%s",
+        lookupEmail, user.passwordHash ? user.passwordHash.slice(0, 7) : "MISSING");
       throw new Response("Invalid credentials.", { status: 401 });
     }
 
