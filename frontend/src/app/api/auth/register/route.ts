@@ -332,6 +332,13 @@ export async function POST(request: NextRequest) {
       expires: session.expiresAt,
       path: "/"
     });
+    response.cookies.set("gclb_locale", detectedLocale, {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/"
+    });
     void runPostRegistrationTasks({ user, ip, userAgent });
     return response;
   });

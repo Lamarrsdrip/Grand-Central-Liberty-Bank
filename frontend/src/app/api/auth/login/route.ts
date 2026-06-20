@@ -192,6 +192,13 @@ export async function POST(request: NextRequest) {
       expires: session.expiresAt,
       path: "/"
     });
+    response.cookies.set("gclb_locale", user.preferredLocale ?? "en", {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/"
+    });
     return response;
   });
 }

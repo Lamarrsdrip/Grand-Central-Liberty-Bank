@@ -31,18 +31,13 @@ export function TranslationProvider({
   const [locale, setLocale] = useState<SupportedLocale>(initial);
 
   useEffect(() => {
-    // Sync locale with cookie on mount (handles cases where cookie differs from server render)
-    const m = document.cookie.match(/(?:^|;\s*)gclb_locale=([^;]+)/);
-    const fromCookie = m?.[1];
-    if (isSupportedLocale(fromCookie) && fromCookie !== locale) setLocale(fromCookie);
-
+    // Listen for client-side locale changes from LocaleSwitcher
     const handler = (e: Event) => {
       const next = (e as CustomEvent<string>).detail;
       if (isSupportedLocale(next)) setLocale(next);
     };
     window.addEventListener("locale-changed", handler);
     return () => window.removeEventListener("locale-changed", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const dict = getTranslations(locale);
