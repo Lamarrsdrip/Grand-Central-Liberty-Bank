@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, Input, Label, Select } from "@/components/ui/input";
@@ -15,7 +15,6 @@ function Status({ message }: { message: string }) {
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,11 +43,16 @@ export function LoginForm() {
                   twoFactorToken: form.get("twoFactorToken") || undefined
                 })
               });
-              router.push(data.user.role === "ADMIN" ? "/admin" : "/dashboard");
-              router.refresh();
+              // Hard redirect instead of router.push(): Next.js App Router's
+              // startTransition keeps the current page mounted (and loading=true)
+              // while the target server component loads. On a slow or cold
+              // database the admin page can take several seconds, leaving the
+              // button stuck on "Signing in…" indefinitely. window.location.href
+              // performs a full navigation that unmounts this page immediately,
+              // the session cookie is already set so the next request is authed.
+              window.location.href = data.user.role === "ADMIN" ? "/admin" : "/dashboard";
             } catch (error) {
               setMessage(error instanceof Error ? error.message : "Login failed.");
-            } finally {
               setLoading(false);
             }
           }}
@@ -100,7 +104,6 @@ function parseFieldErrors(error: unknown): FieldErrors {
 }
 
 export function RegisterForm() {
-  const router = useRouter();
   const [message, setMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
@@ -125,8 +128,7 @@ export function RegisterForm() {
                 method: "POST",
                 body: JSON.stringify(Object.fromEntries(form))
               });
-              router.push("/dashboard");
-              router.refresh();
+              window.location.href = "/dashboard";
             } catch (error) {
               const parsed = parseFieldErrors(error);
               if (Object.keys(parsed).length > 0) {
@@ -134,7 +136,6 @@ export function RegisterForm() {
               } else {
                 setMessage(error instanceof Error ? error.message : "Registration failed.");
               }
-            } finally {
               setLoading(false);
             }
           }}
