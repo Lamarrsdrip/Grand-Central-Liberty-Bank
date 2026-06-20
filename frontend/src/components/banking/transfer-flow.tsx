@@ -8,6 +8,7 @@ import {
   ArrowRight, Wallet, MapPin, Hash,
 } from "lucide-react";
 import { secureFetch } from "@/lib/client-api";
+import { useTranslations } from "@/lib/i18n/use-translations";
 import { formatCurrency, initials } from "@/lib/utils";
 import { accountLabel } from "@/components/banking/finance";
 
@@ -169,6 +170,7 @@ function RecipientStrip({
   onDelete: (id: string) => void;
   deletingId: string | null;
 }) {
+  const { tx } = useTranslations();
   const hasSaved = beneficiaries.length > 0;
   const hasRecent = recentRecipients.length > 0;
   if (!hasSaved && !hasRecent) return null;
@@ -178,7 +180,7 @@ function RecipientStrip({
       {hasSaved && (
         <>
           <p className="text-[11px] font-black uppercase tracking-wider text-white/35 mb-2.5 flex items-center gap-1.5">
-            <Bookmark className="size-3" /> Saved
+            <Bookmark className="size-3" /> {tx.transfer_saved_label}
           </p>
           <div className="space-y-1.5 mb-4">
             {beneficiaries.map((b) => (
@@ -219,7 +221,7 @@ function RecipientStrip({
       {hasRecent && (
         <>
           <p className="text-[11px] font-black uppercase tracking-wider text-white/35 mb-2.5 flex items-center gap-1.5">
-            <Clock className="size-3" /> Recent
+            <Clock className="size-3" /> {tx.transfer_recent_label}
           </p>
           <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 mb-2">
             {recentRecipients.map((r) => (
@@ -245,7 +247,7 @@ function RecipientStrip({
 
       <div className="flex items-center gap-3 mt-3 mb-5">
         <div className="flex-1 h-px bg-white/8" />
-        <span className="text-[11px] text-white/30 font-semibold">or enter new details</span>
+        <span className="text-[11px] text-white/30 font-semibold">{tx.transfer_or_new}</span>
         <div className="flex-1 h-px bg-white/8" />
       </div>
     </div>
@@ -264,6 +266,8 @@ export function TransferFlow({
   savedBeneficiaries: SavedBeneficiary[];
   recentRecipients: RecentRecipient[];
 }) {
+  const { tx } = useTranslations();
+
   /* ── Wizard navigation ──────────────────────────────────────────────── */
   const [step, setStep] = useState<WizardStep>(1);
   const [slideDir, setSlideDir] = useState<"fwd" | "back">("fwd");
@@ -516,9 +520,9 @@ export function TransferFlow({
           <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isOk ? "bg-emerald-400/15" : "bg-red-500/15"}`}>
             <Icon className={`size-8 ${isOk ? "text-emerald-400" : "text-red-300"}`} />
           </div>
-          <p className="text-[10px] font-black tracking-widest text-white/30 uppercase mb-1">Step 5 of 5 — Confirmation</p>
+          <p className="text-[10px] font-black tracking-widest text-white/30 uppercase mb-1">{tx.transfer_result_confirmation}</p>
           <h2 className="text-xl font-black text-white">
-            {isOk ? "Transfer Under Review" : "Transfer Not Submitted"}
+            {isOk ? tx.transfer_under_review : tx.transfer_not_submitted}
           </h2>
           <p className="text-sm text-white/50 mt-1.5 leading-relaxed">{result?.message}</p>
           {settings.supportInstructions && (
@@ -528,17 +532,17 @@ export function TransferFlow({
           <div className="mt-5 bg-white/5 rounded-2xl p-4 text-left space-y-2">
             {(
               [
-                ["Amount", formatCurrency(result?.amount ?? 0, currency)],
-                ["To", result?.beneficiary ?? ""],
-                ["Currency", currency],
-                ["Type", transferType === "INTERNATIONAL" ? "International" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"],
-                ["Reference", result?.reference ?? "Pending"],
-                ["Status", isOk ? "Under Review" : "Failed"],
+                [tx.transfer_amount, formatCurrency(result?.amount ?? 0, currency)],
+                [tx.transfer_label_to, result?.beneficiary ?? ""],
+                [tx.common_currency, currency],
+                [tx.common_type, transferType === "INTERNATIONAL" ? tx.transfer_international : transferType === "INTERNAL" ? tx.transfer_same_bank : tx.transfer_domestic],
+                [tx.common_reference, result?.reference ?? ""],
+                [tx.common_status, isOk ? tx.transfer_status_review : tx.transfer_status_failed],
               ] as [string, string][]
             ).map(([label, val]) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-white/40">{label}</span>
-                <span className={`font-bold ${label === "Status" ? (isOk ? "text-emerald-400" : "text-red-300") : "text-white"}`}>{val}</span>
+                <span className={`font-bold ${label === tx.common_status ? (isOk ? "text-emerald-400" : "text-red-300") : "text-white"}`}>{val}</span>
               </div>
             ))}
           </div>
@@ -553,7 +557,7 @@ export function TransferFlow({
             onClick={resetFlow}
             className="mt-2.5 w-full bg-emerald-500 text-black font-black py-3.5 rounded-2xl hover:bg-emerald-400 transition text-sm"
           >
-            New Transfer
+            {tx.transfer_new}
           </button>
         </div>
       </>
@@ -576,13 +580,13 @@ export function TransferFlow({
         {step === 1 && (
           <>
             <StepHeader step={1} />
-            <h2 className="text-lg font-black text-white mb-0.5">Transfer Type</h2>
-            <p className="text-xs text-white/40 mb-5">Choose how you want to send money.</p>
+            <h2 className="text-lg font-black text-white mb-0.5">{tx.transfer_step_type}</h2>
+            <p className="text-xs text-white/40 mb-5">{tx.transfer_type_how_to_send}</p>
 
             <div className="space-y-4">
               {/* Transfer method */}
               <div>
-                <FL>Transfer method</FL>
+                <FL>{tx.transfer_method}</FL>
                 <div className="grid grid-cols-2 gap-2">
                   {(["BANK", "CRYPTO"] as const).map((m) => (
                     <button
@@ -591,19 +595,19 @@ export function TransferFlow({
                       className={`flex items-center gap-2.5 rounded-xl px-4 py-3 border text-sm font-bold transition ${transferMethod === m ? "bg-emerald-400/12 border-emerald-400/40 text-emerald-300" : "bg-white/5 border-white/8 text-white/50 hover:bg-white/8 hover:text-white"}`}
                     >
                       {m === "BANK" ? <Building2 className="size-4 shrink-0" /> : <Wallet className="size-4 shrink-0" />}
-                      {m === "BANK" ? "Bank Transfer" : "Crypto"}
+                      {m === "BANK" ? tx.transfer_method_bank : tx.nav_crypto}
                     </button>
                   ))}
                 </div>
 
                 {transferMethod === "CRYPTO" && (
                   <div className="mt-3 bg-amber-400/8 border border-amber-400/20 rounded-xl px-4 py-3">
-                    <p className="text-xs font-semibold text-amber-300 mb-1">Crypto transfers use your Wallet</p>
+                    <p className="text-xs font-semibold text-amber-300 mb-1">{tx.transfer_crypto_hint_title}</p>
                     <p className="text-xs text-white/50 mb-2.5">
-                      To send cryptocurrency, go to your Crypto Wallet and use the send/deposit instructions there.
+                      {tx.transfer_crypto_hint_body}
                     </p>
                     <Link href="/wallet" className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-400 hover:text-emerald-300 transition">
-                      Go to Crypto Wallet <ArrowRight className="size-3.5" />
+                      {tx.transfer_go_to_wallet} <ArrowRight className="size-3.5" />
                     </Link>
                   </div>
                 )}
@@ -611,13 +615,13 @@ export function TransferFlow({
 
               {transferMethod === "BANK" && (
                 <div>
-                  <FL>Transfer type</FL>
+                  <FL>{tx.transfer_type_label}</FL>
                   <div className="space-y-2">
                     {(
                       [
-                        ["DOMESTIC", "Domestic", "Send to a bank account in the same country using account number and routing number."],
-                        ["INTERNATIONAL", "International (Wire)", "Send internationally using SWIFT/BIC code, IBAN, and recipient address."],
-                        ["INTERNAL", "Same Bank", "Transfer between accounts within Grand Central Liberty Bank instantly."],
+                        ["DOMESTIC", tx.transfer_domestic, tx.transfer_domestic_desc],
+                        ["INTERNATIONAL", tx.transfer_international_wire, tx.transfer_international_desc],
+                        ["INTERNAL", tx.transfer_same_bank, tx.transfer_same_bank_desc],
                       ] as [TransferType, string, string][]
                     ).map(([type, label, desc]) => (
                       <button
@@ -644,7 +648,7 @@ export function TransferFlow({
                 onClick={nextStep1}
                 className="mt-5 w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
               >
-                Next — Recipient Details
+                {tx.transfer_next_recipient}
                 <ChevronRight className="size-5" />
               </button>
             )}
@@ -655,17 +659,17 @@ export function TransferFlow({
         {step === 2 && (
           <>
             <StepHeader step={2} onBack={() => go(1, "back")} />
-            <h2 className="text-lg font-black text-white mb-0.5">Recipient Details</h2>
+            <h2 className="text-lg font-black text-white mb-0.5">{tx.transfer_recipient_details}</h2>
             <p className="text-xs text-white/40 mb-1">
               {transferType === "INTERNATIONAL"
-                ? "International wire transfer — please provide all required banking details."
+                ? tx.transfer_recipient_note_intl
                 : transferType === "INTERNAL"
-                ? "Transfer within Grand Central Liberty Bank."
-                : "Domestic bank transfer."}
+                ? tx.transfer_recipient_note_internal
+                : tx.transfer_recipient_note_domestic}
             </p>
             <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white/6 border border-white/10 px-3 py-1">
               <span className="text-[10px] font-black text-white/40 uppercase tracking-wider">
-                {transferType === "INTERNATIONAL" ? "International Wire" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"}
+                {transferType === "INTERNATIONAL" ? tx.transfer_wire_label : transferType === "INTERNAL" ? tx.transfer_same_bank : tx.transfer_domestic}
               </span>
             </div>
 
@@ -680,7 +684,7 @@ export function TransferFlow({
             <div className="space-y-3">
               {/* COMMON: Recipient Name */}
               <div>
-                <FL>Recipient full name</FL>
+                <FL>{tx.transfer_recipient_name}</FL>
                 <TextInput value={recipientName} onChange={setRecipientName} placeholder="e.g. Jane Smith" icon={<User className="size-4" />} />
                 <FE msg={errors.recipientName} />
               </div>
@@ -688,7 +692,7 @@ export function TransferFlow({
               {/* COMMON: Bank Name (not for same-bank) */}
               {transferType !== "INTERNAL" && (
                 <div>
-                  <FL>Bank name</FL>
+                  <FL>{tx.transfer_bank_name}</FL>
                   <TextInput value={bankName} onChange={setBankName} placeholder="e.g. Chase Bank" icon={<Building2 className="size-4" />} />
                   <FE msg={errors.bankName} />
                 </div>
@@ -698,12 +702,12 @@ export function TransferFlow({
               {isDomestic && (
                 <>
                   <div>
-                    <FL>Account number</FL>
+                    <FL>{tx.transfer_account_number}</FL>
                     <TextInput value={accountNumber} onChange={setAccountNumber} placeholder="e.g. 1234567890" icon={<CreditCard className="size-4" />} mono />
                     <FE msg={errors.accountNumber} />
                   </div>
                   <div>
-                    <FL>Routing number <span className="normal-case font-normal text-white/25">(optional)</span></FL>
+                    <FL>{tx.transfer_routing_number} <span className="normal-case font-normal text-white/25">{tx.transfer_nickname_optional}</span></FL>
                     <TextInput value={routingNumber} onChange={setRoutingNumber} placeholder="e.g. 021000021" icon={<Hash className="size-4" />} mono />
                   </div>
                 </>
@@ -713,25 +717,25 @@ export function TransferFlow({
               {isIntl && (
                 <>
                   <div>
-                    <FL>IBAN <span className="normal-case font-normal text-white/25">(where applicable)</span></FL>
+                    <FL>{tx.transfer_iban} <span className="normal-case font-normal text-white/25">{tx.transfer_where_applicable}</span></FL>
                     <TextInput value={iban} onChange={setIban} placeholder="e.g. GB29 NWBK 6016 1331 9268 19" icon={<CreditCard className="size-4" />} mono />
                     <FE msg={errors.accountNumber} />
                   </div>
                   <div>
-                    <FL>Account number <span className="normal-case font-normal text-white/25">(if no IBAN)</span></FL>
+                    <FL>{tx.transfer_account_number} <span className="normal-case font-normal text-white/25">(if no IBAN)</span></FL>
                     <TextInput value={accountNumber} onChange={setAccountNumber} placeholder="Account number" icon={<Hash className="size-4" />} mono />
                   </div>
                   <div>
-                    <FL>SWIFT / BIC code</FL>
+                    <FL>{tx.transfer_swift}</FL>
                     <TextInput value={swiftBic} onChange={setSwiftBic} placeholder="e.g. CHASUS33" icon={<Globe className="size-4" />} mono />
                   </div>
                   <div>
-                    <FL>Recipient address <span className="normal-case font-normal text-white/25">(required for some countries)</span></FL>
+                    <FL>{tx.transfer_recipient_address} <span className="normal-case font-normal text-white/25">{tx.transfer_required_some_countries}</span></FL>
                     <TextInput value={recipientAddress} onChange={setRecipientAddress} placeholder="Street, City, Country" icon={<MapPin className="size-4" />} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <FL>Country</FL>
+                      <FL>{tx.transfer_country}</FL>
                       <div className="relative">
                         <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/30 pointer-events-none z-10" />
                         <select
@@ -745,7 +749,7 @@ export function TransferFlow({
                       <FE msg={errors.recipientCountry} />
                     </div>
                     <div>
-                      <FL>Currency</FL>
+                      <FL>{tx.transfer_currency}</FL>
                       <SelectInput value={currency} onChange={setCurrency} options={CURRENCIES} />
                       <FE msg={errors.currency} />
                     </div>
@@ -756,7 +760,7 @@ export function TransferFlow({
               {/* INTERNAL (same bank): Just account number */}
               {transferType === "INTERNAL" && (
                 <div>
-                  <FL>Account number</FL>
+                  <FL>{tx.transfer_account_number}</FL>
                   <TextInput value={accountNumber} onChange={setAccountNumber} placeholder="Recipient's account number" icon={<CreditCard className="size-4" />} mono />
                   <FE msg={errors.accountNumber} />
                 </div>
@@ -766,7 +770,7 @@ export function TransferFlow({
               {isDomestic && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <FL>Country</FL>
+                    <FL>{tx.transfer_country}</FL>
                     <div className="relative">
                       <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/30 pointer-events-none z-10" />
                       <select
@@ -779,7 +783,7 @@ export function TransferFlow({
                     </div>
                   </div>
                   <div>
-                    <FL>Currency</FL>
+                    <FL>{tx.transfer_currency}</FL>
                     <SelectInput value={currency} onChange={setCurrency} options={CURRENCIES} />
                   </div>
                 </div>
@@ -794,13 +798,13 @@ export function TransferFlow({
                   {saveBeneficiary && <Check className="size-3 text-black" />}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">Save as beneficiary</p>
-                  <p className="text-xs text-white/35">Quick-fill this recipient next time</p>
+                  <p className="text-sm font-semibold text-white">{tx.transfer_save_beneficiary}</p>
+                  <p className="text-xs text-white/35">{tx.transfer_save_beneficiary_desc}</p>
                 </div>
               </label>
               {saveBeneficiary && (
                 <div className="ml-8">
-                  <FL>Nickname <span className="normal-case font-normal text-white/25">(optional)</span></FL>
+                  <FL>{tx.transfer_nickname} <span className="normal-case font-normal text-white/25">{tx.transfer_nickname_optional}</span></FL>
                   <TextInput value={beneficiaryNickname} onChange={setBeneficiaryNickname} placeholder="e.g. Mom, Landlord" />
                 </div>
               )}
@@ -810,7 +814,7 @@ export function TransferFlow({
               onClick={nextStep2}
               className="mt-5 w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
             >
-              Next — Transfer Options
+              {tx.transfer_next_options}
               <ChevronRight className="size-5" />
             </button>
           </>
@@ -820,15 +824,15 @@ export function TransferFlow({
         {step === 3 && (
           <>
             <StepHeader step={3} onBack={() => go(2, "back")} />
-            <h2 className="text-lg font-black text-white mb-0.5">Transfer Options</h2>
+            <h2 className="text-lg font-black text-white mb-0.5">{tx.transfer_options_title}</h2>
             <p className="text-xs text-white/40 mb-5">
-              Sending to <span className="text-white font-semibold">{recipientName}</span>
+              {tx.transfer_sending_to} <span className="text-white font-semibold">{recipientName}</span>
             </p>
 
             <div className="space-y-4">
               {/* From account */}
               <div>
-                <FL>From account</FL>
+                <FL>{tx.transfer_from_account}</FL>
                 <div className="space-y-2">
                   {accounts.map((a) => (
                     <button
@@ -841,7 +845,7 @@ export function TransferFlow({
                           {accountLabel(a.type)} •••• {a.accountNumber.slice(-4)}
                         </span>
                         <span className="block text-xs text-white/40">
-                          {formatCurrency(a.availableBalance, a.currency)} available
+                          {formatCurrency(a.availableBalance, a.currency)} {tx.transfer_available_suffix}
                         </span>
                       </span>
                       {fromAccountId === a.id
@@ -856,7 +860,7 @@ export function TransferFlow({
 
               {/* Purpose */}
               <div>
-                <FL>Transfer purpose / note</FL>
+                <FL>{tx.transfer_purpose}</FL>
                 <TextInput value={purpose} onChange={setPurpose} placeholder="e.g. Invoice payment, Rent, Family support" />
                 <FE msg={errors.purpose} />
               </div>
@@ -866,7 +870,7 @@ export function TransferFlow({
               onClick={nextStep3}
               className="mt-5 w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
             >
-              Next — Enter Amount
+              {tx.transfer_next_amount}
               <ChevronRight className="size-5" />
             </button>
           </>
@@ -876,7 +880,7 @@ export function TransferFlow({
         {step === 4 && (
           <>
             <StepHeader step={4} onBack={() => go(3, "back")} />
-            <h2 className="text-lg font-black text-white mb-0.5">Enter Amount</h2>
+            <h2 className="text-lg font-black text-white mb-0.5">{tx.transfer_amount_title}</h2>
             <p className="text-xs text-white/40 mb-5">
               {currency} · to <span className="text-white font-semibold">{recipientName}</span>
             </p>
@@ -904,8 +908,8 @@ export function TransferFlow({
                 <ShieldCheck className={`size-4 shrink-0 ${insufficientFunds ? "text-red-300" : "text-emerald-400"}`} />
                 <p className="text-xs text-white/55">
                   {insufficientFunds
-                    ? `Insufficient — available ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)}`
-                    : `${accountLabel(fromAccount.type)} ••${fromAccount.accountNumber.slice(-4)} — ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)} available`
+                    ? `${tx.transfer_insufficient} — ${tx.transfer_available_suffix}: ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)}`
+                    : `${accountLabel(fromAccount.type)} ••${fromAccount.accountNumber.slice(-4)} — ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)} ${tx.transfer_available_suffix}`
                   }
                 </p>
               </div>
@@ -929,7 +933,7 @@ export function TransferFlow({
               onClick={nextStep4}
               className="w-full bg-emerald-500 text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition flex items-center justify-center gap-2 text-sm"
             >
-              Review Transfer
+              {tx.transfer_next_review}
               <ChevronRight className="size-5" />
             </button>
           </>
@@ -939,32 +943,32 @@ export function TransferFlow({
         {step === 5 && (
           <>
             <StepHeader step={5} onBack={() => go(4, "back")} />
-            <h2 className="text-lg font-black text-white mb-0.5">Review &amp; Confirm</h2>
-            <p className="text-xs text-white/40 mb-5">Please review all details carefully before confirming.</p>
+            <h2 className="text-lg font-black text-white mb-0.5">{tx.transfer_review_confirm_title}</h2>
+            <p className="text-xs text-white/40 mb-5">{tx.transfer_review_note}</p>
 
             {/* Amount hero */}
             <div className="text-center bg-white/5 border border-white/8 rounded-2xl py-6 mb-5">
-              <p className="text-xs font-bold text-white/30 mb-1 uppercase tracking-wider">You&apos;re sending</p>
+              <p className="text-xs font-bold text-white/30 mb-1 uppercase tracking-wider">{tx.transfer_youre_sending}</p>
               <p className="text-4xl font-black text-white">{formatCurrency(numericAmount, currency)}</p>
               <p className="text-sm text-white/40 mt-1.5">
                 {currency} ·{" "}
-                {transferType === "INTERNATIONAL" ? "International Wire" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"}
+                {transferType === "INTERNATIONAL" ? tx.transfer_wire_label : transferType === "INTERNAL" ? tx.transfer_same_bank : tx.transfer_domestic}
               </p>
             </div>
 
             {/* Summary */}
             <div className="space-y-2 mb-5">
-              <p className="text-[11px] font-black uppercase tracking-wider text-white/30 pt-1">Recipient</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-white/30 pt-1">{tx.transfer_recipient_section}</p>
               {(
                 [
-                  ["Name", recipientName],
-                  ...(transferType !== "INTERNAL" ? [["Bank", bankName] as [string, string]] : []),
-                  ...(isIntl && iban ? [["IBAN", iban] as [string, string]] : []),
-                  ...(!isIntl || !iban ? [["Account", accountNumber] as [string, string]] : []),
-                  ...(isIntl && swiftBic ? [["SWIFT / BIC", swiftBic] as [string, string]] : []),
-                  ...(isDomestic && routingNumber ? [["Routing", routingNumber] as [string, string]] : []),
-                  ...(isIntl && recipientAddress ? [["Address", recipientAddress] as [string, string]] : []),
-                  ["Country", recipientCountry],
+                  [tx.transfer_label_name, recipientName],
+                  ...(transferType !== "INTERNAL" ? [[tx.transfer_label_bank, bankName] as [string, string]] : []),
+                  ...(isIntl && iban ? [[tx.transfer_iban, iban] as [string, string]] : []),
+                  ...(!isIntl || !iban ? [[tx.transfer_label_account, accountNumber] as [string, string]] : []),
+                  ...(isIntl && swiftBic ? [[tx.transfer_swift, swiftBic] as [string, string]] : []),
+                  ...(isDomestic && routingNumber ? [[tx.transfer_label_routing, routingNumber] as [string, string]] : []),
+                  ...(isIntl && recipientAddress ? [[tx.transfer_label_address, recipientAddress] as [string, string]] : []),
+                  [tx.transfer_country, recipientCountry],
                 ] as [string, string][]
               ).filter(([, v]) => v).map(([label, val]) => (
                 <div key={label} className="flex items-start justify-between bg-white/4 rounded-xl px-3.5 py-2.5 gap-3">
@@ -973,18 +977,18 @@ export function TransferFlow({
                 </div>
               ))}
 
-              <p className="text-[11px] font-black uppercase tracking-wider text-white/30 pt-2">Transfer Details</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-white/30 pt-2">{tx.transfer_details_section}</p>
               {(
                 [
-                  ["From", fromAccount ? `${accountLabel(fromAccount.type)} •••• ${fromAccount.accountNumber.slice(-4)}` : ""],
-                  ["Type", transferType === "INTERNATIONAL" ? "International Wire" : transferType === "INTERNAL" ? "Same Bank" : "Domestic"],
-                  ["Purpose", purpose],
-                  ["Fee", "None"],
+                  [tx.transfer_label_from, fromAccount ? `${accountLabel(fromAccount.type)} •••• ${fromAccount.accountNumber.slice(-4)}` : ""],
+                  [tx.common_type, transferType === "INTERNATIONAL" ? tx.transfer_wire_label : transferType === "INTERNAL" ? tx.transfer_same_bank : tx.transfer_domestic],
+                  [tx.transfer_label_purpose, purpose],
+                  [tx.transfer_fee, tx.transfer_fee_none],
                 ] as [string, string][]
               ).map(([label, val]) => (
                 <div key={label} className="flex items-start justify-between bg-white/4 rounded-xl px-3.5 py-2.5 gap-3">
                   <span className="text-white/40 text-xs shrink-0">{label}</span>
-                  <span className={`font-semibold text-xs text-right ${label === "Fee" ? "text-emerald-400" : "text-white"}`}>{val}</span>
+                  <span className={`font-semibold text-xs text-right ${label === tx.transfer_fee ? "text-emerald-400" : "text-white"}`}>{val}</span>
                 </div>
               ))}
 
@@ -992,7 +996,7 @@ export function TransferFlow({
                 <div className="flex items-center gap-2 bg-emerald-400/8 border border-emerald-400/20 rounded-xl px-3.5 py-2.5">
                   <Bookmark className="size-3.5 text-emerald-400 shrink-0" />
                   <span className="text-xs text-white/55">
-                    Saved as {beneficiaryNickname ? `"${beneficiaryNickname}"` : "a beneficiary"}
+                    {tx.transfer_save_beneficiary} {beneficiaryNickname ? `"${beneficiaryNickname}"` : tx.transfer_saved_as_beneficiary}
                   </span>
                 </div>
               )}
@@ -1004,7 +1008,7 @@ export function TransferFlow({
                 onClick={() => go(1, "back")}
                 className="flex-1 bg-white/7 border border-white/10 text-white font-bold py-3.5 rounded-2xl hover:bg-white/12 transition text-sm"
               >
-                Edit
+                {tx.common_edit}
               </button>
               <button
                 onClick={submit}
@@ -1012,7 +1016,7 @@ export function TransferFlow({
                 className="flex-1 bg-emerald-500 text-black font-black py-3.5 rounded-2xl hover:bg-emerald-400 transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
               >
                 <Send className="size-4" />
-                {submitting ? "Submitting…" : "Confirm Transfer"}
+                {submitting ? tx.transfer_submitting : tx.transfer_confirm}
               </button>
             </div>
           </>

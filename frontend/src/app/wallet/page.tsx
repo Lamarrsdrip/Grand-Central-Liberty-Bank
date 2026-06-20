@@ -5,12 +5,14 @@ import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { prisma } from "@/lib/db";
 import { getAdminCryptoPrices, computeCryptoTotalUSD } from "@/lib/crypto-prices";
+import { getServerTranslations } from "@/lib/i18n/server-locale";
 
 export const dynamic = "force-dynamic";
 
 export default async function WalletPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const { tx } = getServerTranslations(user.preferredLocale);
 
   const [data, cryptoBalanceRecords, prices] = await Promise.all([
     getUserDashboardData(user.id),
@@ -31,8 +33,8 @@ export default async function WalletPage() {
     <ProtectedShell>
       <div className="mx-auto max-w-4xl space-y-5">
         <div>
-          <h1 className="text-3xl font-black text-white">Wallet</h1>
-          <p className="mt-1 text-sm text-white/50">Deposit, receive, send, withdraw, and swap with manual banking review.</p>
+          <h1 className="text-3xl font-black text-white">{tx.nav_wallet}</h1>
+          <p className="mt-1 text-sm text-white/50">{tx.wallet_page_desc}</p>
         </div>
         <WalletFlow wallets={data.wallets} history={history} cryptoBalance={cryptoBalance} />
       </div>

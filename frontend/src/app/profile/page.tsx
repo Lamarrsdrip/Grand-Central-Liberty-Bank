@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
+import { getServerTranslations } from "@/lib/i18n/server-locale";
 
 export const dynamic = "force-dynamic";
 
@@ -18,19 +19,20 @@ export default async function ProfilePage() {
   if (!user) redirect("/login");
   const data = await getUserDashboardData(user.id);
   if (!data.user) redirect("/login");
+  const { tx } = getServerTranslations(user.preferredLocale);
 
   return (
     <ProtectedShell>
       <div className="grid gap-8 soft-appear">
         <PageHeader
-          title="Profile, identity, and security."
-          description="Manage contact information, verification packages, KYC notes, email verification, and 2FA from one private banking profile."
+          title={tx.profile_page_title}
+          description={tx.profile_page_desc}
         />
         <section className="grid gap-4 lg:grid-cols-3">
           {[
-            { title: "Personal profile", body: `${data.user.firstName} ${data.user.lastName}`, icon: UserRound },
-            { title: "Manual KYC", body: "Government ID and selfie review history.", icon: Fingerprint },
-            { title: "Secure access", body: "Email verification and 2FA controls.", icon: LockKeyhole }
+            { title: tx.profile_personal, body: `${data.user.firstName} ${data.user.lastName}`, icon: UserRound },
+            { title: tx.profile_kyc, body: tx.profile_kyc_desc, icon: Fingerprint },
+            { title: tx.profile_security, body: tx.profile_security_access_desc, icon: LockKeyhole }
           ].map((item) => {
             const Icon = item.icon;
             return (
@@ -55,8 +57,8 @@ export default async function ProfilePage() {
           />
           <Card>
             <CardHeader>
-              <CardTitle>Verification Notes</CardTitle>
-              <CardDescription>Manual KYC review history visible to you.</CardDescription>
+              <CardTitle>{tx.profile_verification_notes}</CardTitle>
+              <CardDescription>{tx.profile_verification_notes_desc}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               {data.user.kycSubmissions.map((submission) => (
@@ -77,26 +79,26 @@ export default async function ProfilePage() {
           <KycForm />
           <Card>
             <CardHeader>
-              <CardTitle>Security</CardTitle>
-              <CardDescription>Email verification and 2FA state.</CardDescription>
+              <CardTitle>{tx.profile_security_card}</CardTitle>
+              <CardDescription>{tx.profile_security_state_desc}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <div className="flex items-center justify-between"><span className="font-semibold">Email</span><StatusBadge status={data.user.emailVerifiedAt ? "APPROVED" : "PENDING"} /></div>
-              <div className="flex items-center justify-between"><span className="font-semibold">2FA</span><StatusBadge status={data.user.twoFactorEnabled ? "ACTIVE" : "PENDING"} /></div>
+              <div className="flex items-center justify-between"><span className="font-semibold">{tx.profile_email}</span><StatusBadge status={data.user.emailVerifiedAt ? "APPROVED" : "PENDING"} /></div>
+              <div className="flex items-center justify-between"><span className="font-semibold">{tx.profile_2fa}</span><StatusBadge status={data.user.twoFactorEnabled ? "ACTIVE" : "PENDING"} /></div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Globe className="size-4" /> Language &amp; Currency</CardTitle>
-              <CardDescription>Set your preferred display language and currency. Changes apply immediately across the app.</CardDescription>
+              <CardTitle className="flex items-center gap-2"><Globe className="size-4" /> {tx.profile_lang_currency}</CardTitle>
+              <CardDescription>{tx.profile_lang_currency_desc}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="grid gap-1.5">
-                <p className="text-sm font-semibold text-white/70">Display language</p>
+                <p className="text-sm font-semibold text-white/70">{tx.profile_display_language}</p>
                 <LocaleSwitcher value={data.user.preferredLocale ?? "en"} />
               </div>
               <div className="grid gap-1.5">
-                <p className="text-sm font-semibold text-white/70">Display currency</p>
+                <p className="text-sm font-semibold text-white/70">{tx.profile_display_currency}</p>
                 <CurrencySwitcher value={(data.user as { preferredCurrency?: string }).preferredCurrency ?? "USD"} />
               </div>
             </CardContent>

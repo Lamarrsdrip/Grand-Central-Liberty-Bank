@@ -1,17 +1,21 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { getTranslations, type TranslationKey } from "@/lib/i18n/translations";
+import { getTranslations, type TranslationKey, type TranslationDict } from "@/lib/i18n/translations";
 import { isSupportedLocale, type SupportedLocale } from "@/lib/locales";
 
 type TCtx = {
   t: (key: TranslationKey) => string;
+  tx: TranslationDict;
   locale: SupportedLocale;
   isRtl: boolean;
 };
 
+const fallbackDict = new Proxy({} as TranslationDict, { get: (_t, k) => k as string });
+
 const TranslationContext = createContext<TCtx>({
   t: (key) => key as string,
+  tx: fallbackDict,
   locale: "en",
   isRtl: false,
 });
@@ -46,7 +50,7 @@ export function TranslationProvider({
   const isRtl = ["ar", "he", "fa", "ur"].includes(locale);
 
   return (
-    <TranslationContext.Provider value={{ t, locale, isRtl }}>
+    <TranslationContext.Provider value={{ t, tx: dict, locale, isRtl }}>
       <div dir={isRtl ? "rtl" : "ltr"} lang={locale} className="contents">
         {children}
       </div>
