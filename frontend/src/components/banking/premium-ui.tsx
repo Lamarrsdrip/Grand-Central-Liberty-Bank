@@ -304,6 +304,7 @@ function CopyText({ value, label }: { value: string; label: string }) {
 }
 
 export function AccountCard({ account }: { account: FinanceAccount; index?: number }) {
+  const { tx } = useTranslations();
   const [showDetails, setShowDetails] = useState(false);
   const cardClass = accountCardStyles[account.type] ?? "account-card-checking";
   const typeLabel = accountLabel(account.type).toUpperCase();
@@ -318,69 +319,67 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
         </div>
         <div className="flex items-center gap-1.5">
           {account.status === "FROZEN" && (
-            <span className="text-xs font-bold text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded-full">Frozen</span>
+            <span className="text-xs font-bold text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded-full">{tx.account_frozen}</span>
           )}
           <span className="text-[0.6rem] font-bold uppercase text-white/30 border border-white/10 rounded px-1.5 py-0.5">{account.currency}</span>
         </div>
       </div>
 
       <p className="text-2xl font-black tracking-tight">{money(account.balance, account.currency)}</p>
-      <p className="text-xs text-white/40 mt-0.5">Available {money(account.availableBalance ?? account.balance, account.currency)}</p>
+      <p className="text-xs text-white/40 mt-0.5">{tx.account_available} {money(account.availableBalance ?? account.balance, account.currency)}</p>
 
-      {/* Always-visible account number */}
       <div className="mt-4 flex items-center gap-2">
-        <span className="text-[0.65rem] text-white/30 font-semibold">Acct</span>
-        <CopyText value={account.accountNumber} label="account number" />
+        <span className="text-[0.65rem] text-white/30 font-semibold">{tx.account_acct}</span>
+        <CopyText value={account.accountNumber} label={tx.account_number_label} />
       </div>
 
-      {/* Expandable deposit details */}
       <button
         type="button"
         className="mt-3 text-[0.65rem] font-bold text-white/40 hover:text-white/70 transition"
         onClick={() => setShowDetails((v) => !v)}
       >
-        {showDetails ? "▲ Hide account details" : "▼ Show deposit details"}
+        {showDetails ? tx.account_hide_details : tx.account_show_details}
       </button>
 
       {showDetails && (
         <div className="mt-3 rounded-xl bg-black/30 border border-white/8 p-3 space-y-2.5">
-          <p className="text-[0.6rem] font-black uppercase tracking-widest text-white/30 mb-2">Account Details</p>
+          <p className="text-[0.6rem] font-black uppercase tracking-widest text-white/30 mb-2">{tx.account_details_title}</p>
           <div className="grid gap-2 text-xs">
             <div className="flex justify-between items-start gap-2">
-              <span className="text-white/40 shrink-0">Bank</span>
+              <span className="text-white/40 shrink-0">{tx.account_bank_label}</span>
               <span className="font-semibold text-right text-white/80">{GCLB_BANK}</span>
             </div>
             <div className="flex justify-between items-start gap-2">
-              <span className="text-white/40 shrink-0">Address</span>
+              <span className="text-white/40 shrink-0">{tx.account_address_label}</span>
               <span className="font-semibold text-right text-white/70 text-[0.65rem]">{GCLB_ADDRESS}</span>
             </div>
             <div className="flex justify-between items-center gap-2">
-              <span className="text-white/40 shrink-0">Account #</span>
-              <CopyText value={account.accountNumber} label="account number" />
+              <span className="text-white/40 shrink-0">{tx.account_number_label}</span>
+              <CopyText value={account.accountNumber} label={tx.account_number_label} />
             </div>
             {!isCrypto && (
               <>
                 <div className="flex justify-between items-center gap-2">
-                  <span className="text-white/40 shrink-0">Routing #</span>
-                  <CopyText value={GCLB_ROUTING} label="routing number" />
+                  <span className="text-white/40 shrink-0">{tx.account_routing_label}</span>
+                  <CopyText value={GCLB_ROUTING} label={tx.account_routing_label} />
                 </div>
                 <div className="flex justify-between items-center gap-2">
-                  <span className="text-white/40 shrink-0">SWIFT/BIC</span>
-                  <CopyText value={GCLB_SWIFT} label="SWIFT code" />
+                  <span className="text-white/40 shrink-0">{tx.account_swift_label}</span>
+                  <CopyText value={GCLB_SWIFT} label={tx.account_swift_label} />
                 </div>
                 <div className="flex justify-between items-center gap-2">
-                  <span className="text-white/40 shrink-0">IBAN</span>
-                  <CopyText value={`US98 GCLB ${account.accountNumber.slice(0,4)} ${account.accountNumber.slice(4)}`} label="IBAN" />
+                  <span className="text-white/40 shrink-0">{tx.account_iban_label}</span>
+                  <CopyText value={`US98 GCLB ${account.accountNumber.slice(0,4)} ${account.accountNumber.slice(4)}`} label={tx.account_iban_label} />
                 </div>
               </>
             )}
             <div className="flex justify-between items-center gap-2">
-              <span className="text-white/40 shrink-0">Currency</span>
+              <span className="text-white/40 shrink-0">{tx.account_currency_label}</span>
               <span className="font-bold text-white/80">{account.currency}</span>
             </div>
             {isCrypto && (
               <Link href="/crypto" className="mt-1 block text-center text-[0.65rem] font-bold text-green hover:text-green-dim border border-green/20 rounded-lg py-1.5 transition">
-                View crypto deposit addresses →
+                {tx.account_crypto_deposit} →
               </Link>
             )}
           </div>
@@ -388,9 +387,9 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
       )}
 
       <div className="mt-4 flex gap-2">
-        <Link href="/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20account." className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Freeze</Link>
-        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Statements</Link>
-        <Link href="/profile" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Manage</Link>
+        <Link href="/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20account." className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">{tx.account_freeze_btn}</Link>
+        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">{tx.account_statements_btn}</Link>
+        <Link href="/profile" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">{tx.account_manage_btn}</Link>
       </div>
     </div>
   );
@@ -398,6 +397,7 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
 
 /* ── Insight Panel ─────────────────────── */
 export function InsightPanel({ total, retirement }: { total: number; retirement: number }) {
+  const { tx } = useTranslations();
   const spending = total * 0.042;
   const retirementShare = total > 0 ? Math.round((retirement / total) * 100) : 0;
   const cats = [
@@ -422,14 +422,14 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
     <div className="card-dark p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-black text-white">Insights</h3>
-          <p className="text-xs text-white/40 mt-0.5">This Month</p>
+          <h3 className="font-black text-white">{tx.insight_panel_title}</h3>
+          <p className="text-xs text-white/40 mt-0.5">{tx.insight_this_month}</p>
         </div>
         <select className="text-xs bg-transparent text-white/50 border-0 outline-none">
-          <option>This Month</option>
+          <option>{tx.insight_filter_month}</option>
         </select>
       </div>
-      <p className="text-xs text-white/40 mb-1">Spending</p>
+      <p className="text-xs text-white/40 mb-1">{tx.insight_spending}</p>
       <p className="text-2xl font-black text-white">{money(spending)}</p>
       <p className="text-xs text-white/30 mb-5">-8.6% vs last month · 401(k) {retirementShare}% of assets</p>
 
@@ -463,7 +463,7 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
         </div>
       </div>
       <Link href="/accounts" className="mt-4 block text-xs font-bold text-green hover:text-green-dim transition">
-        View full insights →
+        {tx.insight_view_full} →
       </Link>
     </div>
   );

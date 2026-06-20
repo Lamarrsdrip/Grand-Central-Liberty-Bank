@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Landmark, Bitcoin, Copy, Check } from "lucide-react";
+import { useTranslations } from "@/lib/i18n/use-translations";
 
 type Account = { id: string; type: string; accountNumber: string; currency: string };
 type Wallet = { id: string; coin: string; symbol: string; address: string; network: string; depositInstructions?: string | null };
@@ -34,6 +35,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
 }
 
 export function DepositSection({ accounts, wallets }: { accounts: Account[]; wallets: Wallet[] }) {
+  const { tx } = useTranslations();
   const [tab, setTab] = useState<"bank" | "crypto">("bank");
   const bankAccounts = accounts.filter((a) => a.type !== "CRYPTO");
   const [selectedAccount, setSelectedAccount] = useState(bankAccounts[0]?.id ?? "");
@@ -41,9 +43,8 @@ export function DepositSection({ accounts, wallets }: { accounts: Account[]; wal
 
   return (
     <div className="card-dark p-5">
-      <h3 className="font-black text-white mb-4">Deposit Funds</h3>
+      <h3 className="font-black text-white mb-4">{tx.deposit_funds}</h3>
 
-      {/* Tab switcher */}
       <div className="flex gap-2 mb-5">
         <button
           type="button"
@@ -53,7 +54,7 @@ export function DepositSection({ accounts, wallets }: { accounts: Account[]; wal
           }`}
         >
           <Landmark className="size-4" />
-          Bank / Wire
+          {tx.deposit_bank_wire}
         </button>
         <button
           type="button"
@@ -63,7 +64,7 @@ export function DepositSection({ accounts, wallets }: { accounts: Account[]; wal
           }`}
         >
           <Bitcoin className="size-4" />
-          Crypto
+          {tx.deposit_crypto}
         </button>
       </div>
 
@@ -80,7 +81,7 @@ export function DepositSection({ accounts, wallets }: { accounts: Account[]; wal
                     selectedAccount === a.id ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
                   }`}
                 >
-                  {a.type === "CHECKING" ? "Checking" : "Savings"} ···{a.accountNumber.slice(-4)}
+                  {a.type === "CHECKING" ? tx.deposit_checking : tx.deposit_savings} ···{a.accountNumber.slice(-4)}
                 </button>
               ))}
             </div>
@@ -88,33 +89,30 @@ export function DepositSection({ accounts, wallets }: { accounts: Account[]; wal
 
           <div className="rounded-xl bg-black/20 border border-white/8 p-4">
             <p className="text-[0.6rem] font-black uppercase tracking-widest text-white/30 mb-3">
-              Wire / ACH Transfer Details
+              {tx.deposit_wire_details}
             </p>
-            <CopyRow label="Bank Name" value="Grand Central Liberty Bank" />
-            <CopyRow label="Bank Address" value="200 Liberty Plaza, New York, NY 10006" />
-            {account && <CopyRow label="Account Number" value={account.accountNumber} />}
-            <CopyRow label="Routing Number" value={GCLB_ROUTING} />
-            <CopyRow label="SWIFT / BIC" value={GCLB_SWIFT} />
+            <CopyRow label={tx.deposit_bank_name} value="Grand Central Liberty Bank" />
+            <CopyRow label={tx.deposit_bank_address} value="200 Liberty Plaza, New York, NY 10006" />
+            {account && <CopyRow label={tx.deposit_account_number} value={account.accountNumber} />}
+            <CopyRow label={tx.deposit_routing} value={GCLB_ROUTING} />
+            <CopyRow label={tx.deposit_swift} value={GCLB_SWIFT} />
             {account && (
               <CopyRow
-                label="IBAN"
+                label={tx.deposit_iban}
                 value={`US98 GCLB ${account.accountNumber.slice(0, 4)} ${account.accountNumber.slice(4)}`}
               />
             )}
-            {account && <CopyRow label="Currency" value={account.currency} />}
+            {account && <CopyRow label={tx.deposit_currency} value={account.currency} />}
           </div>
 
-          <p className="text-xs text-white/30 leading-5">
-            Use these details for domestic ACH transfers or international wires. Deposits typically credit within
-            1–3 business days after bank review. Reference your account number in the memo field.
-          </p>
+          <p className="text-xs text-white/30 leading-5">{tx.deposit_wire_note}</p>
         </div>
       )}
 
       {tab === "crypto" && (
         <div className="space-y-3">
           {wallets.length === 0 && (
-            <p className="text-sm text-white/40 text-center py-6">No crypto deposit addresses configured yet. Contact support.</p>
+            <p className="text-sm text-white/40 text-center py-6">{tx.deposit_no_wallets}</p>
           )}
           {wallets.map((wallet) => (
             <div key={wallet.id} className="rounded-xl bg-black/20 border border-white/8 p-4">
@@ -124,15 +122,13 @@ export function DepositSection({ accounts, wallets }: { accounts: Account[]; wal
                   <p className="text-[0.65rem] text-white/30">{wallet.network}</p>
                 </div>
               </div>
-              <CopyRow label="Deposit Address" value={wallet.address} />
+              <CopyRow label={tx.deposit_address} value={wallet.address} />
               {wallet.depositInstructions && (
                 <p className="mt-2 text-[0.65rem] text-white/30 leading-4">{wallet.depositInstructions}</p>
               )}
             </div>
           ))}
-          <p className="text-xs text-white/30 leading-5">
-            Send only the matching coin and network. Sending the wrong asset may result in permanent loss. All crypto deposits are reviewed before crediting to your account.
-          </p>
+          <p className="text-xs text-white/30 leading-5">{tx.deposit_crypto_note}</p>
         </div>
       )}
     </div>
