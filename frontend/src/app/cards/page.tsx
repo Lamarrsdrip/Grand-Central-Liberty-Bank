@@ -6,6 +6,7 @@ import { CardApplicationForm } from "@/components/banking/workflow-forms";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
+import { getServerTranslations } from "@/lib/i18n/server-locale";
 
 export const dynamic = "force-dynamic";
 
@@ -23,32 +24,39 @@ const CARD_LABELS: Record<string, string> = {
   SIGNATURE: "Liberty Signature",
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  APPROVED:      { label: "Active", color: "text-green", icon: CheckCircle2 },
-  SUBMITTED:     { label: "Under Review", color: "text-amber-400", icon: Clock },
-  UNDER_REVIEW:  { label: "Under Review", color: "text-amber-400", icon: Clock },
-  INFO_REQUESTED:{ label: "Info Needed", color: "text-orange-400", icon: AlertCircle },
-  REJECTED:      { label: "Declined", color: "text-red-400", icon: XCircle },
-};
-
 export default async function CardsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const { tx } = getServerTranslations(user.preferredLocale);
   const data = await getUserDashboardData(user.id);
+
+  const statusConfig = {
+    APPROVED:       { label: tx.cards_status_active,  color: "text-green",       icon: CheckCircle2 },
+    SUBMITTED:      { label: tx.cards_status_review,  color: "text-amber-400",   icon: Clock },
+    UNDER_REVIEW:   { label: tx.cards_status_review,  color: "text-amber-400",   icon: Clock },
+    INFO_REQUESTED: { label: tx.cards_status_info,    color: "text-orange-400",  icon: AlertCircle },
+    REJECTED:       { label: tx.cards_status_declined, color: "text-red-400",    icon: XCircle },
+  } as Record<string, { label: string; color: string; icon: React.ElementType }>;
 
   const cards = data.cards ?? [];
   const approvedCards = cards.filter((c) => c.status === "APPROVED");
   const pendingCards  = cards.filter((c) => c.status !== "APPROVED");
 
+  const cardActions = [
+    { label: tx.cards_freeze,           icon: Snowflake, href: "/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20card." },
+    { label: tx.nav_settings ?? "Settings", icon: Settings2, href: "/profile" },
+    { label: tx.cards_details,          icon: Eye,       href: "/support?message=I%20need%20my%20full%20card%20details%20securely." },
+    { label: tx.cards_report,           icon: FileText,  href: "/support?message=I%20would%20like%20to%20report%20an%20issue%20with%20my%20card." },
+  ];
+
   return (
     <ProtectedShell>
       <div className="max-w-3xl mx-auto space-y-5 fade-up">
         <div>
-          <h1 className="text-3xl font-black text-white">Cards</h1>
-          <p className="text-sm text-white/50 mt-1">Manage your cards and applications.</p>
+          <h1 className="text-3xl font-black text-white">{tx.cards_page_title}</h1>
+          <p className="text-sm text-white/50 mt-1">{tx.cards_page_desc}</p>
         </div>
 
-        {/* Issued cards */}
         {approvedCards.length > 0 && (
           <>
             <div className="flex gap-4 overflow-x-auto scrollbar-none pb-2">
@@ -80,14 +88,8 @@ export default async function CardsPage() {
               ))}
             </div>
 
-            {/* Card actions */}
             <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: "Freeze",   icon: Snowflake, href: "/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20card." },
-                { label: "Settings", icon: Settings2, href: "/profile" },
-                { label: "Details",  icon: Eye,       href: "/support?message=I%20need%20my%20full%20card%20details%20securely." },
-                { label: "Report",   icon: FileText,  href: "/support?message=I%20would%20like%20to%20report%20an%20issue%20with%20my%20card." },
-              ].map((a) => (
+              {cardActions.map((a) => (
                 <Link key={a.label} href={a.href} className="card-dark p-4 flex flex-col items-center gap-2 hover:bg-white/6 transition">
                   <div className="size-11 rounded-full bg-white/8 border border-white/10 flex items-center justify-center">
                     <a.icon className="size-5 text-white/60" />
@@ -99,13 +101,12 @@ export default async function CardsPage() {
           </>
         )}
 
-        {/* Pending applications */}
         {pendingCards.length > 0 && (
           <div className="card-dark p-5">
-            <h3 className="font-black text-white mb-4">Card Applications</h3>
+            <h3 className="font-black text-white mb-4">{tx.cards_applications}</h3>
             <div className="space-y-3">
               {pendingCards.map((c) => {
-                const cfg = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.SUBMITTED;
+                const cfg = statusConfig[c.status] ?? statusConfig.SUBMITTED;
                 const Icon = cfg.icon;
                 return (
                   <div key={c.id} className="flex items-center justify-between bg-white/5 rounded-2xl p-4">
@@ -115,7 +116,7 @@ export default async function CardsPage() {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-white">{CARD_LABELS[c.type]}</p>
-                        <p className="text-xs text-white/40">Applied {formatDate(c.createdAt)}</p>
+                        <p className="text-xs text-white/40">{tx.cards_applied_on} {formatDate(c.createdAt)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -129,26 +130,24 @@ export default async function CardsPage() {
           </div>
         )}
 
-        {/* Empty state when no cards at all */}
         {cards.length === 0 && (
           <div className="card-dark p-8 text-center">
             <div className="size-16 rounded-full bg-white/5 border border-dashed border-white/15 flex items-center justify-center mx-auto mb-4">
               <CreditCard className="size-7 text-white/25" />
             </div>
-            <p className="font-black text-white">No cards yet</p>
-            <p className="text-sm text-white/40 mt-1">Apply for a card below to get started.</p>
+            <p className="font-black text-white">{tx.cards_no_cards_title}</p>
+            <p className="text-sm text-white/40 mt-1">{tx.cards_no_cards_desc}</p>
           </div>
         )}
 
-        {/* Apply for new card */}
         <div id="apply" className="card-dark p-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="size-10 rounded-xl bg-green/15 flex items-center justify-center">
               <CreditCard className="size-5 text-green" />
             </div>
             <div>
-              <h3 className="font-black text-white">Apply for a new card</h3>
-              <p className="text-xs text-white/40">Classic, Gold, Platinum, or Signature</p>
+              <h3 className="font-black text-white">{tx.cards_apply_title}</h3>
+              <p className="text-xs text-white/40">{tx.cards_apply_desc}</p>
             </div>
           </div>
           <CardApplicationForm />

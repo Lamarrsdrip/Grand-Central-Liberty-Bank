@@ -10,6 +10,9 @@ import { Field, FieldGroup, Input, Label, Select, Textarea } from "@/components/
 import { secureFetch } from "@/lib/client-api";
 import { calculateRetirementFee } from "@/lib/domain";
 import { formatCurrency } from "@/lib/utils";
+import { useTranslations } from "@/lib/i18n/use-translations";
+import { getTranslations } from "@/lib/i18n/translations";
+import { isSupportedLocale } from "@/lib/locales";
 
 type Account = { id: string; type: string; accountNumber: string; availableBalance: unknown; currency: string };
 type TransferSettings = { reviewMessage: string; buttonText: string; supportInstructions: string };
@@ -73,6 +76,7 @@ async function uploadFile(file: File, folder: string) {
 }
 
 export function CopyButton({ value }: { value: string }) {
+  const { tx } = useTranslations();
   const [copied, setCopied] = useState(false);
 
   return (
@@ -87,19 +91,20 @@ export function CopyButton({ value }: { value: string }) {
       }}
     >
       <Copy data-icon="inline-start" />
-      {copied ? "Copied" : "Copy"}
+      {copied ? tx.wallet_copied : "Copy"}
     </Button>
   );
 }
 
 export function TransferForm({ accounts, settings }: { accounts: Account[]; settings: TransferSettings }) {
+  const { tx } = useTranslations();
   const [message, setMessage] = useState("");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Complete transfer</CardTitle>
-        <CardDescription>Submit the final details. Requests stay under bank review until approved.</CardDescription>
+        <CardTitle>{tx.transfer_form_title}</CardTitle>
+        <CardDescription>{tx.transfer_form_desc}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -118,15 +123,15 @@ export function TransferForm({ accounts, settings }: { accounts: Account[]; sett
         >
           <Status message={message} />
           <div className="mb-5 grid gap-3 sm:grid-cols-3">
-            {["Recent", "Saved", "New"].map((item) => (
+            {[tx.transfer_recent_label, tx.transfer_saved_label, tx.transfer_or_new].map((item) => (
               <button key={item} type="button" className="rounded-2xl border bg-background/70 px-4 py-3 text-sm font-black transition hover:bg-primary hover:text-primary-foreground">
-                {item} recipient
+                {item}
               </button>
             ))}
           </div>
           <FieldGroup>
             <Field>
-              <Label htmlFor="fromAccountId">From account</Label>
+              <Label htmlFor="fromAccountId">{tx.transfer_label_from}</Label>
               <Select id="fromAccountId" name="fromAccountId" required>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
@@ -137,40 +142,40 @@ export function TransferForm({ accounts, settings }: { accounts: Account[]; sett
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <Label htmlFor="type">Transfer type</Label>
+                <Label htmlFor="type">{tx.transfer_type_label}</Label>
                 <Select id="type" name="type" required>
-                  <option value="INTERNAL">Internal transfer</option>
-                  <option value="DOMESTIC">Domestic transfer</option>
-                  <option value="INTERNATIONAL">International transfer</option>
+                  <option value="INTERNAL">{tx.transfer_internal_option}</option>
+                  <option value="DOMESTIC">{tx.transfer_domestic_option}</option>
+                  <option value="INTERNATIONAL">{tx.transfer_international_option}</option>
                 </Select>
               </Field>
               <Field>
-                <Label htmlFor="amount">Amount</Label>
+                <Label htmlFor="amount">{tx.transfer_amount}</Label>
                 <Input id="amount" name="amount" type="number" step="0.01" min="1" required />
               </Field>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <Label htmlFor="beneficiaryName">Beneficiary name</Label>
+                <Label htmlFor="beneficiaryName">{tx.transfer_beneficiary_name}</Label>
                 <Input id="beneficiaryName" name="beneficiaryName" required />
               </Field>
               <Field>
-                <Label htmlFor="beneficiaryAccount">Beneficiary account</Label>
+                <Label htmlFor="beneficiaryAccount">{tx.transfer_beneficiary_account}</Label>
                 <Input id="beneficiaryAccount" name="beneficiaryAccount" />
               </Field>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <Label htmlFor="beneficiaryBank">Beneficiary bank</Label>
+                <Label htmlFor="beneficiaryBank">{tx.transfer_beneficiary_bank}</Label>
                 <Input id="beneficiaryBank" name="beneficiaryBank" />
               </Field>
               <Field>
-                <Label htmlFor="ibanSwift">IBAN / SWIFT</Label>
+                <Label htmlFor="ibanSwift">{tx.transfer_iban_swift}</Label>
                 <Input id="ibanSwift" name="ibanSwift" />
               </Field>
             </div>
             <Field>
-              <Label htmlFor="purpose">Purpose</Label>
+              <Label htmlFor="purpose">{tx.transfer_label_purpose}</Label>
               <Textarea id="purpose" name="purpose" required />
             </Field>
           </FieldGroup>
@@ -179,7 +184,7 @@ export function TransferForm({ accounts, settings }: { accounts: Account[]; sett
           </div>
           <Button size="lg">
             <Send data-icon="inline-start" />
-            Submit transfer
+            {tx.transfer_submit_btn}
           </Button>
           {message ? (
             <Button asChild variant="secondary">
@@ -199,6 +204,7 @@ export function RetirementWithdrawalForm({
   accounts: RetirementAccount[];
   feeSettings: RetirementFeeSettings;
 }) {
+  const { tx } = useTranslations();
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const selectedAccount = accounts[0];
@@ -210,8 +216,8 @@ export function RetirementWithdrawalForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Withdraw from 401(k)</CardTitle>
-        <CardDescription>Withdrawals are manually reviewed by compliance. No funds move automatically.</CardDescription>
+        <CardTitle>{tx.retire_title}</CardTitle>
+        <CardDescription>{tx.retire_desc}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -232,7 +238,7 @@ export function RetirementWithdrawalForm({
           <Status message={message} />
           <FieldGroup>
             <Field>
-              <Label htmlFor="retirementAccountId">401(k) account</Label>
+              <Label htmlFor="retirementAccountId">{tx.retire_account_label}</Label>
               <Select id="retirementAccountId" name="retirementAccountId" required>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
@@ -242,7 +248,7 @@ export function RetirementWithdrawalForm({
               </Select>
             </Field>
             <Field>
-              <Label htmlFor="amount">Withdrawal amount</Label>
+              <Label htmlFor="amount">{tx.retire_amount_label}</Label>
               <Input
                 id="amount"
                 name="amount"
@@ -255,7 +261,7 @@ export function RetirementWithdrawalForm({
               />
             </Field>
             <Field>
-              <Label htmlFor="reason">Reason for withdrawal</Label>
+              <Label htmlFor="reason">{tx.retire_reason}</Label>
               <Textarea id="reason" name="reason" required />
             </Field>
           </FieldGroup>
@@ -263,21 +269,19 @@ export function RetirementWithdrawalForm({
             <p className="text-sm font-black">{feeSettings.feeName}</p>
             <p className="mt-1 text-sm text-muted-foreground">{feeSettings.feeReason}</p>
             <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-              <div><span className="font-bold">Fee</span><br />{Number(feeSettings.feePercentage).toFixed(2)}%</div>
-              <div><span className="font-bold">Amount</span><br />{formatCurrency(fee.amount)}</div>
-              <div><span className="font-bold">Method</span><br />{feeSettings.paymentMethod.replaceAll("_", " ")}</div>
+              <div><span className="font-bold">{tx.retire_fee_col}</span><br />{Number(feeSettings.feePercentage).toFixed(2)}%</div>
+              <div><span className="font-bold">{tx.retire_amount_col}</span><br />{formatCurrency(fee.amount)}</div>
+              <div><span className="font-bold">{tx.retire_method_col}</span><br />{feeSettings.paymentMethod.replaceAll("_", " ")}</div>
             </div>
             <p className="mt-3 text-xs font-semibold text-muted-foreground">
-              {feeSettings.enabled
-                ? "Crypto deposit is required to unlock eligible 401(k) funds after admin approval."
-                : "Compliance fee is currently disabled by the bank."}
+              {feeSettings.enabled ? tx.retire_fee_enabled : tx.retire_fee_disabled}
             </p>
           </div>
           <Button size="lg" disabled={!selectedAccount || selectedAccount.status === "CLOSED"}>
-            Submit 401(k) withdrawal
+            {tx.retire_submit}
           </Button>
           <Button asChild variant="secondary">
-            <a href="/support">Contact support</a>
+            <a href="/support">{tx.retire_contact_support}</a>
           </Button>
         </form>
       </CardContent>
@@ -286,13 +290,14 @@ export function RetirementWithdrawalForm({
 }
 
 export function KycForm() {
+  const { tx } = useTranslations();
   const [message, setMessage] = useState("");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Manual Verification</CardTitle>
-        <CardDescription>Upload government ID and selfie files for bank review.</CardDescription>
+        <CardTitle>{tx.kyc_title}</CardTitle>
+        <CardDescription>{tx.kyc_desc}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -304,7 +309,7 @@ export function KycForm() {
             const documentFile = form.get("documentFile");
             const selfieFile = form.get("selfieFile");
             if (!(documentFile instanceof File) || !(selfieFile instanceof File)) {
-              setMessage("Document and selfie files are required.");
+              setMessage(tx.kyc_files_required);
               return;
             }
             const [documentUrl, selfieUrl] = await Promise.all([
@@ -315,30 +320,30 @@ export function KycForm() {
               method: "POST",
               body: JSON.stringify({ documentType: form.get("documentType"), documentUrl, selfieUrl })
             });
-            setMessage("Verification submitted for manual review.");
+            setMessage(tx.kyc_submitted);
             formElement.reset();
           }}
         >
           <Status message={message} />
           <Field>
-            <Label htmlFor="documentType">Document type</Label>
+            <Label htmlFor="documentType">{tx.kyc_doc_type}</Label>
             <Select id="documentType" name="documentType" required>
-              <option value="PASSPORT">Passport</option>
-              <option value="DRIVER_LICENSE">Driver License</option>
-              <option value="NATIONAL_ID">National ID</option>
+              <option value="PASSPORT">{tx.kyc_passport}</option>
+              <option value="DRIVER_LICENSE">{tx.kyc_driver}</option>
+              <option value="NATIONAL_ID">{tx.kyc_national}</option>
             </Select>
           </Field>
           <Field>
-            <Label htmlFor="documentFile">Government ID</Label>
+            <Label htmlFor="documentFile">{tx.kyc_gov_id}</Label>
             <Input id="documentFile" name="documentFile" type="file" required />
           </Field>
           <Field>
-            <Label htmlFor="selfieFile">Selfie</Label>
+            <Label htmlFor="selfieFile">{tx.kyc_selfie}</Label>
             <Input id="selfieFile" name="selfieFile" type="file" required />
           </Field>
           <Button>
             <UploadCloud data-icon="inline-start" />
-            Submit verification
+            {tx.kyc_submit}
           </Button>
         </form>
       </CardContent>
@@ -347,13 +352,14 @@ export function KycForm() {
 }
 
 export function CardApplicationForm() {
+  const { tx } = useTranslations();
   const [message, setMessage] = useState("");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Credit Card Application</CardTitle>
-        <CardDescription>Applications are reviewed by an administrator.</CardDescription>
+        <CardTitle>{tx.card_app_title}</CardTitle>
+        <CardDescription>{tx.card_app_desc}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -364,7 +370,7 @@ export function CardApplicationForm() {
             const form = new FormData(formElement);
             const file = form.get("governmentIdFile");
             if (!(file instanceof File)) {
-              setMessage("Government ID file is required.");
+              setMessage(tx.card_gov_id_required);
               return;
             }
             const governmentIdUrl = await uploadFile(file, "card-applications");
@@ -372,56 +378,65 @@ export function CardApplicationForm() {
               method: "POST",
               body: JSON.stringify({ ...Object.fromEntries(form), governmentIdUrl })
             });
-            setMessage("Card application submitted.");
+            setMessage(tx.card_app_submitted);
             formElement.reset();
           }}
         >
           <Status message={message} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field>
-              <Label htmlFor="type">Card type</Label>
+              <Label htmlFor="type">{tx.card_type}</Label>
               <Select id="type" name="type" required>
-                <option value="CLASSIC">Classic Card</option>
-                <option value="GOLD">Gold Card</option>
-                <option value="PLATINUM">Platinum Card</option>
-                <option value="SIGNATURE">Signature Card</option>
+                <option value="CLASSIC">{tx.card_classic}</option>
+                <option value="GOLD">{tx.card_gold}</option>
+                <option value="PLATINUM">{tx.card_platinum}</option>
+                <option value="SIGNATURE">{tx.card_signature}</option>
               </Select>
             </Field>
             <Field>
-              <Label htmlFor="annualIncome">Annual income</Label>
+              <Label htmlFor="annualIncome">{tx.card_annual_income}</Label>
               <Input id="annualIncome" name="annualIncome" type="number" min="1" required />
             </Field>
             <Field>
-              <Label htmlFor="occupation">Occupation</Label>
+              <Label htmlFor="occupation">{tx.card_occupation}</Label>
               <Input id="occupation" name="occupation" required />
             </Field>
             <Field>
-              <Label htmlFor="employer">Employer</Label>
+              <Label htmlFor="employer">{tx.card_employer}</Label>
               <Input id="employer" name="employer" required />
             </Field>
             <Field className="sm:col-span-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">{tx.profile_address_label}</Label>
               <Input id="address" name="address" required />
             </Field>
             <Field className="sm:col-span-2">
-              <Label htmlFor="governmentIdFile">Government ID</Label>
+              <Label htmlFor="governmentIdFile">{tx.kyc_gov_id}</Label>
               <Input id="governmentIdFile" name="governmentIdFile" type="file" required />
             </Field>
           </div>
-          <Button>Submit application</Button>
+          <Button>{tx.card_app_submit}</Button>
         </form>
       </CardContent>
     </Card>
   );
 }
 
-export function SupportCenter({ initialTickets, userId }: { initialTickets: Ticket[]; userId: string }) {
+export function SupportCenter({
+  initialTickets,
+  userId,
+  locale = "en"
+}: {
+  initialTickets: Ticket[];
+  userId: string;
+  locale?: string;
+}) {
+  const { tx } = useTranslations();
   const searchParams = useSearchParams();
   const supportRequestMessage = searchParams.get("message") ?? "";
   const [tickets, setTickets] = useState(initialTickets);
   const [activeId, setActiveId] = useState(initialTickets[0]?.id ?? "");
   const [message, setMessage] = useState("");
-  const [draftSubject, setDraftSubject] = useState("Support request");
+  const [draftSubject, setDraftSubject] = useState("");
   const [draftBody, setDraftBody] = useState("");
   const [draftFile, setDraftFile] = useState<File | null>(null);
   const [messageFile, setMessageFile] = useState<File | null>(null);
@@ -429,6 +444,15 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
   const [socket, setSocket] = useState<Socket | null>(null);
   const [busy, setBusy] = useState(false);
   const activeTicket = useMemo(() => tickets.find((ticket) => ticket.id === activeId), [tickets, activeId]);
+
+  const safe = isSupportedLocale(locale) ? locale : "en";
+  const localTx = getTranslations(safe);
+  const defaultSubject = localTx.support_tickets_title ?? "Support request";
+
+  useEffect(() => {
+    setDraftSubject(defaultSubject);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
 
   useEffect(() => {
     if (!supportRequestMessage || supportRequestMessage === seededSupportRequest) {
@@ -438,10 +462,11 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
     if (activeTicket) {
       setMessage(supportRequestMessage);
     } else {
-      setDraftSubject("Transfer support request");
+      setDraftSubject(localTx.transfer_form_title ?? "Transfer support request");
       setDraftBody(supportRequestMessage);
     }
     setSeededSupportRequest(supportRequestMessage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket, seededSupportRequest, supportRequestMessage]);
 
   useEffect(() => {
@@ -464,8 +489,8 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
     <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
       <Card>
         <CardHeader>
-          <CardTitle>Support Tickets</CardTitle>
-          <CardDescription>Open cases and live conversations.</CardDescription>
+          <CardTitle>{tx.support_tickets_title}</CardTitle>
+          <CardDescription>{tx.support_tickets_desc}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
           {tickets.map((ticket) => (
@@ -498,7 +523,7 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
                 });
                 setTickets((current) => [data.ticket, ...current]);
                 setActiveId(data.ticket.id);
-                setDraftSubject("Support request");
+                setDraftSubject(defaultSubject);
                 setDraftBody("");
                 setDraftFile(null);
                 formElement.reset();
@@ -509,14 +534,14 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
           >
             <Input
               name="subject"
-              placeholder="New ticket subject"
+              placeholder={tx.support_new_subject}
               required
               value={draftSubject}
               onChange={(event) => setDraftSubject(event.target.value)}
             />
             <Textarea
               name="body"
-              placeholder="How can support help?"
+              placeholder={tx.support_help_placeholder}
               required
               value={draftBody}
               onChange={(event) => setDraftBody(event.target.value)}
@@ -526,34 +551,34 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
               type="file"
               onChange={(event) => setDraftFile(event.target.files?.[0] ?? null)}
             />
-            <Button size="sm" disabled={busy}>{busy ? "Opening..." : "Open ticket"}</Button>
+            <Button size="sm" disabled={busy}>{busy ? tx.support_opening : tx.support_open_ticket}</Button>
           </form>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Live Chat</CardTitle>
-          <CardDescription>{activeTicket ? `${activeTicket.subject} · ${activeTicket.status}` : "Chat with support — send a message to start."}</CardDescription>
+          <CardTitle>{tx.support_live_chat_title}</CardTitle>
+          <CardDescription>{activeTicket ? `${activeTicket.subject} · ${activeTicket.status}` : tx.support_start_conv}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="min-h-80 max-h-[28rem] overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-4">
             {activeTicket?.messages.map((item) => (
               <div key={item.id} className={`mb-3 max-w-[88%] rounded-2xl p-3 text-sm shadow-sm ${item.senderId === userId ? "ml-auto bg-primary text-primary-foreground" : "bg-white/8 text-white"}`}>
                 <p className={`mb-1 text-[0.65rem] font-black ${item.senderId === userId ? "text-black/55" : "text-white/40"}`}>
-                  {item.senderId === userId ? "You" : item.senderName ?? "GCLB Support"}
+                  {item.senderId === userId ? tx.support_you : item.senderName ?? tx.support_gclb}
                 </p>
                 <p className="whitespace-pre-wrap break-words">{item.body}</p>
                 {item.attachmentUrl ? (
                   <a href={item.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 block text-xs font-black underline">
-                    View attachment
+                    {tx.support_view_attachment}
                   </a>
                 ) : null}
               </div>
             ))}
             {!activeTicket?.messages.length && activeTicket ? (
-              <p className="py-16 text-center text-sm font-semibold text-muted-foreground">No messages yet.</p>
+              <p className="py-16 text-center text-sm font-semibold text-muted-foreground">{tx.support_no_messages}</p>
             ) : !activeTicket ? (
-              <p className="py-16 text-center text-sm font-semibold text-muted-foreground">Type a message below to start chatting with our support team.</p>
+              <p className="py-16 text-center text-sm font-semibold text-muted-foreground">{tx.support_chat_empty}</p>
             ) : null}
           </div>
           <form
@@ -611,7 +636,7 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
               }
             }}
           >
-            <Input value={message} onChange={(event) => setMessage(event.target.value)} placeholder={activeTicket ? "Type your message..." : "Type a message to start a conversation..."} />
+            <Input value={message} onChange={(event) => setMessage(event.target.value)} placeholder={activeTicket ? tx.support_type_message : tx.support_start_conv} />
             <Input className="sm:w-56" type="file" onChange={(event) => setMessageFile(event.target.files?.[0] ?? null)} />
             <Button type="submit" size="icon" aria-label="Send message" disabled={busy}>
               <Send data-icon="inline-start" />
@@ -624,13 +649,14 @@ export function SupportCenter({ initialTickets, userId }: { initialTickets: Tick
 }
 
 export function ProfileForm({ profile }: { profile: Record<string, string> }) {
+  const { tx } = useTranslations();
   const [message, setMessage] = useState("");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile Management</CardTitle>
-        <CardDescription>Update contact information used for account servicing.</CardDescription>
+        <CardTitle>{tx.profile_form_title}</CardTitle>
+        <CardDescription>{tx.profile_form_desc}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -639,33 +665,33 @@ export function ProfileForm({ profile }: { profile: Record<string, string> }) {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             await secureFetch("/api/user/profile", { method: "PATCH", body: JSON.stringify(Object.fromEntries(form)) });
-            setMessage("Profile updated.");
+            setMessage(tx.profile_updated);
           }}
         >
           <Status message={message} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field>
-              <Label htmlFor="firstName">First name</Label>
+              <Label htmlFor="firstName">{tx.profile_first_name}</Label>
               <Input id="firstName" name="firstName" defaultValue={profile.firstName} />
             </Field>
             <Field>
-              <Label htmlFor="lastName">Last name</Label>
+              <Label htmlFor="lastName">{tx.profile_last_name}</Label>
               <Input id="lastName" name="lastName" defaultValue={profile.lastName} />
             </Field>
             <Field>
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{tx.profile_phone_label}</Label>
               <Input id="phone" name="phone" defaultValue={profile.phone} />
             </Field>
             <Field>
-              <Label htmlFor="country">Country</Label>
+              <Label htmlFor="country">{tx.profile_country_label}</Label>
               <Input id="country" name="country" defaultValue={profile.country} />
             </Field>
             <Field className="sm:col-span-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">{tx.profile_address_label}</Label>
               <Input id="address" name="address" defaultValue={profile.address} />
             </Field>
           </div>
-          <Button>Save profile</Button>
+          <Button>{tx.profile_save_profile}</Button>
         </form>
       </CardContent>
     </Card>

@@ -5,12 +5,14 @@ import { ProtectedShell } from "@/components/layout/protected-shell";
 import { PageHeader } from "@/components/banking/premium-ui";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserSupportTickets } from "@/lib/data";
+import { getServerTranslations } from "@/lib/i18n/server-locale";
 
 export const dynamic = "force-dynamic";
 
 export default async function SupportPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const { tx } = getServerTranslations(user.preferredLocale);
   const supportTickets = await getUserSupportTickets(user.id);
   const tickets = supportTickets.map((ticket) => ({
     id: ticket.id,
@@ -35,19 +37,18 @@ export default async function SupportPage() {
     }))
   }));
 
+  const featureCards = [
+    { title: tx.support_live_chat, body: tx.support_live_chat_desc, icon: Headphones },
+    { title: tx.support_secure_docs, body: tx.support_secure_docs_desc, icon: ShieldCheck },
+    { title: tx.support_priority, body: tx.support_priority_desc, icon: Sparkles }
+  ];
+
   return (
     <ProtectedShell>
       <div className="grid gap-8 soft-appear">
-        <PageHeader
-          title="Support that feels live."
-          description="Open tickets, upload files, and chat with Grand Central Liberty Bank support in real time."
-        />
+        <PageHeader title={tx.support_page_title} description={tx.support_page_desc} />
         <section className="grid gap-4 lg:grid-cols-3">
-          {[
-            { title: "Live chat", body: "Start a conversation and keep the full message history.", icon: Headphones },
-            { title: "Secure documents", body: "Send files into the same protected banking workflow.", icon: ShieldCheck },
-            { title: "Priority help", body: "Unread replies trigger notifications across the app.", icon: Sparkles }
-          ].map((item) => {
+          {featureCards.map((item) => {
             const Icon = item.icon;
             return (
               <div key={item.title} className="premium-hover glass-panel rounded-[1.5rem] p-5">
@@ -58,7 +59,7 @@ export default async function SupportPage() {
             );
           })}
         </section>
-        <SupportCenter initialTickets={tickets} userId={user.id} />
+        <SupportCenter initialTickets={tickets} userId={user.id} locale={user.preferredLocale ?? "en"} />
       </div>
     </ProtectedShell>
   );

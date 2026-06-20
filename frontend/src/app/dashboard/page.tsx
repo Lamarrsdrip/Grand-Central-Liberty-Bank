@@ -31,15 +31,16 @@ export default async function DashboardPage() {
   const { tx } = getServerTranslations(user.preferredLocale);
   const pCurrency = user.preferredCurrency ?? "USD";
 
-  const accountTotal   = data.accounts.reduce((s, a) => s + Number(a.balance), 0);
-  const available      = data.accounts.reduce((s, a) => s + Number(a.availableBalance), 0);
+  const accountTotal    = data.accounts.reduce((s, a) => s + Number(a.balance), 0);
+  const available       = data.accounts.reduce((s, a) => s + Number(a.availableBalance), 0);
   const retirementTotal = data.retirementAccounts.reduce((s, a) => s + Number(a.balance), 0);
-  const totalAssets    = accountTotal + retirementTotal;
+  const totalAssets     = accountTotal + retirementTotal;
 
-  const checking    = data.accounts.filter(a => a.type === "CHECKING").reduce((s,a) => s+Number(a.balance),0);
-  const crypto      = computeCryptoTotalUSD(cryptoBalanceRecords, prices);
+  const checking         = data.accounts.filter(a => a.type === "CHECKING").reduce((s, a) => s + Number(a.balance), 0);
+  const crypto           = computeCryptoTotalUSD(cryptoBalanceRecords, prices);
   const primaryRetirement = data.retirementAccounts[0];
-  const fallbackAccount = data.accounts.find((account) => account.type === "CHECKING") ?? data.accounts[0];
+  const fallbackAccount  = data.accounts.find((account) => account.type === "CHECKING") ?? data.accounts[0];
+
   const selectedBalance = primaryRetirement
     ? {
         label: "401(k) Retirement",
@@ -59,31 +60,33 @@ export default async function DashboardPage() {
       : null;
 
   const wealthItems = [
-    { label: "Checking",      value: checking,        color: "bg-blue-400"   },
-    { label: "Crypto Wallet", value: crypto,          color: "bg-amber-400"  },
-    { label: "401(k)",        value: retirementTotal, color: "bg-fuchsia-400"},
-    { label: "Cards",         value: 0,               color: "bg-cyan-400"   },
+    { label: "Checking",      value: checking,        color: "bg-blue-400"    },
+    { label: "Crypto Wallet", value: crypto,          color: "bg-amber-400"   },
+    { label: "401(k)",        value: retirementTotal, color: "bg-fuchsia-400" },
+    { label: "Cards",         value: 0,               color: "bg-cyan-400"    },
+  ];
+
+  const filterTabs = [
+    { label: tx.dash_filter_all,    key: "all"    },
+    { label: tx.dash_filter_income, key: "income" },
+    { label: tx.dash_filter_spend,  key: "spend"  },
   ];
 
   return (
     <ProtectedShell>
       <div className="max-w-4xl mx-auto space-y-5 fade-up">
 
-        {/* ── Top bar ─────────────────── */}
         <CustomerTopBar user={user} notifCount={data.notifications.filter(n => !n.readAt).length} />
 
-        {/* ── Frozen account notice ─────── */}
         {user.status === "FROZEN" && (
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-5 py-4">
-            <p className="font-black text-amber-300">Account Temporarily Frozen</p>
+            <p className="font-black text-amber-300">{tx.dash_frozen_title}</p>
             <p className="mt-1 text-sm text-amber-100/70">
-              Your account has been placed on a temporary hold. Transactions are suspended pending review.
-              Please <Link href="/support" className="underline">contact support</Link> to resolve this.
+              {tx.dash_frozen_body}
             </p>
           </div>
         )}
 
-        {/* ── Total Assets Hero ─────────── */}
         <TotalAssetsCard
           total={totalAssets}
           available={available}
@@ -105,46 +108,36 @@ export default async function DashboardPage() {
           </Link>
         ) : null}
 
-        {/* ── Quick Actions ─────────────── */}
         <div className="card-dark p-4">
           <QuickActions />
         </div>
 
-        {/* ── Recent Transactions + Insights ─ */}
         <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
-          {/* Transactions */}
           <div className="card-dark p-5">
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-black text-white">{tx.dash_recent_transactions}</h3>
-              </div>
+              <h3 className="font-black text-white">{tx.dash_recent_transactions}</h3>
               <div className="flex items-center gap-1">
-                {["All","Income","Spend"].map((tab, i) => (
+                {filterTabs.map((tab, i) => (
                   <Link
-                    key={tab}
-                    href={`/accounts?filter=${tab.toLowerCase()}`}
+                    key={tab.key}
+                    href={`/accounts?filter=${tab.key}`}
                     className={`text-xs font-bold px-3 py-1.5 rounded-full transition ${
-                      i === 0
-                        ? "bg-white/15 text-white"
-                        : "text-white/40 hover:text-white/70"
+                      i === 0 ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
                     }`}
                   >
-                    {tab}
+                    {tab.label}
                   </Link>
                 ))}
                 <Link href="/accounts" className="text-xs font-bold text-green ml-2 hover:text-green-dim transition">
-                  View all →
+                  {tx.dash_view_all} →
                 </Link>
               </div>
             </div>
             <TransactionCards transactions={data.transactions} />
           </div>
-
-          {/* Insights */}
           <InsightPanel total={totalAssets} retirement={retirementTotal} />
         </div>
 
-        {/* ── Accounts row ─────────────── */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-black text-white">{tx.nav_accounts}</h3>
@@ -159,13 +152,12 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Premium Metal Card ──────────── */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-white/10 p-5 flex items-center justify-between">
           <div>
-            <p className="text-xs text-white/40 font-semibold mb-1">Premium Metal Card</p>
-            <p className="text-lg font-black text-white">Elevate every experience.</p>
+            <p className="text-xs text-white/40 font-semibold mb-1">{tx.dash_premium_card}</p>
+            <p className="text-lg font-black text-white">{tx.dash_premium_cta}</p>
             <Link href="/cards" className="text-xs font-bold text-green mt-2 inline-block hover:text-green-dim transition">
-              Learn more →
+              {tx.dash_learn_more} →
             </Link>
           </div>
           <div className="w-32 h-20 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl border border-white/10 flex items-center justify-center">
@@ -174,11 +166,10 @@ export default async function DashboardPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-green/5 rounded-full -translate-y-1/2 translate-x-1/2" />
         </div>
 
-        {/* ── Crypto + 401k summary ─────── */}
         <div className="grid grid-cols-2 gap-4">
-            <Link href="/wallet" className="card-dark p-5 hover:bg-white/6 transition rounded-2xl block">
+          <Link href="/wallet" className="card-dark p-5 hover:bg-white/6 transition rounded-2xl block">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Crypto</p>
+              <p className="text-xs font-bold text-white/40 uppercase tracking-wider">{tx.nav_crypto}</p>
               <span className="text-xs font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{data.wallets.length} networks</span>
             </div>
             <p className="text-xl font-black text-white">{formatInCurrency(crypto, pCurrency)}</p>
@@ -190,36 +181,34 @@ export default async function DashboardPage() {
                 ))}
               </div>
             </div>
-            <MiniChart className="mt-3 h-10 w-full" color="#f59e0b"
-              path="M0 30 C14 20 26 28 40 14 C52 4 64 18 80 8" />
+            <MiniChart className="mt-3 h-10 w-full" color="#f59e0b" path="M0 30 C14 20 26 28 40 14 C52 4 64 18 80 8" />
           </Link>
 
           <Link href="/retirement" className="card-dark p-5 hover:bg-white/6 transition rounded-2xl block">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold text-white/40 uppercase tracking-wider">401(k)</p>
-              <span className="text-xs font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{data.retirementAccounts.length > 0 ? "Active" : "Inactive"}</span>
+              <span className="text-xs font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">
+                {data.retirementAccounts.length > 0 ? tx.dash_active : tx.dash_inactive}
+              </span>
             </div>
             <p className="text-xl font-black text-white">{formatInCurrency(retirementTotal, pCurrency)}</p>
             <p className="text-xs text-white/30 mt-0.5">
               {primaryRetirement?.investmentGrowthPlaceholder ?? "Projected growth active"}
             </p>
-            <MiniChart className="mt-3 h-10 w-full" color="#6366f1"
-              path="M0 28 C16 20 28 24 42 14 C56 4 66 18 80 10" />
+            <MiniChart className="mt-3 h-10 w-full" color="#6366f1" path="M0 28 C16 20 28 24 42 14 C56 4 66 18 80 10" />
           </Link>
         </div>
 
-        {/* ── Market rates strip ────────── */}
         <div className="card-dark p-4">
-          <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-3">Exchange Rates</p>
+          <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-3">{tx.dash_exchange_rates}</p>
           <MarketStrip />
         </div>
 
-        {/* ── Notifications ─────────────── */}
         {data.notifications.length > 0 && (
           <div className="card-dark p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-black text-white">Notifications</h3>
-              <Link href="/notifications" className="text-xs font-bold text-green hover:text-green-dim transition">See all</Link>
+              <h3 className="font-black text-white">{tx.dash_notifications}</h3>
+              <Link href="/notifications" className="text-xs font-bold text-green hover:text-green-dim transition">{tx.dash_see_all}</Link>
             </div>
             <div className="space-y-3">
               {data.notifications.slice(0, 3).map((n) => (

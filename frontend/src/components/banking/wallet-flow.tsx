@@ -10,6 +10,7 @@ import { MiniChart } from "@/components/banking/premium-ui";
 import { cryptoAssets, money } from "@/components/banking/finance";
 import { secureFetch } from "@/lib/client-api";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { useTranslations } from "@/lib/i18n/use-translations";
 
 type Wallet = {
   id: string;
@@ -34,16 +35,6 @@ type HistoryItem = {
   createdAt: Date | string;
 };
 
-const actions = [
-  { key: "deposit", label: "Deposit", icon: ArrowDownToLine },
-  { key: "withdraw", label: "Withdraw", icon: ArrowUpFromLine },
-  { key: "swap", label: "Swap", icon: RefreshCcw },
-  { key: "receive", label: "Receive", icon: QrCode },
-  { key: "send", label: "Send", icon: Send }
-] as const;
-
-type WalletAction = (typeof actions)[number]["key"];
-
 export function WalletFlow({
   wallets,
   history,
@@ -53,6 +44,18 @@ export function WalletFlow({
   history: HistoryItem[];
   cryptoBalance: number;
 }) {
+  const { tx } = useTranslations();
+
+  const actions = [
+    { key: "deposit", label: tx.wallet_action_deposit, icon: ArrowDownToLine },
+    { key: "withdraw", label: tx.wallet_action_withdraw, icon: ArrowUpFromLine },
+    { key: "swap", label: tx.wallet_action_swap, icon: RefreshCcw },
+    { key: "receive", label: tx.wallet_action_receive, icon: QrCode },
+    { key: "send", label: tx.wallet_action_send, icon: Send }
+  ] as const;
+
+  type WalletAction = (typeof actions)[number]["key"];
+
   const enabledWallets = wallets.filter((wallet) => wallet.enabled);
   const [action, setAction] = useState<WalletAction>("deposit");
   const [selectedWalletId, setSelectedWalletId] = useState(enabledWallets[0]?.id ?? "");
@@ -101,12 +104,12 @@ export function WalletFlow({
           notes
         })
       });
-      setMessage(data.message ?? "Request submitted for review.");
+      setMessage(data.message ?? tx.wallet_request_submitted);
       setAmount("");
       setRecipientAddress("");
       setNotes("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Crypto request failed. Please contact support.");
+      setMessage(error instanceof Error ? error.message : tx.wallet_request_failed);
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +121,7 @@ export function WalletFlow({
         <div className="grid gap-4 md:grid-cols-[1fr_14rem]">
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-white/40">Selected wallet</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-white/40">{tx.wallet_selected}</p>
               <div className="mt-1 flex items-center gap-3">
                 <CryptoIcon symbol={selectedWallet.symbol} className="size-10" />
                 <h3 className="text-xl font-black text-white">{selectedWallet.coin} {selectedWallet.network}</h3>
@@ -126,22 +129,21 @@ export function WalletFlow({
               <p className="text-sm text-white/45">{selectedWallet.label}</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-              <p className="mb-1 text-xs font-bold text-white/35">Wallet address</p>
+              <p className="mb-1 text-xs font-bold text-white/35">{tx.wallet_address_label}</p>
               <p className="break-all text-sm font-semibold text-white">{selectedWallet.address}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={copyAddress}>
                 {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                {copied ? "Copied" : "Copy address"}
+                {copied ? tx.wallet_copied : tx.wallet_copy_address}
               </Button>
               <Button type="button" variant="secondary" onClick={generateQr}>
                 <QrCode className="size-4" />
-                Generate QR
+                {tx.wallet_gen_qr}
               </Button>
             </div>
             <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/10 p-3 text-sm text-white/70">
-              {selectedWallet.depositInstructions ||
-                "Send only the selected asset on the selected network. Deposits are credited after administrator review and blockchain confirmation."}
+              {selectedWallet.depositInstructions || tx.wallet_deposit_default}
             </div>
           </div>
           <div className="flex items-center justify-center rounded-3xl border border-white/10 bg-white p-4">
@@ -154,7 +156,7 @@ export function WalletFlow({
               />
             ) : (
               <div className="grid h-48 w-48 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-center text-xs font-bold text-slate-500">
-                Generate QR
+                {tx.wallet_gen_qr}
               </div>
             )}
           </div>
@@ -162,10 +164,10 @@ export function WalletFlow({
       ) : (
         <div className="grid gap-3 text-center">
           <WalletCards className="mx-auto size-10 text-emerald-300" />
-          <h3 className="text-xl font-black text-white">No crypto deposit wallet is configured.</h3>
-          <p className="text-sm text-white/50">Contact support and an administrator can enable the correct wallet network for your account.</p>
+          <h3 className="text-xl font-black text-white">{tx.wallet_no_wallet_title}</h3>
+          <p className="text-sm text-white/50">{tx.wallet_no_wallet_desc}</p>
           <Button asChild>
-            <Link href="/support?message=Please%20help%20me%20activate%20a%20crypto%20deposit%20wallet.">Contact support</Link>
+            <Link href="/support?message=Please%20help%20me%20activate%20a%20crypto%20deposit%20wallet.">{tx.wallet_contact_support}</Link>
           </Button>
         </div>
       )}
@@ -177,9 +179,9 @@ export function WalletFlow({
       <div className="luxury-hero p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-white/40">Crypto Wallet Value</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-white/40">{tx.wallet_crypto_value}</p>
             <p className="mt-2 text-4xl font-black text-white">{money(cryptoBalance)}</p>
-            <p className="mt-1 text-sm font-semibold text-green">Requests require manual banking review</p>
+            <p className="mt-1 text-sm font-semibold text-green">{tx.wallet_manual_review_note}</p>
           </div>
           <MiniChart className="h-16 w-28" color="#f59e0b" path="M0 46 C16 28 30 34 44 18 C58 4 72 22 90 8" />
         </div>
@@ -210,7 +212,7 @@ export function WalletFlow({
       <div className="card-dark p-5">
         <div className="mb-4 grid gap-3 md:grid-cols-2">
           <Field>
-            <Label>Asset</Label>
+            <Label>{tx.wallet_asset}</Label>
             <Select value={selectedWalletId} onChange={(event) => setSelectedWalletId(event.target.value)} disabled={!enabledWallets.length}>
               {enabledWallets.map((wallet) => (
                 <option key={wallet.id} value={wallet.id}>{wallet.symbol} - {wallet.coin}</option>
@@ -218,8 +220,8 @@ export function WalletFlow({
             </Select>
           </Field>
           <Field>
-            <Label>Network</Label>
-            <Input value={selectedWallet?.network ?? "No network configured"} readOnly />
+            <Label>{tx.wallet_network}</Label>
+            <Input value={selectedWallet?.network ?? tx.wallet_no_network} readOnly />
           </Field>
         </div>
 
@@ -229,12 +231,12 @@ export function WalletFlow({
           <div className="grid gap-4">
             <div className="grid gap-3 md:grid-cols-2">
               <Field>
-                <Label>Amount</Label>
+                <Label>{tx.common_amount}</Label>
                 <Input value={amount} onChange={(event) => setAmount(event.target.value)} type="number" min="0" step="0.01" placeholder="0.00" />
               </Field>
               {action === "swap" ? (
                 <Field>
-                  <Label>Receive asset</Label>
+                  <Label>{tx.wallet_receive_asset}</Label>
                   <Select value={toAsset} onChange={(event) => setToAsset(event.target.value)}>
                     {cryptoAssets.map((asset) => (
                       <option key={asset.symbol} value={asset.symbol}>{asset.symbol} - {asset.name}</option>
@@ -243,19 +245,19 @@ export function WalletFlow({
                 </Field>
               ) : (
                 <Field>
-                  <Label>Recipient address</Label>
-                  <Input value={recipientAddress} onChange={(event) => setRecipientAddress(event.target.value)} placeholder="Wallet address" />
+                  <Label>{tx.wallet_recipient_address}</Label>
+                  <Input value={recipientAddress} onChange={(event) => setRecipientAddress(event.target.value)} placeholder={tx.wallet_address_label} />
                 </Field>
               )}
             </div>
             <Field>
-              <Label>Notes</Label>
-              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional memo for compliance review" />
+              <Label>{tx.wallet_notes_label}</Label>
+              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={tx.wallet_notes_placeholder} />
             </Field>
             <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm">
-              <div className="flex justify-between"><span className="text-white/45">Estimated network/review fee</span><span className="font-black text-white">{formatCurrency(feePreview)}</span></div>
-              <div className="flex justify-between"><span className="text-white/45">Status after submit</span><span className="font-black text-emerald-300">Manual Review</span></div>
-              <p className="text-xs text-white/40">No automatic crypto movement occurs. An administrator must review this request before funds are released.</p>
+              <div className="flex justify-between"><span className="text-white/45">{tx.wallet_fee_estimate}</span><span className="font-black text-white">{formatCurrency(feePreview)}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">{tx.wallet_status_after}</span><span className="font-black text-emerald-300">{tx.wallet_manual_status}</span></div>
+              <p className="text-xs text-white/40">{tx.wallet_admin_review_note}</p>
             </div>
             {message ? <p className="rounded-2xl bg-white/8 px-4 py-3 text-sm font-semibold text-white">{message}</p> : null}
             <Button
@@ -264,7 +266,7 @@ export function WalletFlow({
               disabled={submitting || !Number(amount) || (action !== "swap" && !recipientAddress.trim())}
               className="h-14 w-full"
             >
-              {submitting ? "Submitting..." : `Review ${action}`}
+              {submitting ? tx.wallet_submitting : `${tx.wallet_manual_status} ${action}`}
             </Button>
           </div>
         )}
@@ -272,7 +274,7 @@ export function WalletFlow({
 
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         <div className="card-dark p-2">
-          <p className="px-3 pt-3 text-sm font-black text-white">Wallet History</p>
+          <p className="px-3 pt-3 text-sm font-black text-white">{tx.wallet_history}</p>
           {history.length ? (
             history.slice(0, 8).map((item) => (
               <div key={item.id} className="coin-row px-3">
@@ -285,11 +287,11 @@ export function WalletFlow({
               </div>
             ))
           ) : (
-            <p className="p-6 text-center text-sm text-white/45">No crypto wallet activity yet.</p>
+            <p className="p-6 text-center text-sm text-white/45">{tx.wallet_no_activity}</p>
           )}
         </div>
         <div className="card-dark p-5">
-          <p className="text-sm font-black text-white">Top Movers</p>
+          <p className="text-sm font-black text-white">{tx.wallet_top_movers}</p>
           <div className="mt-4 space-y-3">
             {cryptoAssets.slice(0, 4).map((coin) => (
               <div key={coin.symbol} className="flex items-center gap-3">
