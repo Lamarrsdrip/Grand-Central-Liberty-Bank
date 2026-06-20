@@ -27,11 +27,22 @@ export function TranslationProvider({
   children: React.ReactNode;
   initialLocale?: string;
 }) {
-  const initial = isSupportedLocale(initialLocale) ? initialLocale : "en";
-  const [locale, setLocale] = useState<SupportedLocale>(initial);
+  const toSafe = (v: unknown): SupportedLocale =>
+    isSupportedLocale(v) ? v : "en";
 
+  const [locale, setLocale] = useState<SupportedLocale>(() => toSafe(initialLocale));
+
+  // Sync server-provided locale into state whenever it changes.
+  // This handles soft-navigation reconciliation where useState keeps
+  // a stale value even though the initialLocale prop updated.
   useEffect(() => {
-    // Listen for client-side locale changes from LocaleSwitcher
+    const next = toSafe(initialLocale);
+    setLocale(next);
+  }, [initialLocale]);
+
+  // Also accept instant locale-changed events from LocaleSwitcher
+  // so the UI updates before the server round-trip completes.
+  useEffect(() => {
     const handler = (e: Event) => {
       const next = (e as CustomEvent<string>).detail;
       if (isSupportedLocale(next)) setLocale(next);

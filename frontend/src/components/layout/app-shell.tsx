@@ -56,7 +56,7 @@ export function AppShell({
   const nav = user.role === "ADMIN" ? adminNav : userNav;
 
   return (
-    <TranslationProvider initialLocale={user.preferredLocale}>
+    <TranslationProvider key={user.preferredLocale} initialLocale={user.preferredLocale}>
     <div className="app-bg min-h-screen flex">
       {/* ── Desktop Sidebar ───────────────────── */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col sidebar-glass z-30">
