@@ -10,6 +10,7 @@ import {
   BeneficiaryDeleteControl,
   BroadcastForm,
   CardDecisionControl,
+  CryptoAssetPriceControl,
   EmailSettingsForm,
   KycDecisionControl,
   KycDocumentViewer,
@@ -32,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getCurrentUser } from "@/lib/auth";
 import { getAdminData } from "@/lib/data";
+import { CRYPTO_RATES_USD } from "@/lib/swap-rates";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +68,13 @@ export default async function AdminPage({
     ...data.retirementFeeSettings,
     feePercentage: Number(data.retirementFeeSettings.feePercentage)
   };
+
+  const dbPriceMap = Object.fromEntries(data.cryptoAssetPrices.map(p => [p.symbol, p.priceUSD]));
+  const cryptoPriceList = Object.entries(CRYPTO_RATES_USD).map(([symbol, defaultPrice]) => ({
+    symbol,
+    priceUSD: dbPriceMap[symbol] ?? defaultPrice,
+    isCustom: dbPriceMap[symbol] !== undefined
+  }));
 
   const visibleUsers = userQuery
     ? data.users.filter((u) =>
@@ -183,7 +192,7 @@ export default async function AdminPage({
         </section>}
 
         {/* Crypto Balances */}
-        {activeTab === "crypto-balances" && <section>
+        {activeTab === "crypto-balances" && <section className="grid gap-5">
           <Card>
             <CardHeader>
               <CardTitle>Crypto Balance Management</CardTitle>
@@ -191,6 +200,15 @@ export default async function AdminPage({
             </CardHeader>
             <CardContent>
               <AdminCryptoTopupControl users={data.users.map(u => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email }))} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Asset Price Configuration</CardTitle>
+              <CardDescription>Set USD prices for each crypto asset. These prices are used for wallet value calculations and swap rates. Default prices are used when no custom price is set.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CryptoAssetPriceControl prices={cryptoPriceList} />
             </CardContent>
           </Card>
         </section>}

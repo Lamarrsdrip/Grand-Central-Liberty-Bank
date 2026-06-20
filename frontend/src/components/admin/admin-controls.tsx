@@ -999,6 +999,103 @@ export function BeneficiaryDeleteControl({ id }: { id: string }) {
   );
 }
 
+export function CryptoAssetPriceControl({
+  prices
+}: {
+  prices: Array<{ symbol: string; priceUSD: number; isCustom: boolean }>
+}) {
+  const [symbol, setSymbol] = useState(prices[0]?.symbol ?? "BTC");
+  const [priceUSD, setPriceUSD] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+
+  const current = prices.find(p => p.symbol === symbol);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseFloat(priceUSD);
+    if (!parsed || parsed <= 0) { setMessage("Enter a positive price."); return; }
+    setBusy(true); setMessage("");
+    try {
+      await secureFetch("/api/admin/crypto-prices", {
+        method: "POST",
+        body: JSON.stringify({ symbol, priceUSD: parsed })
+      });
+      setMessage(`${symbol} price set to $${parsed.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+      setPriceUSD("");
+      router.refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed.");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="grid gap-4">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10">
+              <th className="text-left py-2 text-xs font-bold text-muted-foreground uppercase tracking-wide">Asset</th>
+              <th className="text-right py-2 text-xs font-bold text-muted-foreground uppercase tracking-wide">Price (USD)</th>
+              <th className="text-right py-2 text-xs font-bold text-muted-foreground uppercase tracking-wide">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {prices.map(p => (
+              <tr key={p.symbol} className="border-b border-white/5">
+                <td className="py-2 font-black text-white">{p.symbol}</td>
+                <td className="py-2 text-right font-semibold text-white">
+                  ${p.priceUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                </td>
+                <td className="py-2 text-right">
+                  <span className={`text-xs font-bold ${p.isCustom ? "text-emerald-400" : "text-white/30"}`}>
+                    {p.isCustom ? "Admin" : "Default"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="border-t border-white/10 pt-4">
+        <p className="text-sm font-black text-white mb-3">Update asset price</p>
+        <form className="grid gap-3" onSubmit={handleSubmit}>
+          <Notice message={message} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset</label>
+              <select
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={symbol}
+                onChange={e => { setSymbol(e.target.value); setPriceUSD(""); }}
+              >
+                {prices.map(p => <option key={p.symbol} value={p.symbol}>{p.symbol}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Price in USD {current ? `(current: $${current.priceUSD.toLocaleString("en-US", { maximumFractionDigits: 2 })})` : ""}
+              </label>
+              <input
+                type="number"
+                step="any"
+                min="0.000001"
+                placeholder={`e.g. ${current?.priceUSD ?? 0}`}
+                value={priceUSD}
+                onChange={e => setPriceUSD(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                required
+              />
+            </div>
+          </div>
+          <Button size="sm" disabled={busy}>{busy ? "Saving…" : "Set price"}</Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function DocPanel({ label, url, isImage }: { label: string; url: string; isImage: boolean }) {
   const [error, setError] = useState(false);
   return (

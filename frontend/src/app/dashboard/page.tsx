@@ -10,16 +10,24 @@ import {
 } from "@/components/banking/premium-ui";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
+import { prisma } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
 import { formatInCurrency } from "@/lib/currency";
+import { getAdminCryptoPrices, computeCryptoTotalUSD } from "@/lib/crypto-prices";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const data = await getUserDashboardData(user.id);
+
+  const [data, cryptoBalanceRecords, prices] = await Promise.all([
+    getUserDashboardData(user.id),
+    prisma.userCryptoBalance.findMany({ where: { userId: user.id } }),
+    getAdminCryptoPrices()
+  ]);
+
   const { tx } = getServerTranslations(user.preferredLocale);
   const pCurrency = user.preferredCurrency ?? "USD";
 
@@ -29,7 +37,7 @@ export default async function DashboardPage() {
   const totalAssets    = accountTotal + retirementTotal;
 
   const checking    = data.accounts.filter(a => a.type === "CHECKING").reduce((s,a) => s+Number(a.balance),0);
-  const crypto      = data.accounts.filter(a => a.type === "CRYPTO").reduce((s,a) => s+Number(a.balance),0);
+  const crypto      = computeCryptoTotalUSD(cryptoBalanceRecords, prices);
   const primaryRetirement = data.retirementAccounts[0];
   const fallbackAccount = data.accounts.find((account) => account.type === "CHECKING") ?? data.accounts[0];
   const selectedBalance = primaryRetirement

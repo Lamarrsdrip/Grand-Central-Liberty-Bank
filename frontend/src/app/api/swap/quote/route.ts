@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { handleApi, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
-import { resolveRateUSD, SWAP_FEE_PERCENT } from "@/lib/swap-rates";
+import { getAdminCryptoPrices, resolveRateFromMap } from "@/lib/crypto-prices";
+import { SWAP_FEE_PERCENT } from "@/lib/swap-rates";
 
 const schema = z.object({
   fromAsset: z.string().min(2).max(10),
@@ -16,8 +17,9 @@ export async function POST(request: NextRequest) {
     const input = schema.parse(await request.json());
     const { fromAsset, toAsset, fromAmount } = input;
 
-    const fromRateUSD = resolveRateUSD(fromAsset.toUpperCase());
-    const toRateUSD = resolveRateUSD(toAsset.toUpperCase());
+    const cryptoPrices = await getAdminCryptoPrices();
+    const fromRateUSD = resolveRateFromMap(fromAsset.toUpperCase(), cryptoPrices);
+    const toRateUSD = resolveRateFromMap(toAsset.toUpperCase(), cryptoPrices);
 
     if (!fromRateUSD || !toRateUSD) {
       throw Object.assign(new Error("No exchange rate available for this asset pair."), { status: 422 });

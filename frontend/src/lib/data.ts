@@ -198,10 +198,11 @@ export async function getAdminData() {
       orderBy: { createdAt: "desc" },
       take: 200,
       include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
-    })
+    }),
+    prisma.cryptoAssetPrice.findMany({ orderBy: { symbol: "asc" } })
   ]);
 
-  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15] = results;
+  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16] = results;
 
   const defaultBankSettings = {
     id: 1, bankName: "Grand Central Liberty Bank", bankAddress: "200 Liberty Plaza, New York, NY",
@@ -229,6 +230,7 @@ export async function getAdminData() {
     retirementAccounts:  settled(r12, [], "retirementAccounts"),
     retirementWithdrawals: settled(r13, [], "retirementWithdrawals"),
     retirementFeeSettings: (settled(r14, null, "retirementFeeSettings")) ?? defaultRetirementFeeSettings,
-    savedBeneficiaries:   settled(r15, [], "savedBeneficiaries")
+    savedBeneficiaries:   settled(r15, [], "savedBeneficiaries"),
+    cryptoAssetPrices:    settled(r16, [], "cryptoAssetPrices") as Array<{ id: string; symbol: string; priceUSD: number; updatedAt: Date; createdAt: Date }>
   };
 }

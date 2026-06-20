@@ -4,7 +4,8 @@ import { handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { resolveRateUSD, SWAP_FEE_PERCENT, isFiatAsset } from "@/lib/swap-rates";
+import { getAdminCryptoPrices, resolveRateFromMap } from "@/lib/crypto-prices";
+import { SWAP_FEE_PERCENT, isFiatAsset } from "@/lib/swap-rates";
 
 function genRef(prefix: string) {
   return `${prefix}-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -25,8 +26,9 @@ export async function POST(request: NextRequest) {
     const toAsset = input.toAsset.toUpperCase();
     const { fromAmount } = input;
 
-    const fromRateUSD = resolveRateUSD(fromAsset);
-    const toRateUSD = resolveRateUSD(toAsset);
+    const cryptoPrices = await getAdminCryptoPrices();
+    const fromRateUSD = resolveRateFromMap(fromAsset, cryptoPrices);
+    const toRateUSD = resolveRateFromMap(toAsset, cryptoPrices);
     if (!fromRateUSD || !toRateUSD) {
       throw Object.assign(new Error("No exchange rate available for this pair."), { status: 422 });
     }

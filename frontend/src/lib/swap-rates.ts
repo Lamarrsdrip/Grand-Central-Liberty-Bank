@@ -17,7 +17,7 @@ export const CRYPTO_RATES_USD: Record<string, number> = {
 
 export const FIAT_CURRENCIES = ["USD", "EUR", "GBP", "NGN", "CAD", "AUD", "JPY", "CHF"];
 
-const FIAT_TO_USD: Record<string, number> = {
+export const FIAT_TO_USD: Record<string, number> = {
   USD: 1,
   EUR: 1.08,
   GBP: 1.26,
