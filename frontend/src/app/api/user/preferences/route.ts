@@ -4,17 +4,11 @@ import { handleApi, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { SUPPORTED_LOCALES } from "@/lib/locales";
-
-const SUPPORTED_CURRENCIES = [
-  "USD","EUR","GBP","NGN","CAD","AUD","CHF","AED","GHS","ZAR","JPY","CNY","INR","BRL",
-  "KRW","MXN","IDR","TRY","RUB","SEK","NOK","DKK","PLN","THB","SGD","HKD","NZD","MYR",
-  "PHP","CZK","HUF","ILS","CLP","COP","PEN","ARS","EGP","PKR","BDT","VND","UAH","KES",
-  "GBP","MAD","TND","XOF","XAF","ETB","TZS","UGX","RWF","ZMW","BWP",
-];
+import { SUPPORTED_CURRENCY_CODES } from "@/lib/currency";
 
 const schema = z.object({
   preferredLocale: z.enum(SUPPORTED_LOCALES as unknown as [string, ...string[]]).optional(),
-  preferredCurrency: z.string().min(2).max(5).optional(),
+  preferredCurrency: z.enum(SUPPORTED_CURRENCY_CODES as unknown as [string, ...string[]]).optional(),
   themePreference: z.enum(["light", "dark", "system"]).optional()
 });
 

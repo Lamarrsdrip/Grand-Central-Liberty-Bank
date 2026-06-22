@@ -1,3 +1,11 @@
+export const SUPPORTED_CURRENCY_CODES = [
+  "USD","EUR","GBP","NGN","CAD","AUD","CHF","AED","GHS","ZAR","JPY","CNY","INR","BRL",
+  "KRW","MXN","IDR","TRY","RUB","SEK","NOK","DKK","PLN","SGD","HKD","NZD","MYR","PHP",
+  "THB","EGP","KES","PKR","BDT","VND","UAH","ILS","TZS","UGX","ETB","MAD","XOF","XAF",
+] as const;
+
+export type SupportedCurrencyCode = typeof SUPPORTED_CURRENCY_CODES[number];
+
 /**
  * Static exchange rates relative to USD.
  * Used for display conversion only — not for actual financial transactions.
