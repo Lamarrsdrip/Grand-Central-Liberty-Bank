@@ -295,7 +295,7 @@ export function TransferFlow({
   const [iban, setIban] = useState("");                      // international IBAN
   const [recipientAddress, setRecipientAddress] = useState(""); // international address
   const [recipientCountry, setRecipientCountry] = useState("United States");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(accounts[0]?.currency ?? "USD");
   const [saveBeneficiary, setSaveBeneficiary] = useState(false);
   const [beneficiaryNickname, setBeneficiaryNickname] = useState("");
 
@@ -303,8 +303,9 @@ export function TransferFlow({
   const [fromAccountId, setFromAccountId] = useState(accounts[0]?.id ?? "");
   const [purpose, setPurpose] = useState("");
 
-  // Step 4: Amount
-  const [amount, setAmount] = useState("0");
+  // Step 4: Amount — stored as a RAW numeric string (no commas, no formatting)
+  // so parseFloat is always reliable regardless of locale/device
+  const [rawAmount, setRawAmount] = useState("0");
 
   // UI state
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -314,31 +315,46 @@ export function TransferFlow({
   const [beneficiaries, setBeneficiaries] = useState<SavedBeneficiary[]>(savedBeneficiaries);
 
   /* ── Derived ────────────────────────────────────────────────────────── */
-  const numericAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+  // numericAmount is always a clean JS number — no string parsing tricks needed
+  const numericAmount = parseFloat(rawAmount) || 0;
   const fromAccount = accounts.find((a) => a.id === fromAccountId);
-  const insufficientFunds = Boolean(fromAccount && numericAmount > 0 && numericAmount > fromAccount.availableBalance);
+  // availableBalance is a Prisma Float (JS number) — compare directly, never as string
+  const availableBalance = Number(fromAccount?.availableBalance ?? 0);
+  const insufficientFunds = Boolean(fromAccount && numericAmount > 0 && numericAmount > availableBalance);
   const isIntl = transferType === "INTERNATIONAL";
   const isDomestic = transferType === "DOMESTIC";
 
+  // Display-only formatted amount string (for the keypad display)
+  const displayAmount = (() => {
+    if (rawAmount === "0" || rawAmount === "") return "0";
+    if (rawAmount.endsWith(".")) return rawAmount; // user mid-typing decimal
+    const n = parseFloat(rawAmount);
+    if (!Number.isFinite(n)) return "0";
+    const [intPart, decPart] = rawAmount.split(".");
+    const formattedInt = parseInt(intPart, 10).toLocaleString("en-US");
+    return decPart !== undefined ? `${formattedInt}.${decPart.slice(0, 2)}` : formattedInt;
+  })();
+
   /* ── Keypad ─────────────────────────────────────────────────────────── */
   function pressKey(key: string) {
-    setAmount((prev) => {
-      const clean = prev.replace(/,/g, "");
-      if (key === "del") {
-        const next = clean.slice(0, -1) || "0";
-        return fmt(next);
+    setRawAmount((prev) => {
+      if (key === "del") return prev.length <= 1 ? "0" : prev.slice(0, -1);
+      if (key === ".") return prev.includes(".") ? prev : prev + ".";
+      if (prev === "0") return key;
+      // Limit to 2 decimal places
+      if (prev.includes(".")) {
+        const dec = prev.split(".")[1] ?? "";
+        if (dec.length >= 2) return prev;
       }
-      if (key === ".") return clean.includes(".") ? prev : clean + ".";
-      const next = clean === "0" ? key : clean + key;
-      return fmt(next);
+      return prev + key;
     });
   }
-  function fmt(v: string) {
-    if (v.includes(".")) {
-      const [int, dec] = v.split(".");
-      return Number(int).toLocaleString("en-US") + "." + dec.slice(0, 2);
-    }
-    return Number(v).toLocaleString("en-US");
+
+  /* ── Auto-sync currency when source account changes ─────────────────── */
+  function selectFromAccount(accountId: string) {
+    setFromAccountId(accountId);
+    const acct = accounts.find((a) => a.id === accountId);
+    if (acct) setCurrency(acct.currency);
   }
 
   /* ── Fill from saved / recent ───────────────────────────────────────── */
@@ -352,7 +368,10 @@ export function TransferFlow({
     if (/^\d{9}$/.test(rs)) { setRoutingNumber(rs); setSwiftBic(""); }
     else { setSwiftBic(rs); setRoutingNumber(""); }
     setRecipientCountry(b.recipientCountry || "United States");
-    setCurrency(b.currency || "USD");
+    // Only set currency from beneficiary if it matches one of the user's accounts;
+    // otherwise default to the current source account's currency.
+    const benefCurrency = b.currency || fromAccount?.currency || "USD";
+    setCurrency(benefCurrency);
     setErrors({});
     go(3, "fwd"); // jump to options
   }
@@ -387,8 +406,11 @@ export function TransferFlow({
   function validateStep4(): FieldErrors {
     const e: FieldErrors = {};
     if (numericAmount <= 0) e.amount = "Enter an amount greater than 0";
-    if (insufficientFunds)
-      e.amount = `Insufficient funds — available ${formatCurrency(fromAccount?.availableBalance ?? 0, fromAccount?.currency)}`;
+    if (!Number.isFinite(numericAmount)) e.amount = "Enter a valid amount";
+    if (fromAccount && currency !== fromAccount.currency)
+      e.amount = `Your account is in ${fromAccount.currency} but transfer currency is ${currency}. They must match.`;
+    else if (insufficientFunds)
+      e.amount = `Insufficient funds — available ${formatCurrency(availableBalance, fromAccount?.currency ?? currency)}`;
     return e;
   }
 
@@ -488,9 +510,12 @@ export function TransferFlow({
   }
 
   function resetFlow() {
-    setAmount("0"); setRecipientName(""); setBankName(""); setAccountNumber("");
+    setRawAmount("0"); setRecipientName(""); setBankName(""); setAccountNumber("");
     setRoutingNumber(""); setSwiftBic(""); setIban(""); setRecipientAddress("");
-    setRecipientCountry("United States"); setCurrency("USD"); setPurpose("");
+    setRecipientCountry("United States");
+    setCurrency(accounts[0]?.currency ?? "USD");
+    setFromAccountId(accounts[0]?.id ?? "");
+    setPurpose("");
     setSaveBeneficiary(false); setBeneficiaryNickname(""); setErrors({});
     setResult(null); setShowResult(false);
     setSlideDir("back"); setAnimKey((k) => k + 1); setStep(1);
@@ -837,7 +862,7 @@ export function TransferFlow({
                   {accounts.map((a) => (
                     <button
                       key={a.id}
-                      onClick={() => setFromAccountId(a.id)}
+                      onClick={() => selectFromAccount(a.id)}
                       className={`w-full flex items-center justify-between rounded-xl px-4 py-3 border text-left transition ${fromAccountId === a.id ? "bg-emerald-400/10 border-emerald-400/30" : "bg-white/5 border-white/8 hover:bg-white/8"}`}
                     >
                       <span>
@@ -890,12 +915,12 @@ export function TransferFlow({
               <div>
                 <p className="text-xs font-bold text-white/30 mb-0.5 uppercase tracking-wider">{currency}</p>
                 <p className="text-4xl font-black text-white tracking-tight">
-                  {currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "NGN" ? "₦" : currency === "JPY" ? "¥" : currency === "CNY" ? "¥" : currency === "INR" ? "₹" : currency === "BRL" ? "R$" : ""}
-                  {amount}
+                  {currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "NGN" ? "₦" : currency === "JPY" ? "¥" : currency === "CNY" ? "¥" : currency === "INR" ? "₹" : currency === "BRL" ? "R$" : currency === "ZAR" ? "R" : ""}
+                  {displayAmount}
                 </p>
               </div>
               <button
-                onClick={() => setAmount("0")}
+                onClick={() => setRawAmount("0")}
                 className="size-8 rounded-full bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition"
               >
                 <X className="size-4" />
@@ -908,8 +933,8 @@ export function TransferFlow({
                 <ShieldCheck className={`size-4 shrink-0 ${insufficientFunds ? "text-red-300" : "text-emerald-400"}`} />
                 <p className="text-xs text-white/55">
                   {insufficientFunds
-                    ? `${tx.transfer_insufficient} — ${tx.transfer_available_suffix}: ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)}`
-                    : `${accountLabel(fromAccount.type)} ••${fromAccount.accountNumber.slice(-4)} — ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)} ${tx.transfer_available_suffix}`
+                    ? `${tx.transfer_insufficient} — ${tx.transfer_available_suffix}: ${formatCurrency(availableBalance, fromAccount.currency)}`
+                    : `${accountLabel(fromAccount.type)} ••${fromAccount.accountNumber.slice(-4)} — ${formatCurrency(availableBalance, fromAccount.currency)} ${tx.transfer_available_suffix}`
                   }
                 </p>
               </div>

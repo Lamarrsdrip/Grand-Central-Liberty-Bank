@@ -30,8 +30,12 @@ export default async function TransfersPage() {
     id: a.id,
     type: a.type,
     accountNumber: a.accountNumber,
-    availableBalance: Number(a.availableBalance),
-    currency: a.currency,
+    // Explicit coercion: Prisma returns Float as JS number, but guard against
+    // Decimal128 objects or string serialization from older MongoDB drivers
+    availableBalance: Number.isFinite(Number(a.availableBalance))
+      ? Number(a.availableBalance)
+      : parseFloat(String(a.availableBalance)) || 0,
+    currency: (a.currency ?? "USD").trim().toUpperCase(),
   }));
 
   // Derive recent unique recipients from past transfers

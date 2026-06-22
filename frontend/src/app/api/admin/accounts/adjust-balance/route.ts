@@ -29,8 +29,14 @@ export async function POST(request: NextRequest) {
     }
 
     const signed = input.action === "TOP_UP" ? input.amount : -input.amount;
-    const nextBalance = Math.round((Number(account.balance) + signed) * 100) / 100;
-    const nextAvailable = Math.round((Number(account.availableBalance) + signed) * 100) / 100;
+    // Always coerce stored balance to number — guards against Decimal128 or string edge cases
+    const currentBalance = Number(account.balance);
+    const currentAvailable = Number(account.availableBalance);
+    if (!Number.isFinite(currentBalance) || !Number.isFinite(currentAvailable)) {
+      throw new Response("Account balance data is corrupted. Contact technical operations.", { status: 500 });
+    }
+    const nextBalance = Math.round((currentBalance + signed) * 100) / 100;
+    const nextAvailable = Math.round((currentAvailable + signed) * 100) / 100;
     if (!input.allowNegative && (nextBalance < 0 || nextAvailable < 0)) {
       throw new Response("Adjustment would create a negative balance. Enable authorized negative balance to continue.", { status: 400 });
     }
