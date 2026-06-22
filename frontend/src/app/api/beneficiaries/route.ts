@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { created, handleApi, ok } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   return handleApi(async () => {
     const user = await requireUser();
-    const { id } = await request.json();
+    const { id } = z.object({ id: z.string().min(1) }).parse(await request.json());
     await prisma.$runCommandRaw({
       delete: "SavedBeneficiary",
       deletes: [{ q: { _id: { $oid: id }, userId: { $oid: user.id } }, limit: 1 }],

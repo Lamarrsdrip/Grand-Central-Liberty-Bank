@@ -5,10 +5,11 @@ import {
 } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { MiniChart, ProgressRail } from "@/components/banking/premium-ui";
-import { cryptoAssets, money } from "@/components/banking/finance";
+import { cryptoAssets } from "@/components/banking/finance";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getAdminCryptoPrices, computeCryptoTotalUSD } from "@/lib/crypto-prices";
+import { formatInCurrency } from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function CryptoPage() {
     getAdminCryptoPrices()
   ]);
 
+  const pCurrency = user.preferredCurrency ?? "USD";
   const balanceMap = Object.fromEntries(cryptoBalanceRecords.map(b => [b.symbol, b.balance]));
   const totalCryptoUSD = computeCryptoTotalUSD(cryptoBalanceRecords, prices);
 
@@ -77,7 +79,7 @@ export default async function CryptoPage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs text-white/40 font-semibold uppercase tracking-wider">Total Crypto Value ◉</p>
-              <p className="text-4xl font-black text-white mt-2">{money(totalCryptoUSD)}</p>
+              <p className="text-4xl font-black text-white mt-2">{formatInCurrency(totalCryptoUSD, pCurrency)}</p>
               {totalCryptoUSD === 0 ? (
                 <p className="text-sm text-white/40 mt-1">No crypto balance yet</p>
               ) : (
@@ -124,7 +126,7 @@ export default async function CryptoPage() {
                   </p>
                   <p className="text-xs text-white/40">
                     {priceUSD > 0
-                      ? `$${priceUSD.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })} · ${money(usdValue)}`
+                      ? `${formatInCurrency(priceUSD, pCurrency)} · ${formatInCurrency(usdValue, pCurrency)}`
                       : coin.price}
                   </p>
                 </div>

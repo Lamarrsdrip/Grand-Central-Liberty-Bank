@@ -6,7 +6,8 @@ import { AccountCard } from "@/components/banking/premium-ui";
 import { accountLabel } from "@/components/banking/finance";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { formatInCurrency } from "@/lib/currency";
 import { DepositSection } from "@/components/banking/deposit-section";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
 
@@ -17,6 +18,7 @@ export default async function AccountsPage() {
   if (!user) redirect("/login");
   const { tx } = getServerTranslations(user.preferredLocale);
   const data = await getUserDashboardData(user.id);
+  const pCurrency = user.preferredCurrency ?? "USD";
 
   return (
     <ProtectedShell>
@@ -71,7 +73,7 @@ export default async function AccountsPage() {
                     <p className="text-xs text-white/40 mt-0.5">{formatDate(t.createdAt)} · {t.accountType ? accountLabel(t.accountType) : "Checking"}</p>
                   </div>
                   <p className={`text-sm font-black ${positive ? "text-green" : "text-white"}`}>
-                    {positive ? "+" : ""}{formatCurrency(amount, t.currency)}
+                    {positive ? "+" : ""}{formatInCurrency(amount, pCurrency)}
                   </p>
                 </div>
               );

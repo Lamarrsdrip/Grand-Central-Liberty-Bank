@@ -33,6 +33,7 @@ import {
 } from "@/components/banking/finance";
 import { useTranslations } from "@/components/layout/translation-provider";
 import { formatInCurrency, compactInCurrency } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
 
 /* ── Re-export pure helpers so existing client imports keep working ─ */
 export { cryptoAssets, marketSignals, accountLabel, statusText, money, compactMoney };
@@ -237,6 +238,7 @@ export function TransactionRow({ tx }: { tx: FinanceTransaction }) {
   const amount = Number(tx.amount);
   const positive = amount >= 0;
   const m = getMerchantStyle(tx.description);
+  const displayCurrency = useCurrency();
   return (
     <div className="tx-item">
       <div className="tx-icon text-white text-sm font-black" style={{ background: m.bg }}>
@@ -248,7 +250,7 @@ export function TransactionRow({ tx }: { tx: FinanceTransaction }) {
       </div>
       <div className="text-right">
         <p className={cn("text-sm font-black", positive ? "text-green" : "text-white")}>
-          {positive ? "+" : ""}{formatCurrency(amount, tx.currency)}
+          {positive ? "+" : ""}{formatInCurrency(amount, displayCurrency)}
         </p>
       </div>
     </div>
@@ -309,6 +311,7 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
   const cardClass = accountCardStyles[account.type] ?? "account-card-checking";
   const typeLabel = accountLabel(account.type).toUpperCase();
   const isCrypto = account.type === "CRYPTO";
+  const displayCurrency = useCurrency();
 
   return (
     <div className={cn("rounded-2xl p-5 border border-white/10 text-white", cardClass)}>
@@ -325,8 +328,8 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
         </div>
       </div>
 
-      <p className="text-2xl font-black tracking-tight">{money(account.balance, account.currency)}</p>
-      <p className="text-xs text-white/40 mt-0.5">{tx.account_available} {money(account.availableBalance ?? account.balance, account.currency)}</p>
+      <p className="text-2xl font-black tracking-tight">{formatInCurrency(Number(account.balance), displayCurrency)}</p>
+      <p className="text-xs text-white/40 mt-0.5">{tx.account_available} {formatInCurrency(Number(account.availableBalance ?? account.balance), displayCurrency)}</p>
 
       <div className="mt-4 flex items-center gap-2">
         <span className="text-[0.65rem] text-white/30 font-semibold">{tx.account_acct}</span>
@@ -400,6 +403,7 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
   const { tx } = useTranslations();
   const spending = total * 0.042;
   const retirementShare = total > 0 ? Math.round((retirement / total) * 100) : 0;
+  const displayCurrency = useCurrency();
   const cats = [
     { label: "Shopping",       pct: 32, color: "#6366f1" },
     { label: "Food & Dining",  pct: 24, color: "#22c55e" },
@@ -430,7 +434,7 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
         </select>
       </div>
       <p className="text-xs text-white/40 mb-1">{tx.insight_spending}</p>
-      <p className="text-2xl font-black text-white">{money(spending)}</p>
+      <p className="text-2xl font-black text-white">{formatInCurrency(spending, displayCurrency)}</p>
       <p className="text-xs text-white/30 mb-5">-8.6% vs last month · 401(k) {retirementShare}% of assets</p>
 
       {/* Donut chart */}

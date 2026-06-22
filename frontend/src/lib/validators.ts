@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORTED_CURRENCY_CODES } from "@/lib/currency";
 
 export const registrationSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required").max(60),
@@ -19,7 +20,7 @@ export const registrationSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .max(128, "Password is too long"),
   preferredLocale: z.string().min(2).max(10).optional(),
-  preferredCurrency: z.string().min(2).max(5).optional(),
+  preferredCurrency: z.enum(SUPPORTED_CURRENCY_CODES as unknown as [string, ...string[]]).optional(),
 });
 
 export const loginSchema = z.object({

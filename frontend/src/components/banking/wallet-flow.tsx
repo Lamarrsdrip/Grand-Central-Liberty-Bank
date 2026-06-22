@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Label, Select, Textarea } from "@/components/ui/input";
 import { CryptoIcon } from "@/components/banking/crypto-icons";
 import { MiniChart } from "@/components/banking/premium-ui";
-import { cryptoAssets, money } from "@/components/banking/finance";
+import { cryptoAssets } from "@/components/banking/finance";
 import { secureFetch } from "@/lib/client-api";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { useTranslations } from "@/lib/i18n/use-translations";
+import { formatInCurrency } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
 
 type Wallet = {
   id: string;
@@ -69,6 +71,7 @@ export function WalletFlow({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const selectedAsset = selectedWallet?.symbol ?? "BTC";
+  const displayCurrency = useCurrency();
   const feePreview = useMemo(() => {
     const numeric = Number(amount);
     return Number.isFinite(numeric) && numeric > 0 ? Math.max(1.5, numeric * 0.006) : 0;
@@ -180,7 +183,7 @@ export function WalletFlow({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-white/40">{tx.wallet_crypto_value}</p>
-            <p className="mt-2 text-4xl font-black text-white">{money(cryptoBalance)}</p>
+            <p className="mt-2 text-4xl font-black text-white">{formatInCurrency(cryptoBalance, displayCurrency)}</p>
             <p className="mt-1 text-sm font-semibold text-green">{tx.wallet_manual_review_note}</p>
           </div>
           <MiniChart className="h-16 w-28" color="#f59e0b" path="M0 46 C16 28 30 34 44 18 C58 4 72 22 90 8" />
@@ -255,7 +258,7 @@ export function WalletFlow({
               <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={tx.wallet_notes_placeholder} />
             </Field>
             <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm">
-              <div className="flex justify-between"><span className="text-white/45">{tx.wallet_fee_estimate}</span><span className="font-black text-white">{formatCurrency(feePreview)}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">{tx.wallet_fee_estimate}</span><span className="font-black text-white">{formatInCurrency(feePreview, displayCurrency)}</span></div>
               <div className="flex justify-between"><span className="text-white/45">{tx.wallet_status_after}</span><span className="font-black text-emerald-300">{tx.wallet_manual_status}</span></div>
               <p className="text-xs text-white/40">{tx.wallet_admin_review_note}</p>
             </div>
@@ -283,7 +286,7 @@ export function WalletFlow({
                   <p className="truncate text-sm font-black text-white">{item.description}</p>
                   <p className="text-xs text-white/40">{formatDate(item.createdAt)} - {item.status}</p>
                 </div>
-                <p className="text-sm font-black text-white">{formatCurrency(Number(item.amount), item.currency)}</p>
+                <p className="text-sm font-black text-white">{formatInCurrency(Number(item.amount), displayCurrency)}</p>
               </div>
             ))
           ) : (

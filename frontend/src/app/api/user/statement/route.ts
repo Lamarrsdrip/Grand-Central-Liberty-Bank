@@ -3,8 +3,10 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 function esc(v: string | number) {
-  const s = String(v ?? "").replace(/"/g, '""');
-  return `"${s}"`;
+  const s = String(v ?? "");
+  // Prefix formula-starting chars to prevent CSV injection in spreadsheet apps
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 export async function GET() {

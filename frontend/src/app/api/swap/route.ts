@@ -40,17 +40,17 @@ export async function POST(request: NextRequest) {
 
     // ── Deduct from source ──────────────────────────────
     if (isFiatAsset(fromAsset)) {
-      // Try by currency match first, fallback to first checking/savings
+      // Try by currency match first, fallback to first active checking/savings
       let account = await prisma.account.findFirst({
-        where: { userId: user.id, currency: fromAsset, type: { in: ["CHECKING", "SAVINGS"] } }
+        where: { userId: user.id, currency: fromAsset, status: "ACTIVE", type: { in: ["CHECKING", "SAVINGS"] } }
       });
       if (!account) {
         account = await prisma.account.findFirst({
-          where: { userId: user.id, type: { in: ["CHECKING", "SAVINGS"] } }
+          where: { userId: user.id, status: "ACTIVE", type: { in: ["CHECKING", "SAVINGS"] } }
         });
       }
       if (!account) throw Object.assign(new Error("Source fiat account not found."), { status: 400 });
-      if (account.availableBalance < fromAmount) {
+      if (Number(account.availableBalance) < fromAmount) {
         throw Object.assign(new Error("Insufficient fiat balance."), { status: 400 });
       }
       await prisma.account.update({
@@ -87,11 +87,11 @@ export async function POST(request: NextRequest) {
     // ── Credit to destination ────────────────────────────
     if (isFiatAsset(toAsset)) {
       let account = await prisma.account.findFirst({
-        where: { userId: user.id, currency: toAsset, type: { in: ["CHECKING", "SAVINGS"] } }
+        where: { userId: user.id, currency: toAsset, status: "ACTIVE", type: { in: ["CHECKING", "SAVINGS"] } }
       });
       if (!account) {
         account = await prisma.account.findFirst({
-          where: { userId: user.id, type: { in: ["CHECKING", "SAVINGS"] } }
+          where: { userId: user.id, status: "ACTIVE", type: { in: ["CHECKING", "SAVINGS"] } }
         });
       }
       if (!account) throw Object.assign(new Error("Destination fiat account not found."), { status: 400 });

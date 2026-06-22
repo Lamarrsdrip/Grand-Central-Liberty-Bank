@@ -6,7 +6,8 @@ import { ProgressRail } from "@/components/banking/premium-ui";
 import { RetirementWithdrawalForm } from "@/components/banking/workflow-forms";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { formatInCurrency } from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function RetirementPage() {
   const data = await getUserDashboardData(user.id);
   const account = data.retirementAccounts[0];
 
+  const pCurrency = user.preferredCurrency ?? "USD";
   const balance = Number(account?.balance ?? 0);
   const contributionYtd = Number(account?.contributionYtd ?? 0);
   const annualLimit = 23000;
@@ -58,11 +60,11 @@ export default async function RetirementPage() {
         {/* Portfolio value card */}
         <div className="luxury-hero p-6">
           <p className="text-xs text-white/40 font-semibold uppercase tracking-wider">Portfolio Value ◉</p>
-          <p className="text-4xl font-black text-white mt-2">{formatCurrency(balance)}</p>
+          <p className="text-4xl font-black text-white mt-2">{formatInCurrency(balance, pCurrency)}</p>
           <div className="flex gap-8 mt-4">
             <div>
               <p className="text-xs text-white/40">Contributed YTD</p>
-              <p className="text-sm font-bold text-green mt-0.5">{formatCurrency(contributionYtd)}</p>
+              <p className="text-sm font-bold text-green mt-0.5">{formatInCurrency(contributionYtd, pCurrency)}</p>
             </div>
             <div>
               <p className="text-xs text-white/40">Status</p>
@@ -94,7 +96,7 @@ export default async function RetirementPage() {
             </svg>
             <div className="absolute top-0 right-2 bg-white/10 backdrop-blur rounded-lg px-2.5 py-1.5">
               <p className="text-[0.6rem] text-white/50">Current Value</p>
-              <p className="text-xs font-black text-white">{formatCurrency(balance)}</p>
+              <p className="text-xs font-black text-white">{formatInCurrency(balance, pCurrency)}</p>
             </div>
           </div>
         </div>
@@ -104,8 +106,8 @@ export default async function RetirementPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-white/40 font-semibold uppercase tracking-wider">Annual Contribution Progress</p>
-              <p className="text-xs text-white/30 mt-1">IRS limit ${annualLimit.toLocaleString()} for 2026</p>
-              <p className="text-2xl font-black text-white mt-1">{formatCurrency(contributionYtd)}</p>
+              <p className="text-xs text-white/30 mt-1">IRS limit {formatInCurrency(annualLimit, pCurrency)} for 2026</p>
+              <p className="text-2xl font-black text-white mt-1">{formatInCurrency(contributionYtd, pCurrency)}</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-white/40">Completed</p>
@@ -138,7 +140,7 @@ export default async function RetirementPage() {
             <div className="space-y-3">
               <div>
                 <p className="text-xs text-white/40">2026 YTD</p>
-                <p className="text-xl font-black text-white">{formatCurrency(contributionYtd)}</p>
+                <p className="text-xl font-black text-white">{formatInCurrency(contributionYtd, pCurrency)}</p>
               </div>
               <div className="flex items-center gap-3">
                 <svg width="48" height="48" viewBox="0 0 48 48">
@@ -150,7 +152,7 @@ export default async function RetirementPage() {
                 </svg>
                 <div>
                   <p className="text-xs text-white/40">Annual Limit</p>
-                  <p className="text-sm font-bold text-white">{formatCurrency(annualLimit)}</p>
+                  <p className="text-sm font-bold text-white">{formatInCurrency(annualLimit, pCurrency)}</p>
                 </div>
               </div>
             </div>
@@ -178,7 +180,7 @@ export default async function RetirementPage() {
                   <p className="text-sm font-bold text-white">{c.description || c.source}</p>
                   <p className="text-xs text-white/40">{formatDate(c.contributionDate)}</p>
                 </div>
-                <p className="text-sm font-black text-green">+{formatCurrency(Number(c.amount))}</p>
+                <p className="text-sm font-black text-green">+{formatInCurrency(Number(c.amount), pCurrency)}</p>
               </div>
             ))}
             {(!account?.contributions || account.contributions.length === 0) && (

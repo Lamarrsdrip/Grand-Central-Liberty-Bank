@@ -1,3 +1,11 @@
+export const SUPPORTED_CURRENCY_CODES = [
+  "USD","EUR","GBP","NGN","CAD","AUD","CHF","AED","GHS","ZAR","JPY","CNY","INR","BRL",
+  "KRW","MXN","IDR","TRY","RUB","SEK","NOK","DKK","PLN","SGD","HKD","NZD","MYR","PHP",
+  "THB","EGP","KES","PKR","BDT","VND","UAH","ILS","TZS","UGX","ETB","MAD","XOF","XAF",
+] as const;
+
+export type SupportedCurrencyCode = typeof SUPPORTED_CURRENCY_CODES[number];
+
 /**
  * Static exchange rates relative to USD.
  * Used for display conversion only — not for actual financial transactions.
@@ -65,6 +73,16 @@ export function formatInCurrency(amountUsd: number, currency: string): string {
     }).format(converted);
   } catch {
     return `${currency} ${converted.toFixed(2)}`;
+  }
+}
+
+/** Get the currency symbol for a given currency code */
+export function getCurrencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat("en-US", { style: "currency", currency }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? currency;
+  } catch {
+    return currency;
   }
 }
 
