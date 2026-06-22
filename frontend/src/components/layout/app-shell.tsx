@@ -11,6 +11,7 @@ import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { TranslationProvider } from "@/components/layout/translation-provider";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
 import { initials } from "@/lib/utils";
+import { CurrencyProvider } from "@/lib/currency-context";
 
 type User = {
   id: string; firstName: string; lastName: string;
@@ -57,6 +58,7 @@ export function AppShell({
 
   return (
     <TranslationProvider key={user.preferredLocale} initialLocale={user.preferredLocale}>
+    <CurrencyProvider currency={user.preferredCurrency}>
     <div className="app-bg min-h-screen flex">
       {/* ── Desktop Sidebar ───────────────────── */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col sidebar-glass z-30">
@@ -190,6 +192,7 @@ export function AppShell({
         </nav>
       )}
     </div>
+    </CurrencyProvider>
     </TranslationProvider>
   );
 }

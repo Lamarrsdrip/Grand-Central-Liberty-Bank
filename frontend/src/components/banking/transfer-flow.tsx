@@ -10,6 +10,8 @@ import {
 import { secureFetch } from "@/lib/client-api";
 import { useTranslations } from "@/lib/i18n/use-translations";
 import { formatCurrency, initials } from "@/lib/utils";
+import { formatInCurrency, getCurrencySymbol } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
 import { accountLabel } from "@/components/banking/finance";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
@@ -267,6 +269,7 @@ export function TransferFlow({
   recentRecipients: RecentRecipient[];
 }) {
   const { tx } = useTranslations();
+  const displayCurrency = useCurrency();
 
   /* ── Wizard navigation ──────────────────────────────────────────────── */
   const [step, setStep] = useState<WizardStep>(1);
@@ -388,7 +391,7 @@ export function TransferFlow({
     const e: FieldErrors = {};
     if (numericAmount <= 0) e.amount = "Enter an amount greater than 0";
     if (insufficientFunds)
-      e.amount = `Insufficient funds — available ${formatCurrency(fromAccount?.availableBalance ?? 0, fromAccount?.currency)}`;
+      e.amount = `Insufficient funds — available ${formatInCurrency(fromAccount?.availableBalance ?? 0, displayCurrency)}`;
     return e;
   }
 
@@ -845,7 +848,7 @@ export function TransferFlow({
                           {accountLabel(a.type)} •••• {a.accountNumber.slice(-4)}
                         </span>
                         <span className="block text-xs text-white/40">
-                          {formatCurrency(a.availableBalance, a.currency)} {tx.transfer_available_suffix}
+                          {formatInCurrency(a.availableBalance, displayCurrency)} {tx.transfer_available_suffix}
                         </span>
                       </span>
                       {fromAccountId === a.id
@@ -890,8 +893,7 @@ export function TransferFlow({
               <div>
                 <p className="text-xs font-bold text-white/30 mb-0.5 uppercase tracking-wider">{currency}</p>
                 <p className="text-4xl font-black text-white tracking-tight">
-                  {currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "NGN" ? "₦" : currency === "JPY" ? "¥" : currency === "CNY" ? "¥" : currency === "INR" ? "₹" : currency === "BRL" ? "R$" : ""}
-                  {amount}
+                  {getCurrencySymbol(currency)}{amount}
                 </p>
               </div>
               <button
@@ -908,8 +910,8 @@ export function TransferFlow({
                 <ShieldCheck className={`size-4 shrink-0 ${insufficientFunds ? "text-red-300" : "text-emerald-400"}`} />
                 <p className="text-xs text-white/55">
                   {insufficientFunds
-                    ? `${tx.transfer_insufficient} — ${tx.transfer_available_suffix}: ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)}`
-                    : `${accountLabel(fromAccount.type)} ••${fromAccount.accountNumber.slice(-4)} — ${formatCurrency(fromAccount.availableBalance, fromAccount.currency)} ${tx.transfer_available_suffix}`
+                    ? `${tx.transfer_insufficient} — ${tx.transfer_available_suffix}: ${formatInCurrency(fromAccount.availableBalance, displayCurrency)}`
+                    : `${accountLabel(fromAccount.type)} ••${fromAccount.accountNumber.slice(-4)} — ${formatInCurrency(fromAccount.availableBalance, displayCurrency)} ${tx.transfer_available_suffix}`
                   }
                 </p>
               </div>

@@ -68,6 +68,16 @@ export function formatInCurrency(amountUsd: number, currency: string): string {
   }
 }
 
+/** Get the currency symbol for a given currency code */
+export function getCurrencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat("en-US", { style: "currency", currency }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
 /** Compact format for large numbers in the user's preferred currency */
 export function compactInCurrency(amountUsd: number, currency: string): string {
   const converted = convertFromUsd(amountUsd, currency);

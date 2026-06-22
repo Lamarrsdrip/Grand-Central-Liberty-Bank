@@ -13,6 +13,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useTranslations } from "@/lib/i18n/use-translations";
 import { getTranslations } from "@/lib/i18n/translations";
 import { isSupportedLocale } from "@/lib/locales";
+import { formatInCurrency } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
 
 type Account = { id: string; type: string; accountNumber: string; availableBalance: unknown; currency: string };
 type TransferSettings = { reviewMessage: string; buttonText: string; supportInstructions: string };
@@ -99,6 +101,7 @@ export function CopyButton({ value }: { value: string }) {
 export function TransferForm({ accounts, settings }: { accounts: Account[]; settings: TransferSettings }) {
   const { tx } = useTranslations();
   const [message, setMessage] = useState("");
+  const displayCurrency = useCurrency();
 
   return (
     <Card>
@@ -135,7 +138,7 @@ export function TransferForm({ accounts, settings }: { accounts: Account[]; sett
               <Select id="fromAccountId" name="fromAccountId" required>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.type} •••• {account.accountNumber.slice(-4)} · {formatCurrency(Number(account.availableBalance), account.currency)}
+                    {account.type} •••• {account.accountNumber.slice(-4)} · {formatInCurrency(Number(account.availableBalance), displayCurrency)}
                   </option>
                 ))}
               </Select>
@@ -207,6 +210,7 @@ export function RetirementWithdrawalForm({
   const { tx } = useTranslations();
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
+  const displayCurrency = useCurrency();
   const selectedAccount = accounts[0];
   const fee = calculateRetirementFee(Number(amount || 0), {
     feePercentage: Number(feeSettings.feePercentage),
@@ -242,7 +246,7 @@ export function RetirementWithdrawalForm({
               <Select id="retirementAccountId" name="retirementAccountId" required>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
-                    401(k) •••• {account.accountNumber.slice(-4)} · vested {formatCurrency(Number(account.vestedBalance))}
+                    401(k) •••• {account.accountNumber.slice(-4)} · vested {formatInCurrency(Number(account.vestedBalance), displayCurrency)}
                   </option>
                 ))}
               </Select>
@@ -270,7 +274,7 @@ export function RetirementWithdrawalForm({
             <p className="mt-1 text-sm text-muted-foreground">{feeSettings.feeReason}</p>
             <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
               <div><span className="font-bold">{tx.retire_fee_col}</span><br />{Number(feeSettings.feePercentage).toFixed(2)}%</div>
-              <div><span className="font-bold">{tx.retire_amount_col}</span><br />{formatCurrency(fee.amount)}</div>
+              <div><span className="font-bold">{tx.retire_amount_col}</span><br />{formatInCurrency(fee.amount, displayCurrency)}</div>
               <div><span className="font-bold">{tx.retire_method_col}</span><br />{feeSettings.paymentMethod.replaceAll("_", " ")}</div>
             </div>
             <p className="mt-3 text-xs font-semibold text-muted-foreground">
