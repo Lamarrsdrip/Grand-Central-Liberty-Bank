@@ -10,6 +10,7 @@ import { LogoutButton } from "@/components/layout/logout-button";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { TranslationProvider } from "@/components/layout/translation-provider";
 import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
+import { LiveChatNavButton } from "@/components/layout/live-chat-nav-button";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
 import { initials } from "@/lib/utils";
 import { CurrencyProvider } from "@/lib/currency-context";
@@ -44,16 +45,16 @@ export function AppShell({
 }) {
   const { tx } = getServerTranslations(user.preferredLocale);
 
+  // Support is removed from userNav — it opens the floating chat widget instead
   const userNav = [
-    { href: "/dashboard",  label: tx.nav_home,          icon: Home          },
-    { href: "/accounts",   label: tx.nav_accounts,      icon: Landmark      },
-    { href: "/wallet",     label: tx.nav_wallet,        icon: WalletCards   },
-    { href: "/transfers",  label: tx.nav_payments,      icon: Send          },
-    { href: "/cards",      label: tx.nav_cards,         icon: CreditCard    },
-    { href: "/retirement", label: tx.nav_invest,        icon: LineChart     },
-    { href: "/crypto",     label: tx.nav_crypto,        icon: Bitcoin       },
-    { href: "/profile",    label: tx.nav_profile,       icon: UserCircle    },
-    { href: "/support",    label: tx.nav_support,       icon: Headphones    },
+    { href: "/dashboard",  label: tx.nav_home,     icon: Home          },
+    { href: "/accounts",   label: tx.nav_accounts, icon: Landmark      },
+    { href: "/wallet",     label: tx.nav_wallet,   icon: WalletCards   },
+    { href: "/transfers",  label: tx.nav_payments, icon: Send          },
+    { href: "/cards",      label: tx.nav_cards,    icon: CreditCard    },
+    { href: "/retirement", label: tx.nav_invest,   icon: LineChart     },
+    { href: "/crypto",     label: tx.nav_crypto,   icon: Bitcoin       },
+    { href: "/profile",    label: tx.nav_profile,  icon: UserCircle    },
   ];
   const nav = user.role === "ADMIN" ? adminNav : userNav;
 
@@ -110,6 +111,10 @@ export function AppShell({
               </Link>
             );
           })}
+          {/* Live chat opens the floating widget — no page navigation */}
+          {user.role !== "ADMIN" && (
+            <LiveChatNavButton label={tx.nav_support} />
+          )}
         </nav>
 
         {/* Footer */}
@@ -133,9 +138,6 @@ export function AppShell({
             <div className="w-36">
               <LocaleSwitcher value={user.preferredLocale} />
             </div>
-            <Link href="/support" className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Search support">
-              <Search className="size-4" />
-            </Link>
             <Link href="/notifications" className="relative size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Notifications">
               <Bell className="size-4" />
               {announcements.length > 0 ? (
