@@ -11,6 +11,7 @@ import {
   BroadcastForm,
   CardDecisionControl,
   CryptoAssetPriceControl,
+  CryptoWithdrawalDecisionControl,
   EmailSettingsForm,
   KycDecisionControl,
   KycDocumentViewer,
@@ -39,7 +40,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  "overview","users","accounts","kyc","crypto-balances","transfers","beneficiaries",
+  "overview","users","accounts","kyc","crypto-balances","crypto-withdrawals","transfers","beneficiaries",
   "cards","retirement","wallets","support","notifications","email","settings","audit",
 ] as const;
 type AdminTab = (typeof TABS)[number];
@@ -62,6 +63,7 @@ export default async function AdminPage({
   const pendingTransfers = data.transfers.filter((item) => item.status === "SUBMITTED" || item.status === "UNDER_REVIEW").length;
   const openTickets = data.tickets.filter((item) => item.status !== "CLOSED").length;
   const pendingRetirement = data.retirementWithdrawals.filter((item) => item.status === "SUBMITTED" || item.status === "UNDER_REVIEW").length;
+  const pendingCryptoWithdrawals = data.cryptoWithdrawals.filter((item) => item.status === "PENDING_REVIEW").length;
   const activeAnnouncements = data.announcements.filter((a) => a.active).length;
 
   const retirementFeeSettings = {
@@ -105,21 +107,22 @@ export default async function AdminPage({
   }));
 
   const tabLinks: Array<[AdminTab, string, string?]> = [
-    ["overview",       "Overview"],
-    ["users",          "Users",        pendingKyc > 0 ? undefined : undefined],
-    ["accounts",       "Accounts"],
-    ["kyc",            "KYC",          pendingKyc > 0 ? String(pendingKyc) : undefined],
-    ["crypto-balances","Crypto Bal."],
-    ["transfers",      "Transfers",    pendingTransfers > 0 ? String(pendingTransfers) : undefined],
-    ["beneficiaries",  "Beneficiaries"],
-    ["cards",          "Cards"],
-    ["retirement",     "401(k)",       pendingRetirement > 0 ? String(pendingRetirement) : undefined],
-    ["wallets",        "Wallets"],
-    ["support",        "Support",      openTickets > 0 ? String(openTickets) : undefined],
-    ["notifications",  "Notif."],
-    ["email",          "Email"],
-    ["settings",       "Settings"],
-    ["audit",          "Audit"],
+    ["overview",            "Overview"],
+    ["users",               "Users"],
+    ["accounts",            "Accounts"],
+    ["kyc",                 "KYC",            pendingKyc > 0 ? String(pendingKyc) : undefined],
+    ["crypto-balances",     "Crypto Bal."],
+    ["crypto-withdrawals",  "Crypto Wdraw.",  pendingCryptoWithdrawals > 0 ? String(pendingCryptoWithdrawals) : undefined],
+    ["transfers",           "Transfers",      pendingTransfers > 0 ? String(pendingTransfers) : undefined],
+    ["beneficiaries",       "Beneficiaries"],
+    ["cards",               "Cards"],
+    ["retirement",          "401(k)",         pendingRetirement > 0 ? String(pendingRetirement) : undefined],
+    ["wallets",             "Wallets"],
+    ["support",             "Support",        openTickets > 0 ? String(openTickets) : undefined],
+    ["notifications",       "Notif."],
+    ["email",               "Email"],
+    ["settings",            "Settings"],
+    ["audit",               "Audit"],
   ];
 
   return (
@@ -209,6 +212,58 @@ export default async function AdminPage({
             </CardHeader>
             <CardContent>
               <CryptoAssetPriceControl prices={cryptoPriceList} />
+            </CardContent>
+          </Card>
+        </section>}
+
+        {/* Crypto Withdrawals */}
+        {activeTab === "crypto-withdrawals" && <section>
+          <Card>
+            <CardHeader>
+              <CardTitle>Crypto Withdrawal Requests</CardTitle>
+              <CardDescription>Review and update the status of user crypto withdrawal requests. Set a custom message users will see on their status page.</CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Asset</TableHead>
+                    <TableHead>Network</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Recipient</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Admin Message</TableHead>
+                    <TableHead>Decision</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.cryptoWithdrawals.map((w) => (
+                    <TableRow key={w.id}>
+                      <TableCell>
+                        <p className="font-bold whitespace-nowrap">{w.user.firstName} {w.user.lastName}</p>
+                        <p className="text-xs text-muted-foreground">{w.user.email}</p>
+                      </TableCell>
+                      <TableCell className="font-bold">{w.asset}</TableCell>
+                      <TableCell className="text-sm">{w.network}</TableCell>
+                      <TableCell className="font-black whitespace-nowrap">{formatCurrency(w.amount)}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-32 truncate">{w.recipientAddress}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(w.createdAt)}</TableCell>
+                      <TableCell>
+                        <Badge variant={w.status === "APPROVED" ? "success" : w.status === "FAILED" ? "danger" : "secondary"} className="text-xs whitespace-nowrap">
+                          {w.status.replace("_", " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-48 text-xs text-muted-foreground truncate">{w.adminMessage ?? "—"}</TableCell>
+                      <TableCell className="min-w-96"><CryptoWithdrawalDecisionControl id={w.id} /></TableCell>
+                    </TableRow>
+                  ))}
+                  {!data.cryptoWithdrawals.length && (
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No crypto withdrawal requests yet.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </section>}

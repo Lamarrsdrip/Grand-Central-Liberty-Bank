@@ -199,10 +199,15 @@ export async function getAdminData() {
       take: 200,
       include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
     }),
-    prisma.cryptoAssetPrice.findMany({ orderBy: { symbol: "asc" } })
+    prisma.cryptoAssetPrice.findMany({ orderBy: { symbol: "asc" } }),
+    prisma.cryptoWithdrawalRequest.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
+    })
   ]);
 
-  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16] = results;
+  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17] = results;
 
   const defaultBankSettings = {
     id: 1, bankName: "Grand Central Liberty Bank", bankAddress: "200 Liberty Plaza, New York, NY",
@@ -231,6 +236,12 @@ export async function getAdminData() {
     retirementWithdrawals: settled(r13, [], "retirementWithdrawals"),
     retirementFeeSettings: (settled(r14, null, "retirementFeeSettings")) ?? defaultRetirementFeeSettings,
     savedBeneficiaries:   settled(r15, [], "savedBeneficiaries"),
-    cryptoAssetPrices:    settled(r16, [], "cryptoAssetPrices") as Array<{ id: string; symbol: string; priceUSD: number; updatedAt: Date; createdAt: Date }>
+    cryptoAssetPrices:    settled(r16, [], "cryptoAssetPrices") as Array<{ id: string; symbol: string; priceUSD: number; updatedAt: Date; createdAt: Date }>,
+    cryptoWithdrawals:    settled(r17, [], "cryptoWithdrawals") as Array<{
+      id: string; userId: string; asset: string; network: string; amount: number;
+      recipientAddress: string; notes: string | null; status: string;
+      adminMessage: string | null; reference: string; createdAt: Date; updatedAt: Date;
+      user: { id: string; firstName: string; lastName: string; email: string };
+    }>
   };
 }

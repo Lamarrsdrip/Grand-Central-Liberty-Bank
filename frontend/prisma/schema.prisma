@@ -202,6 +202,7 @@ model User {
   retirementNotes RetirementWithdrawalNote[] @relation("RetirementNoteAuthor")
   cryptoBalances      UserCryptoBalance[]
   swapTransactions    SwapTransaction[]
+  cryptoWithdrawals   CryptoWithdrawalRequest[]
 }
 
 model Session {
@@ -623,4 +624,20 @@ model CryptoAssetPrice {
   priceUSD  Float
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+model CryptoWithdrawalRequest {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @db.ObjectId
+  user             User     @relation(fields: [userId], references: [id])
+  asset            String
+  network          String
+  amount           Float
+  recipientAddress String
+  notes            String?
+  status           String   @default("PENDING_REVIEW")
+  adminMessage     String?
+  reference        String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

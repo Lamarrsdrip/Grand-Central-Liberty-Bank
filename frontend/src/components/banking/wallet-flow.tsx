@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowDownToLine, ArrowUpFromLine, Check, Copy, QrCode, RefreshCcw, Send, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ type HistoryItem = {
   reference: string;
   status: string;
   createdAt: Date | string;
+  withdrawalId?: string | null;
 };
 
 export function WalletFlow({
@@ -47,6 +49,7 @@ export function WalletFlow({
   cryptoBalance: number;
 }) {
   const { tx } = useTranslations();
+  const router = useRouter();
 
   const actions = [
     { key: "deposit", label: tx.wallet_action_deposit, icon: ArrowDownToLine },
@@ -95,6 +98,20 @@ export function WalletFlow({
     setSubmitting(true);
     setMessage("");
     try {
+      if (kind === "WITHDRAW") {
+        const data = await secureFetch("/api/crypto/withdrawals", {
+          method: "POST",
+          body: JSON.stringify({
+            asset: selectedAsset,
+            network: selectedWallet?.network ?? "Mainnet",
+            amount,
+            recipientAddress,
+            notes
+          })
+        });
+        router.push(`/wallet/withdrawal/${data.withdrawalId}`);
+        return;
+      }
       const data = await secureFetch("/api/crypto/actions", {
         method: "POST",
         body: JSON.stringify({
@@ -279,16 +296,29 @@ export function WalletFlow({
         <div className="card-dark p-2">
           <p className="px-3 pt-3 text-sm font-black text-white">{tx.wallet_history}</p>
           {history.length ? (
-            history.slice(0, 8).map((item) => (
-              <div key={item.id} className="coin-row px-3">
-                <div className="size-10 rounded-full bg-emerald-300 text-black grid place-items-center font-black">{item.type.slice(0, 1)}</div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-black text-white">{item.description}</p>
-                  <p className="text-xs text-white/40">{formatDate(item.createdAt)} - {item.status}</p>
+            history.slice(0, 10).map((item) => {
+              const isWithdrawal = item.withdrawalId;
+              const statusColor =
+                item.status === "PENDING_REVIEW" ? "text-amber-400" :
+                item.status === "APPROVED" ? "text-emerald-400" :
+                item.status === "FAILED" || item.status === "DECLINED" ? "text-red-400" :
+                "text-white/40";
+              const row = (
+                <div key={item.id} className="coin-row px-3">
+                  <div className="size-10 rounded-full bg-emerald-300 text-black grid place-items-center font-black">{item.type.slice(0, 1)}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-white">{item.description}</p>
+                    <p className={`text-xs ${statusColor}`}>{formatDate(item.createdAt)} · {item.status.replace("_", " ")}</p>
+                  </div>
+                  <p className="text-sm font-black text-white">{formatInCurrency(Number(item.amount), displayCurrency)}</p>
                 </div>
-                <p className="text-sm font-black text-white">{formatInCurrency(Number(item.amount), displayCurrency)}</p>
-              </div>
-            ))
+              );
+              return isWithdrawal ? (
+                <Link key={item.id} href={`/wallet/withdrawal/${item.withdrawalId}`} className="block hover:bg-white/5 rounded-2xl transition">
+                  {row}
+                </Link>
+              ) : row;
+            })
           ) : (
             <p className="p-6 text-center text-sm text-white/45">{tx.wallet_no_activity}</p>
           )}

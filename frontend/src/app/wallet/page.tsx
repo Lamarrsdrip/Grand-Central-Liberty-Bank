@@ -14,20 +14,52 @@ export default async function WalletPage() {
   if (!user) redirect("/login");
   const { tx } = getServerTranslations(user.preferredLocale);
 
-  const [data, cryptoBalanceRecords, prices] = await Promise.all([
+  const [data, cryptoBalanceRecords, prices, cryptoWithdrawals] = await Promise.all([
     getUserDashboardData(user.id),
     prisma.userCryptoBalance.findMany({ where: { userId: user.id } }),
-    getAdminCryptoPrices()
+    getAdminCryptoPrices(),
+    prisma.cryptoWithdrawalRequest.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 20
+    })
   ]);
 
   const cryptoBalance = computeCryptoTotalUSD(cryptoBalanceRecords, prices);
 
-  const history = data.transactions
+  const txHistory = data.transactions
     .filter((transaction) => transaction.accountType === "CRYPTO" || transaction.type.startsWith("CRYPTO_") || transaction.type === "SWAP_OUT" || transaction.type === "SWAP_IN")
     .map((transaction) => ({
-      ...transaction,
-      amount: Number(transaction.amount)
+      id: transaction.id,
+      type: transaction.type,
+      amount: Number(transaction.amount),
+      currency: transaction.currency,
+      description: transaction.description,
+      reference: transaction.reference,
+      status: transaction.status,
+      createdAt: transaction.createdAt,
+      withdrawalId: null as string | null
     }));
+
+  // Merge withdrawal requests into history (deduplicate by reference)
+  const txRefs = new Set(txHistory.map((t) => `TX-${t.reference}`).concat(txHistory.map((t) => t.reference)));
+  const withdrawalHistory = cryptoWithdrawals
+    .filter((w) => !txRefs.has(`TX-${w.reference}`) && !txRefs.has(w.reference))
+    .map((w) => ({
+      id: w.id,
+      type: "CRYPTO_WITHDRAW",
+      amount: -Math.abs(w.amount),
+      currency: "USD",
+      description: `Withdraw ${w.asset} on ${w.network}`,
+      reference: w.reference,
+      status: w.status,
+      createdAt: w.createdAt,
+      withdrawalId: w.id
+    }));
+
+  const history = [...txHistory, ...withdrawalHistory].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   return (
     <ProtectedShell>

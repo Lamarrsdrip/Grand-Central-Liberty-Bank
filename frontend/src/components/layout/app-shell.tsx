@@ -9,6 +9,7 @@ import { Role } from "@prisma/client";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { TranslationProvider } from "@/components/layout/translation-provider";
+import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
 import { initials } from "@/lib/utils";
 import { CurrencyProvider } from "@/lib/currency-context";
@@ -29,7 +30,7 @@ const adminNav = [
   { href: "/admin?tab=retirement",      label: "401(k)",      icon: LineChart     },
   { href: "/admin?tab=transfers",       label: "Transfers",   icon: BadgeDollarSign},
   { href: "/admin?tab=cards",           label: "Cards",       icon: CreditCard    },
-  { href: "/admin?tab=support",         label: "Support",     icon: Headphones    },
+  { href: "/admin?tab=support",         label: "Live Chat",   icon: Headphones    },
   { href: "/admin?tab=settings",        label: "Settings",    icon: Settings2     },
 ] as const;
 
@@ -60,6 +61,10 @@ export function AppShell({
     <TranslationProvider key={user.preferredLocale} initialLocale={user.preferredLocale}>
     <CurrencyProvider currency={user.preferredCurrency}>
     <div className="app-bg min-h-screen flex">
+      {/* ── Admin mobile nav (hamburger + slide-out) ── */}
+      {user.role === "ADMIN" && (
+        <AdminMobileNav userName={`${user.firstName} ${user.lastName}`} />
+      )}
       {/* ── Desktop Sidebar ───────────────────── */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col sidebar-glass z-30">
         {/* Brand */}
@@ -117,7 +122,7 @@ export function AppShell({
       </aside>
 
       {/* ── Main content ─────────────────────── */}
-      <div className="flex-1 min-w-0 lg:pl-[15.5rem] flex flex-col min-h-screen">
+      <div className={`flex-1 min-w-0 lg:pl-[15.5rem] flex flex-col min-h-screen${user.role === "ADMIN" ? " pt-14 lg:pt-0" : ""}`}>
         {/* Desktop top bar */}
         <header className="hidden lg:flex sticky top-0 z-20 items-center justify-between px-8 py-4 bg-[#0b0f18]/90 backdrop-blur-xl border-b border-white/5">
           <div>

@@ -197,6 +197,21 @@ export function RetirementWithdrawalDecisionControl({ id }: { id: string }) {
   );
 }
 
+export function CryptoWithdrawalDecisionControl({ id }: { id: string }) {
+  return (
+    <AdminJsonForm endpoint={`/api/admin/crypto-withdrawals/${id}`} method="PATCH" buttonLabel="Update withdrawal">
+      <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
+        <Select name="status" defaultValue="PENDING_REVIEW">
+          <option value="PENDING_REVIEW">Pending Review</option>
+          <option value="APPROVED">Approve</option>
+          <option value="FAILED">Failed</option>
+        </Select>
+        <Input name="adminMessage" placeholder="Message shown to user" required />
+      </div>
+    </AdminJsonForm>
+  );
+}
+
 export function RetirementFeeSettingsForm({
   settings
 }: {
