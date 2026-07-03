@@ -109,36 +109,14 @@ export async function POST(request: NextRequest) {
       }) as { cursor?: { firstBatch?: RawUserDoc[] } } | null;
 
       const rawDoc = rawResult?.cursor?.firstBatch?.[0];
-
       if (rawDoc) {
-        console.error(
-          "[login:debug] Prisma findUnique returned null; raw query found user. " +
-          "db_email=%s role=%s status=%s hash_prefix=%s",
-          rawDoc.email,
-          rawDoc.role,
-          rawDoc.status,
-          rawDoc.passwordHash ? rawDoc.passwordHash.slice(0, 7) : "MISSING"
-        );
         user = userFromRaw(rawDoc);
-      } else {
-        console.error("[login:debug] NOT FOUND by Prisma or raw query. email=%s", lookupEmail);
       }
     }
-
-    console.error(
-      "[login:debug] email=%s found=%s role=%s status=%s hash_prefix=%s",
-      lookupEmail,
-      user ? "YES" : "NO",
-      user?.role ?? "n/a",
-      user?.status ?? "n/a",
-      user?.passwordHash ? user.passwordHash.slice(0, 7) : "MISSING"
-    );
 
     const passwordValid = user
       ? await verifyPassword(input.password, user.passwordHash)
       : false;
-
-    console.error("[login:debug] passwordValid=%s", passwordValid);
 
     void recordLoginAttempt({
       userId: user?.id,
@@ -148,13 +126,7 @@ export async function POST(request: NextRequest) {
       success: Boolean(user && passwordValid),
     }).catch((error) => console.error("[auth] login history failed:", error));
 
-    if (!user) {
-      console.error("[login:debug] REJECT: user not found for email=%s", lookupEmail);
-      throw new Response("Invalid credentials.", { status: 401 });
-    }
-    if (!passwordValid) {
-      console.error("[login:debug] REJECT: password mismatch for email=%s hash_prefix=%s",
-        lookupEmail, user.passwordHash ? user.passwordHash.slice(0, 7) : "MISSING");
+    if (!user || !passwordValid) {
       throw new Response("Invalid credentials.", { status: 401 });
     }
 

@@ -10,7 +10,15 @@ function key() {
   }
   // Derive a stable 32-byte key from JWT_SECRET when SETTINGS_MASTER_KEY is absent.
   // This lets email settings be saved without requiring an extra env var.
-  const seed = process.env.JWT_SECRET ?? "grand-central-liberty-bank-default-key";
+  // There is deliberately no further fallback: a hardcoded default here would let
+  // anyone who reads the source decrypt stored SMTP credentials in any deployment
+  // that forgot to set either env var.
+  const seed = process.env.JWT_SECRET;
+  if (!seed) {
+    throw new Error(
+      "Cannot derive email settings encryption key: set SETTINGS_MASTER_KEY (preferred) or JWT_SECRET."
+    );
+  }
   return crypto.createHash("sha256").update(seed).digest();
 }
 

@@ -16,8 +16,8 @@ export type TranslationKey =
   | "auth_reset_password" | "auth_new_password" | "auth_confirm_reset"
   | "dash_welcome" | "dash_total_balance" | "dash_available"
   | "dash_recent_transactions" | "dash_no_transactions" | "dash_view_all"
-  | "dash_quick_actions" | "dash_send_money" | "dash_add_money" | "dash_accounts"
-  | "transfer_title" | "transfer_step_type" | "transfer_step_recipient"
+  | "dash_quick_actions" | "dash_send_money" | "dash_add_money" | "dash_accounts" | "dash_pay_bills"
+  | "transfer_title" | "transfer_recent_title" | "transfer_step_type" | "transfer_step_recipient"
   | "transfer_step_options" | "transfer_step_amount" | "transfer_step_review" | "transfer_step_confirm"
   | "transfer_domestic" | "transfer_international" | "transfer_same_bank"
   | "transfer_recipient_name" | "transfer_bank_name" | "transfer_account_number"
@@ -215,9 +215,11 @@ export const translations: Record<string, Partial<TranslationDict>> = {
     dash_send_money: "Send Money",
     dash_add_money: "Add Money",
     dash_accounts: "My Accounts",
+    dash_pay_bills: "Pay Bills",
 
     // Transfer
     transfer_title: "Send Money",
+    transfer_recent_title: "Recent Transfers",
     transfer_step_type: "Transfer Type",
     transfer_step_recipient: "Recipient",
     transfer_step_options: "Options",

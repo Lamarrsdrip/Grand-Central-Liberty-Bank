@@ -2,16 +2,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
+  ArrowDownToLine,
+  ArrowLeftRight,
   ArrowRight,
+  ArrowUp,
+  ArrowUpRight,
   Banknote,
   Bell,
   Bitcoin,
   Building2,
   CreditCard,
+  FileText,
   Globe2,
   Landmark,
   LineChart,
   LockKeyhole,
+  MoreHorizontal,
   PiggyBank,
   QrCode,
   RefreshCcw,
@@ -22,7 +28,7 @@ import {
   TrendingUp,
   WalletCards
 } from "lucide-react";
-import { cn, formatCurrency, formatDate, initials } from "@/lib/utils";
+import { cn, formatDate, initials } from "@/lib/utils";
 import {
   cryptoAssets,
   marketSignals,
@@ -191,12 +197,12 @@ export function TotalAssetsCard({
 export function QuickActions() {
   const { t } = useTranslations();
   const quickActions = [
-    { label: t("transfer_title") || "Transfer", href: "/transfers", bg: "#1a2a3a", icon: "↗" },
-    { label: "Pay Bills",                        href: "/transfers", bg: "#1a1a2a", icon: "📄" },
-    { label: t("dash_add_money") || "Deposit",  href: "/wallet",    bg: "#1a2a20", icon: "⬇" },
-    { label: t("dash_send_money") || "Send",    href: "/transfers", bg: "#2a1a1a", icon: "↑" },
-    { label: t("nav_wallet") || "Wallet",       href: "/wallet",    bg: "#1a2520", icon: "⇄" },
-    { label: t("nav_more") || "More",           href: "/more",      bg: "#1a1a1a", icon: "⋯" },
+    { label: t("transfer_title") || "Transfer", href: "/transfers", bg: "#1a2a3a", Icon: ArrowUpRight },
+    { label: t("dash_pay_bills") || "Pay Bills", href: "/transfers", bg: "#1a1a2a", Icon: FileText },
+    { label: t("dash_add_money") || "Deposit",  href: "/wallet",    bg: "#1a2a20", Icon: ArrowDownToLine },
+    { label: t("dash_send_money") || "Send",    href: "/transfers", bg: "#2a1a1a", Icon: ArrowUp },
+    { label: t("nav_wallet") || "Wallet",       href: "/wallet",    bg: "#1a2520", Icon: ArrowLeftRight },
+    { label: t("nav_more") || "More",           href: "/more",      bg: "#1a1a1a", Icon: MoreHorizontal },
   ];
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
@@ -206,7 +212,7 @@ export function QuickActions() {
             className="quick-action-icon mx-auto mb-1 group-hover:scale-110 transition-transform duration-200"
             style={{ background: action.bg }}
           >
-            <span className="text-xl">{action.icon}</span>
+            <action.Icon className="size-5 text-white" />
           </div>
           <span className="text-[0.7rem] font-bold text-white/60 group-hover:text-white/90 transition-colors">{action.label}</span>
         </Link>
@@ -435,7 +441,7 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
       </div>
       <p className="text-xs text-white/40 mb-1">{tx.insight_spending}</p>
       <p className="text-2xl font-black text-white">{formatInCurrency(spending, displayCurrency)}</p>
-      <p className="text-xs text-white/30 mb-5">-8.6% vs last month · 401(k) {retirementShare}% of assets</p>
+      <p className="text-xs text-white/30 mb-5">401(k) {retirementShare}% of assets</p>
 
       {/* Donut chart */}
       <div className="flex items-center gap-5">
@@ -673,7 +679,7 @@ export function FeatureRail() {
       {[
         { title: "Market News",      body: "Tech stocks rise as AI optimism boosts global markets.", icon: TrendingUp },
         { title: "Interest Rates",   body: "Checking 0.50% APY · Savings 4.60% APY · CD 4.85%",    icon: LineChart  },
-        { title: "Credit Score",     body: "Your score is 782 — Excellent. Updated May 20, 2026.",  icon: ShieldCheck},
+        { title: "Credit Score",     body: "Track your credit health with real-time score monitoring, built into your account.", icon: ShieldCheck},
       ].map((f) => (
         <div key={f.title} className="bg-white/5 border border-white/8 rounded-2xl p-5">
           <f.icon className="size-5 text-green mb-3" />

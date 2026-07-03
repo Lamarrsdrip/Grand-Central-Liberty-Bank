@@ -57,28 +57,37 @@ export default async function AccountsPage() {
             <h3 className="font-black text-white">{tx.accounts_recent}</h3>
             <a href="/api/user/statement" download className="text-xs font-bold text-green hover:text-green-dim transition flex items-center gap-1"><Download className="size-3" />{tx.accounts_export}</a>
           </div>
-          <div className="space-y-1">
-            {data.transactions.slice(0, 6).map((t) => {
-              const amount = Number(t.amount);
-              const positive = amount >= 0;
-              return (
-                <div key={t.id} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
-                  <div className={`size-10 rounded-full flex items-center justify-center ${positive ? "bg-green/15" : "bg-white/8"}`}>
-                    {positive
-                      ? <ArrowDownToLine className="size-4 text-green" />
-                      : <ShoppingCart className="size-4 text-white/50" />}
+          {data.transactions.length === 0 ? (
+            <div className="py-8 text-center">
+              <div className="size-14 rounded-full bg-white/5 border border-dashed border-white/15 flex items-center justify-center mx-auto mb-3">
+                <ArrowDownToLine className="size-5 text-white/25" />
+              </div>
+              <p className="text-sm font-bold text-white/50">{tx.dash_no_transactions}</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {data.transactions.slice(0, 6).map((t) => {
+                const amount = Number(t.amount);
+                const positive = amount >= 0;
+                return (
+                  <div key={t.id} className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0">
+                    <div className={`size-10 rounded-full flex items-center justify-center ${positive ? "bg-green/15" : "bg-white/8"}`}>
+                      {positive
+                        ? <ArrowDownToLine className="size-4 text-green" />
+                        : <ShoppingCart className="size-4 text-white/50" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{t.description}</p>
+                      <p className="text-xs text-white/40 mt-0.5">{formatDate(t.createdAt)} · {accountLabel(t.accountType ?? "CHECKING")}</p>
+                    </div>
+                    <p className={`text-sm font-black ${positive ? "text-green" : "text-white"}`}>
+                      {positive ? "+" : ""}{formatInCurrency(amount, pCurrency)}
+                    </p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-white truncate">{t.description}</p>
-                    <p className="text-xs text-white/40 mt-0.5">{formatDate(t.createdAt)} · {t.accountType ? accountLabel(t.accountType) : "Checking"}</p>
-                  </div>
-                  <p className={`text-sm font-black ${positive ? "text-green" : "text-white"}`}>
-                    {positive ? "+" : ""}{formatInCurrency(amount, pCurrency)}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </ProtectedShell>

@@ -5,6 +5,7 @@ import { auditLog, notifyUser } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { plainText } from "@/lib/sanitize";
+import { getAdminCryptoPrices, resolveRateFromMap } from "@/lib/crypto-prices";
 
 const schema = z.object({
   asset: z.string().min(2).max(12),
@@ -30,13 +31,21 @@ export async function POST(request: NextRequest) {
   return handleApi(async () => {
     const user = await requireUser();
     const input = schema.parse(await request.json());
+    const asset = input.asset.toUpperCase();
+
+    const cryptoBal = await prisma.userCryptoBalance.findUnique({
+      where: { userId_symbol: { userId: user.id, symbol: asset } }
+    });
+    if (!cryptoBal || cryptoBal.balance < input.amount) {
+      throw Object.assign(new Error(`Insufficient ${asset} balance.`), { status: 400 });
+    }
 
     const reference = `CWDRAW-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
     const withdrawal = await prisma.cryptoWithdrawalRequest.create({
       data: {
         userId: user.id,
-        asset: input.asset,
+        asset,
         network: input.network,
         amount: input.amount,
         recipientAddress: plainText(input.recipientAddress, 160),
@@ -47,21 +56,28 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Also record in CRYPTO account transaction history if account exists
+    // Also record in CRYPTO account transaction history if account exists.
+    // Transaction.amount/currency is always a USD ledger entry (see swap route) —
+    // convert the coin quantity to its USD-equivalent value here so the wallet
+    // history never shows a raw coin amount (e.g. 0.5) mislabeled as "$0.50".
     const cryptoAccount = await prisma.account.findFirst({ where: { userId: user.id, type: "CRYPTO" } });
     if (cryptoAccount) {
       try {
-        await prisma.transaction.create({
-          data: {
-            accountId: cryptoAccount.id,
-            type: "CRYPTO_WITHDRAW",
-            amount: -Math.abs(input.amount),
-            currency: "USD",
-            description: plainText(`Withdraw ${input.asset} on ${input.network}`, 180),
-            reference: `TX-${reference}`,
-            status: "REVIEW"
-          }
-        });
+        const prices = await getAdminCryptoPrices();
+        const rateUSD = resolveRateFromMap(asset, prices);
+        if (rateUSD) {
+          await prisma.transaction.create({
+            data: {
+              accountId: cryptoAccount.id,
+              type: "CRYPTO_WITHDRAW",
+              amount: -Math.abs(input.amount * rateUSD),
+              currency: "USD",
+              description: plainText(`Withdraw ${input.amount} ${asset} on ${input.network}`, 180),
+              reference: `TX-${reference}`,
+              status: "REVIEW"
+            }
+          });
+        }
       } catch (err) {
         console.error("[crypto/withdrawals] transaction record failed:", err);
       }
@@ -78,7 +94,7 @@ export async function POST(request: NextRequest) {
       action: "CRYPTO_WITHDRAW_REQUESTED",
       entity: "CryptoWithdrawalRequest",
       entityId: withdrawal.id,
-      metadata: { asset: input.asset, network: input.network, amount: input.amount, reference }
+      metadata: { asset, network: input.network, amount: input.amount, reference }
     });
 
     return created({ withdrawalId: withdrawal.id, reference });

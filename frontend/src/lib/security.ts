@@ -53,6 +53,18 @@ export function apiError(error: unknown) {
     );
   }
 
+  // Routes throw `Object.assign(new Error(message), { status })` to surface a
+  // specific client-facing status/message (e.g. "Insufficient balance.", 400)
+  // without needing a `Response` object. Only honor 4xx here — a deliberate
+  // validation/business-rule rejection, never a 5xx, which still gets the
+  // generic message below so internal failures don't leak details.
+  if (error instanceof Error && "status" in error) {
+    const status = (error as Error & { status?: unknown }).status;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      return NextResponse.json({ error: error.message }, { status });
+    }
+  }
+
   if (error instanceof Error) {
     const isDatabaseInit =
       error.name === "PrismaClientInitializationError" ||

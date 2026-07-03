@@ -67,13 +67,18 @@ async function seedAdminUser(dbUrl: string) {
   const adminEmail = (
     process.env.SEED_ADMIN_EMAIL || "admin@gclbank.local"
   ).toLowerCase().trim();
-  const adminPassword =
-    process.env.SEED_ADMIN_PASSWORD || "AdminPassphrase!2026";
 
   try {
     const { PrismaClient } = await import("@prisma/client");
     const { randomBytes } = await import("node:crypto");
     const bcrypt = (await import("bcryptjs")).default;
+
+    // No SEED_ADMIN_PASSWORD in production is not "use a shared default" —
+    // that default would be a public, permanent admin login for every
+    // deployment that forgot to set it. Generate a one-time random password
+    // instead and print it to the (server-only) startup log.
+    const generatedPassword = randomBytes(18).toString("base64url");
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || generatedPassword;
 
     // Create a dedicated client with the URL we just set — bypasses singleton timing.
     const prisma = new PrismaClient({ datasourceUrl: dbUrl });
@@ -138,7 +143,16 @@ async function seedAdminUser(dbUrl: string) {
       }
 
       console.log(`[instrumentation] ✓ Admin seeded: ${adminEmail} role=${created.role} status=${created.status}`);
-      console.log(`[instrumentation] ✓ Password set to: ${adminPassword === "AdminPassphrase!2026" ? "(default)" : "(from SEED_ADMIN_PASSWORD)"}`);
+      if (process.env.SEED_ADMIN_PASSWORD) {
+        console.log("[instrumentation] ✓ Password set from SEED_ADMIN_PASSWORD env var.");
+      } else {
+        console.log(
+          `[instrumentation] ✓ No SEED_ADMIN_PASSWORD set — generated a one-time random password: ${adminPassword}`
+        );
+        console.log(
+          "[instrumentation]   Log in once with this password and change it immediately, or set SEED_ADMIN_PASSWORD and redeploy."
+        );
+      }
     } finally {
       await prisma.$disconnect();
     }

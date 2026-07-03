@@ -17,6 +17,35 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
 
+    const existing = await prisma.cryptoWithdrawalRequest.findUnique({ where: { id } });
+    if (!existing) {
+      throw Object.assign(new Error("Withdrawal request not found."), { status: 404 });
+    }
+    if (existing.status === "APPROVED") {
+      throw Object.assign(new Error("This withdrawal has already been approved."), { status: 409 });
+    }
+
+    // Approving a crypto withdrawal must actually debit the user's ledger balance —
+    // otherwise the user's wallet/dashboard keep showing coins that were already
+    // sent off-platform. Use a conditional update as an atomic funds check so two
+    // concurrent approval calls can't both succeed against the same balance.
+    if (input.status === "APPROVED") {
+      const debited = await prisma.userCryptoBalance.updateMany({
+        where: {
+          userId: existing.userId,
+          symbol: existing.asset,
+          balance: { gte: existing.amount }
+        },
+        data: { balance: { decrement: existing.amount } }
+      });
+      if (debited.count === 0) {
+        throw Object.assign(
+          new Error(`Cannot approve: user does not have sufficient ${existing.asset} balance.`),
+          { status: 400 }
+        );
+      }
+    }
+
     const withdrawal = await prisma.cryptoWithdrawalRequest.update({
       where: { id },
       data: { status: input.status, adminMessage: input.adminMessage }

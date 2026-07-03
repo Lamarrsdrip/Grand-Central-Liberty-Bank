@@ -68,10 +68,15 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
     if (!ticketId) return;
     pollRef.current = setInterval(async () => {
       const msgs = await loadMessages(ticketId);
+      if (!msgs.length) return;
       if (!open && lastSeenAt.current) {
         const newAdmin = msgs.filter(m => m.senderRole === "ADMIN" && m.createdAt > lastSeenAt.current!).length;
         if (newAdmin > 0) setUnread(u => u + newAdmin);
       }
+      // Advance the watermark so already-counted messages aren't recounted on
+      // the next tick — without this the same unseen message inflated the
+      // badge every 3s for as long as the widget stayed closed.
+      if (!open) lastSeenAt.current = msgs[msgs.length - 1].createdAt;
     }, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [ticketId, open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -138,8 +143,8 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
       <a
         href="/login?support=1"
         aria-label="Sign in to open live chat"
+        className="floating-chat-trigger"
         style={{
-          position: "fixed", bottom: "1.25rem", right: "1.25rem", zIndex: 9999,
           width: 56, height: 56, borderRadius: "50%",
           background: "linear-gradient(135deg,#22c55e,#059669)",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -156,15 +161,11 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
     <>
       {/* Chat panel */}
       {open && (
-        <div style={{
-          position: "fixed",
-          bottom: "80px",
+        <div className="floating-chat-panel" style={{
           right: "12px",
           left: "12px",
           maxWidth: "380px",
           marginLeft: "auto",
-          height: "min(500px, calc(100dvh - 110px))",
-          zIndex: 9999,
           display: "flex",
           flexDirection: "column",
           borderRadius: "20px",
@@ -197,7 +198,7 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
                   background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.8)",
                 }} />
                 <span style={{ fontSize: "0.65rem", color: "rgba(74,222,128,0.8)", fontWeight: 700 }}>
-                  Online · Replies in minutes
+                  Typically replies in minutes
                 </span>
               </div>
             </div>
@@ -335,11 +336,8 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
       <button
         onClick={() => setOpen(o => !o)}
         aria-label={open ? "Close support chat" : "Open live support chat"}
+        className="floating-chat-trigger"
         style={{
-          position: "fixed",
-          bottom: "1.25rem",
-          right: "1.25rem",
-          zIndex: 9999,
           width: 56,
           height: 56,
           borderRadius: "50%",

@@ -247,7 +247,7 @@ export default async function AdminPage({
                       </TableCell>
                       <TableCell className="font-bold">{w.asset}</TableCell>
                       <TableCell className="text-sm">{w.network}</TableCell>
-                      <TableCell className="font-black whitespace-nowrap">{formatCurrency(w.amount)}</TableCell>
+                      <TableCell className="font-black whitespace-nowrap">{w.amount} {w.asset}</TableCell>
                       <TableCell className="font-mono text-xs max-w-32 truncate">{w.recipientAddress}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(w.createdAt)}</TableCell>
                       <TableCell>

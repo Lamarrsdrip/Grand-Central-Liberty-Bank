@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import { secureFetch } from "@/lib/client-api";
 import { useTranslations } from "@/lib/i18n/use-translations";
+import { formatInCurrency } from "@/lib/currency";
 
 const SUPPORTED_ASSETS = ["USD", "EUR", "GBP", "BTC", "ETH", "USDT", "USDC", "SOL", "BNB", "XRP", "DOGE"];
 
@@ -152,7 +153,7 @@ export default function SwapPage() {
               </div>
               <div className="flex justify-between text-white/70">
                 <span>{tx.swap_network_fee} ({quote.feePercent}%)</span>
-                <span className="font-semibold text-white">${quote.feeAmount.toFixed(4)} {quote.feeCurrency}</span>
+                <span className="font-semibold text-white">{formatInCurrency(quote.feeAmount, quote.feeCurrency)}</span>
               </div>
               <div className="flex justify-between text-white/70 border-t border-white/10 pt-2">
                 <span>{tx.swap_you_receive}</span>

@@ -127,7 +127,7 @@ export default async function CryptoPage() {
                   <p className="text-xs text-white/40">
                     {priceUSD > 0
                       ? `${formatInCurrency(priceUSD, pCurrency)} · ${formatInCurrency(usdValue, pCurrency)}`
-                      : coin.price}
+                      : "Price not available"}
                   </p>
                 </div>
                 <div className="text-right w-16 shrink-0">

@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getUserDashboardData } from "@/lib/data";
 import { prisma } from "@/lib/db";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
+import { formatInCurrency } from "@/lib/currency";
+import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,7 @@ export default async function TransfersPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const { tx } = getServerTranslations(user.preferredLocale);
+  const pCurrency = user.preferredCurrency ?? "USD";
 
   const [data, savedBeneficiaries, recentTransfers] = await Promise.all([
     getUserDashboardData(user.id),
@@ -79,6 +82,33 @@ export default async function TransfersPage() {
           }))}
           recentRecipients={recentRecipients}
         />
+
+        {recentTransfers.length > 0 && (
+          <div className="card-dark p-5">
+            <p className="text-sm font-black text-white mb-3">{tx.transfer_recent_title}</p>
+            <div className="space-y-2">
+              {recentTransfers.slice(0, 5).map((t) => {
+                const statusColor =
+                  t.status === "APPROVED" ? "text-emerald-400" :
+                  t.status === "REJECTED" || t.status === "CANCELLED" ? "text-red-400" :
+                  "text-amber-400";
+                return (
+                  <div key={t.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-white">{t.beneficiaryName}</p>
+                      <p className={`text-xs ${statusColor}`}>
+                        {t.status.replace("_", " ")} · {formatDate(t.createdAt)}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-black text-white">
+                      {formatInCurrency(Number(t.amount), pCurrency)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </ProtectedShell>
   );

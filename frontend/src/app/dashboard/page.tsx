@@ -34,10 +34,10 @@ export default async function DashboardPage() {
   const accountTotal    = data.accounts.reduce((s, a) => s + Number(a.balance), 0);
   const available       = data.accounts.reduce((s, a) => s + Number(a.availableBalance), 0);
   const retirementTotal = data.retirementAccounts.reduce((s, a) => s + Number(a.balance), 0);
-  const totalAssets     = accountTotal + retirementTotal;
-
   const checking         = data.accounts.filter(a => a.type === "CHECKING").reduce((s, a) => s + Number(a.balance), 0);
   const crypto           = computeCryptoTotalUSD(cryptoBalanceRecords, prices);
+  const totalAssets     = accountTotal + retirementTotal + crypto;
+
   const primaryRetirement = data.retirementAccounts[0];
   const fallbackAccount  = data.accounts.find((account) => account.type === "CHECKING") ?? data.accounts[0];
 
@@ -59,11 +59,13 @@ export default async function DashboardPage() {
         }
       : null;
 
+  // Cards draw against the linked checking/savings account (no separate card
+  // balance exists in the schema) — that value is already inside "Checking",
+  // so there is no real "Cards" bucket to show here.
   const wealthItems = [
     { label: "Checking",      value: checking,        color: "bg-blue-400"    },
     { label: "Crypto Wallet", value: crypto,          color: "bg-amber-400"   },
     { label: "401(k)",        value: retirementTotal, color: "bg-fuchsia-400" },
-    { label: "Cards",         value: 0,               color: "bg-cyan-400"    },
   ];
 
   const filterTabs = [
