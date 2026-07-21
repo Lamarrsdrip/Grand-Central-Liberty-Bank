@@ -3,12 +3,7 @@ import { revokeCurrentSession, sessionCookieName } from "@/lib/auth";
 
 export async function POST() {
   return handleApi(async () => {
-    // Best-effort: always clear the cookie even if the DB revocation fails.
-    // If revokeCurrentSession throws (e.g. P2031), the user must still be
-    // signed out from the browser's perspective.
-    await revokeCurrentSession().catch((err) => {
-      console.error("[auth] revokeCurrentSession failed:", err);
-    });
+    await revokeCurrentSession();
     const response = ok({ success: true });
     response.cookies.set(sessionCookieName, "", {
       httpOnly: true,

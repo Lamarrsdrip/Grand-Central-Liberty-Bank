@@ -24,21 +24,16 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         notes: input.note,
         rejectionReason: input.status === "REJECTED" ? input.note : null,
         reviewedById: admin.id,
-        reviewedAt: new Date()
+        reviewedAt: new Date(),
+        notesHistory: {
+          create: {
+            authorId: admin.id,
+            body: input.note,
+            visibleToUser: input.visibleToUser
+          }
+        }
       }
     });
-    try {
-      await prisma.kycNote.create({
-        data: {
-          kycSubmissionId: id,
-          authorId: admin.id,
-          body: input.note,
-          visibleToUser: input.visibleToUser
-        }
-      });
-    } catch (error) {
-      console.error("[admin] kycNote.create failed:", error);
-    }
 
     const notificationType =
       input.status === "APPROVED" ? "KYC_APPROVED" : input.status === "REJECTED" ? "KYC_REJECTED" : "KYC_INFO_REQUESTED";

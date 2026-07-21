@@ -17,7 +17,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
-  url      = env("PRISMA_DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -154,8 +154,6 @@ enum NotificationType {
   PASSWORD_CHANGED
   EMAIL_VERIFICATION
   SYSTEM
-  SWAP_COMPLETED
-  CRYPTO_BALANCE_ADJUSTED
 }
 
 model User {
@@ -174,7 +172,6 @@ model User {
   twoFactorSecret    String?
   twoFactorEnabled   Boolean           @default(false)
   preferredLocale    String            @default("en")
-  preferredCurrency  String            @default("USD")
   themePreference    String            @default("system")
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
@@ -188,7 +185,6 @@ model User {
   assignedTickets    SupportTicket[]   @relation("TicketAssignee")
   supportMessages    SupportMessage[]
   transferRequests   TransferRequest[]
-  savedBeneficiaries SavedBeneficiary[]
   notifications      Notification[]
   broadcastEmails    BroadcastEmail[]
   auditLogs          AuditLog[]
@@ -200,9 +196,6 @@ model User {
   retirementWithdrawalRequests RetirementWithdrawalRequest[] @relation("RetirementWithdrawalUser")
   retirementWithdrawalReviews RetirementWithdrawalRequest[] @relation("RetirementWithdrawalReviewer")
   retirementNotes RetirementWithdrawalNote[] @relation("RetirementNoteAuthor")
-  cryptoBalances      UserCryptoBalance[]
-  swapTransactions    SwapTransaction[]
-  cryptoWithdrawals   CryptoWithdrawalRequest[]
 }
 
 model Session {
@@ -440,7 +433,6 @@ model TransferRequest {
   beneficiaryBank    String?
   beneficiaryAccount String?
   ibanSwift          String?
-  recipientCountry   String?
   amount             Float
   currency           String         @default("USD")
   purpose            String
@@ -448,21 +440,6 @@ model TransferRequest {
   adminNote          String?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
-}
-
-model SavedBeneficiary {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId           String   @db.ObjectId
-  user             User     @relation(fields: [userId], references: [id])
-  nickname         String?
-  recipientName    String
-  bankName         String
-  accountNumber    String
-  routingSwift     String?
-  recipientCountry String
-  currency         String   @default("USD")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
 }
 
 model TransferSetting {
@@ -588,56 +565,4 @@ model EmailVerificationToken {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime @default(now())
-}
-
-model UserCryptoBalance {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id])
-  symbol    String
-  balance   Float    @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, symbol])
-}
-
-model SwapTransaction {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String   @db.ObjectId
-  user         User     @relation(fields: [userId], references: [id])
-  fromAsset    String
-  toAsset      String
-  fromAmount   Float
-  toAmount     Float
-  rate         Float
-  feeAmount    Float
-  feeCurrency  String
-  status       String   @default("COMPLETED")
-  reference    String   @unique
-  createdAt    DateTime @default(now())
-}
-
-model CryptoAssetPrice {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  symbol    String   @unique
-  priceUSD  Float
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-}
-
-model CryptoWithdrawalRequest {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId           String   @db.ObjectId
-  user             User     @relation(fields: [userId], references: [id])
-  asset            String
-  network          String
-  amount           Float
-  recipientAddress String
-  notes            String?
-  status           String   @default("PENDING_REVIEW")
-  adminMessage     String?
-  reference        String   @unique
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
 }

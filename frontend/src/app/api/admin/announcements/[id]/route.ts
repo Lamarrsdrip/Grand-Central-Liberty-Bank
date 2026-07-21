@@ -44,14 +44,3 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     return ok({ announcement });
   });
 }
-
-export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  return handleApi(async () => {
-    const admin = await requireAdmin();
-    const { id } = await context.params;
-    const { ip, userAgent } = await requestIpAndAgent();
-    await prisma.announcementBanner.delete({ where: { id } });
-    await auditLog({ actorId: admin.id, action: "ADMIN_DELETED_ANNOUNCEMENT", entity: "AnnouncementBanner", entityId: id, ip, userAgent });
-    return ok({ ok: true });
-  });
-}

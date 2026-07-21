@@ -60,34 +60,14 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         throw new Response("Transfer was already finalized by another reviewer.", { status: 409 });
       }
 
-      // Conditional decrement (not an absolute write of a pre-read balance) —
-      // this is what actually closes the race: if a second transfer on the
-      // same account was approved in between our read and this write, the
-      // availableBalance floor here re-checks against the row's current
-      // value at write time instead of trusting our stale snapshot.
-      const debited = await prisma.account.updateMany({
-        where: {
-          id: existing.fromAccount.id,
-          status: "ACTIVE",
-          availableBalance: { gte: outcome.debit }
-        },
-        data: {
-          availableBalance: { decrement: outcome.debit },
-          balance: { decrement: outcome.debit }
-        }
-      });
-      if (debited.count === 0) {
-        await prisma.transferRequest.update({
-          where: { id },
-          data: { status: existing.status }
-        }).catch(() => undefined);
-        throw new Response(
-          "Insufficient available balance at approval time — a concurrent approval on this account may have used the funds. Please review and retry.",
-          { status: 409 }
-        );
-      }
-
       try {
+        await prisma.account.update({
+          where: { id: existing.fromAccount.id },
+          data: {
+            availableBalance: outcome.newAvailable,
+            balance: outcome.newBalance
+          }
+        });
         await prisma.transaction.create({
           data: {
             accountId: existing.fromAccount.id,

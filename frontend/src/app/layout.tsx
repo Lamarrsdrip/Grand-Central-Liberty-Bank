@@ -7,8 +7,9 @@ import {
   detectLocaleFromAcceptLanguage,
   isSupportedLocale
 } from "@/lib/locales";
-import { FloatingChat } from "@/components/layout/floating-chat";
+import { FloatingSupportButton } from "@/components/layout/floating-support-button";
 import { getCurrentUser } from "@/lib/auth";
+import { getUnreadSupportReplyCount } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Grand Central Liberty Bank",
@@ -32,6 +33,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     : detectLocaleFromAcceptLanguage(headerStore.get("accept-language")) ?? DEFAULT_LOCALE;
   const dir = RTL_LOCALES.has(resolved) ? "rtl" : "ltr";
   const currentUser = await getCurrentUser();
+  const unreadSupportReplies =
+    currentUser && currentUser.role !== "ADMIN" ? await getUnreadSupportReplyCount(currentUser.id).catch(() => 0) : 0;
 
   return (
     <html lang={resolved} dir={dir} suppressHydrationWarning>
@@ -44,7 +47,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         />
         {children}
         {currentUser?.role !== "ADMIN" ? (
-          <FloatingChat signedIn={Boolean(currentUser)} />
+          <FloatingSupportButton signedIn={Boolean(currentUser)} unreadCount={unreadSupportReplies} />
         ) : null}
       </body>
     </html>

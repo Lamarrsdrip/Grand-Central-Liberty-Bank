@@ -34,8 +34,7 @@ export async function PUT(request: NextRequest) {
     const { ip, userAgent } = await requestIpAndAgent();
     const data = {
       gmailAddress: input.gmailAddress,
-      // Strip spaces — Gmail App Passwords must be entered without spaces
-      appPasswordEncrypted: input.appPassword ? encryptSecret(input.appPassword.replace(/\s/g, "")) : undefined,
+      appPasswordEncrypted: input.appPassword ? encryptSecret(input.appPassword) : undefined,
       smtpHost: input.smtpHost,
       smtpPort: input.smtpPort,
       smtpSecure: input.smtpSecure,

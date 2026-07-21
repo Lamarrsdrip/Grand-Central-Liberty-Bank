@@ -75,18 +75,6 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     if (input.action === "FREEZE" || input.action === "UNFREEZE") {
       const status = input.action === "FREEZE" ? "FROZEN" : "ACTIVE";
-
-      // Mirror the freeze onto User.status too (the schema's UserStatus enum
-      // has a FROZEN value for exactly this) so the dashboard's frozen banner
-      // — keyed on user.status — actually fires. Guarded so it never
-      // overrides a SUSPENDED user back to ACTIVE via an unrelated UNFREEZE.
-      const currentUser = await prisma.user.findUnique({ where: { id }, select: { status: true } });
-      if (input.action === "FREEZE" && currentUser?.status !== "SUSPENDED") {
-        await prisma.user.update({ where: { id }, data: { status: "FROZEN" } });
-      } else if (input.action === "UNFREEZE" && currentUser?.status === "FROZEN") {
-        await prisma.user.update({ where: { id }, data: { status: "ACTIVE" } });
-      }
-
       const accounts = await prisma.account.findMany({ where: { userId: id } });
       for (const account of accounts) {
         await prisma.account.update({
@@ -94,21 +82,16 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
           data: {
             status,
             freezeReason: input.action === "FREEZE" ? input.reason : null,
-            frozenAt: input.action === "FREEZE" ? new Date() : null
+            frozenAt: input.action === "FREEZE" ? new Date() : null,
+            freezeEvents: {
+              create: {
+                actorId: admin.id,
+                action: status,
+                reason: input.reason
+              }
+            }
           }
         });
-        try {
-          await prisma.accountFreezeEvent.create({
-            data: {
-              accountId: account.id,
-              actorId: admin.id,
-              action: status,
-              reason: input.reason
-            }
-          });
-        } catch (error) {
-          console.error("[admin] accountFreezeEvent.create failed:", error);
-        }
       }
     }
 

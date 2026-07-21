@@ -50,12 +50,9 @@ export async function POST(request: NextRequest) {
         }
       }
     });
-    // Any reply — admin or user — brings the ticket back to ACTIVE. Without this,
-    // a user replying into a CLOSED ticket left it CLOSED forever: the message
-    // was saved but nothing signaled it needed attention again.
     await prisma.supportTicket.update({
       where: { id: ticket.id },
-      data: { status: "ACTIVE", updatedAt: new Date() }
+      data: { status: user.role === "ADMIN" ? "ACTIVE" : ticket.status, updatedAt: new Date() }
     });
 
     const recipientId = user.id === ticket.userId ? ticket.assignedAdminId : ticket.userId;

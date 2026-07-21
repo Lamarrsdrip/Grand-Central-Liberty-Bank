@@ -1,30 +1,18 @@
 import { z } from "zod";
-import { SUPPORTED_CURRENCY_CODES } from "@/lib/currency";
 
 export const registrationSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required").max(60),
-  lastName: z.string().trim().min(1, "Last name is required").max(60),
-  email: z.string().trim().email("Enter a valid email address"),
-  // Accept international formats: +, spaces, dashes, parentheses, 6–20 digits
-  phone: z
-    .string()
-    .trim()
-    .min(6, "Phone number must be at least 6 digits")
-    .max(30, "Phone number is too long")
-    .regex(/^[+\d][\d\s\-().]{4,}$/, "Enter a valid phone number"),
-  country: z.string().min(1, "Select your country"),
-  address: z.string().trim().min(5, "Enter your full address").max(200),
-  dateOfBirth: z.string().min(8, "Date of birth is required"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128, "Password is too long"),
-  preferredLocale: z.string().min(2).max(10).optional(),
-  preferredCurrency: z.enum(SUPPORTED_CURRENCY_CODES as unknown as [string, ...string[]]).optional(),
+  firstName: z.string().min(2),
+  lastName: z.string().min(2),
+  email: z.string().email(),
+  phone: z.string().min(7),
+  country: z.string().min(2),
+  address: z.string().min(8),
+  dateOfBirth: z.string().min(8),
+  password: z.string().min(12)
 });
 
 export const loginSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().email(),
   password: z.string().min(1),
   twoFactorToken: z.string().optional()
 });
@@ -40,34 +28,20 @@ export const cardApplicationSchema = z.object({
   occupation: z.string().min(2),
   annualIncome: z.coerce.number().positive(),
   employer: z.string().min(2),
-  address: z.string().min(5),
+  address: z.string().min(8),
   governmentIdUrl: z.string().min(1)
 });
 
 export const transferSchema = z.object({
   fromAccountId: z.string().min(1),
   type: z.enum(["INTERNAL", "DOMESTIC", "INTERNATIONAL"]),
-  beneficiaryName: z.string().trim().min(2, "Recipient full name is required"),
-  beneficiaryBank: z.string().trim().min(1, "Bank name is required"),
-  beneficiaryAccount: z.string().trim().min(4, "Account number / IBAN is required"),
-  ibanSwift: z.string().trim().optional(),
-  recipientCountry: z.string().min(1, "Recipient country is required"),
-  amount: z.coerce.number().positive("Amount must be greater than 0"),
-  currency: z.string().min(1, "Currency is required").default("USD"),
-  purpose: z.string().trim().min(2, "Transfer purpose is required"),
-  saveBeneficiary: z.boolean().optional().default(false),
-  beneficiaryNickname: z.string().trim().optional(),
-  recipientAddress: z.string().trim().optional(),
-});
-
-export const beneficiarySchema = z.object({
-  recipientName: z.string().trim().min(2, "Recipient name is required"),
-  bankName: z.string().trim().min(1, "Bank name is required"),
-  accountNumber: z.string().trim().min(4, "Account number is required"),
-  routingSwift: z.string().trim().optional(),
-  recipientCountry: z.string().min(1, "Country is required"),
+  beneficiaryName: z.string().min(2),
+  beneficiaryBank: z.string().optional(),
+  beneficiaryAccount: z.string().optional(),
+  ibanSwift: z.string().optional(),
+  amount: z.coerce.number().positive(),
   currency: z.string().default("USD"),
-  nickname: z.string().trim().optional()
+  purpose: z.string().min(3)
 });
 
 export const ticketSchema = z.object({
@@ -85,5 +59,5 @@ export const messageSchema = z.object({
 export const retirementWithdrawalSchema = z.object({
   retirementAccountId: z.string().min(1),
   amount: z.coerce.number().positive(),
-  reason: z.string().min(5)
+  reason: z.string().min(8)
 });
