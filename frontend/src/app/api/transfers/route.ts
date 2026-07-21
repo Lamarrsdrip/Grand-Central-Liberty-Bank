@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { NextRequest } from "next/server";
 import { created, handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
@@ -58,12 +59,36 @@ export async function POST(request: NextRequest) {
         beneficiaryBank: input.beneficiaryBank,
         beneficiaryAccount: input.beneficiaryAccount,
         ibanSwift: input.ibanSwift,
+        recipientCountry: input.recipientCountry,
         amount: input.amount,
         currency: input.currency,
         purpose: input.purpose,
         status: "SUBMITTED"
       }
     });
+
+    if (input.saveBeneficiary) {
+      const benefId = randomBytes(12).toString("hex");
+      const now = new Date().toISOString();
+      await prisma.$runCommandRaw({
+        insert: "SavedBeneficiary",
+        documents: [{
+          _id: { $oid: benefId },
+          userId: { $oid: user.id },
+          nickname: input.beneficiaryNickname || null,
+          recipientName: input.beneficiaryName,
+          bankName: input.beneficiaryBank ?? "",
+          accountNumber: input.beneficiaryAccount ?? "",
+          routingSwift: input.ibanSwift || null,
+          recipientCountry: input.recipientCountry,
+          currency: input.currency,
+          createdAt: { $date: now },
+          updatedAt: { $date: now }
+        }],
+        writeConcern: { w: 1 }
+      });
+    }
+
     await notifyUser(user.id, {
       type: "TRANSFER_SUBMITTED",
       title: "Transfer submitted",

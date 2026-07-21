@@ -40,9 +40,9 @@ export function money(value: unknown, currency = "USD") {
   return formatCurrency(Number(value), currency);
 }
 
-export function compactMoney(value: unknown) {
+export function compactMoney(value: unknown, currency = "USD") {
   return new Intl.NumberFormat("en-US", {
-    style: "currency", currency: "USD",
+    style: "currency", currency,
     notation: "compact", maximumFractionDigits: 1
   }).format(Number(value) || 0);
 }

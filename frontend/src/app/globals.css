@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@source "../**/*.{js,jsx,ts,tsx,mdx}";
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -250,6 +252,45 @@ button, input, textarea, select {
   margin-top: -0.75rem;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* ── Floating live chat trigger/panel ──
+   Bottom offset = mobile bottom-nav height + a spacing gap + the iOS safe-area inset,
+   so the button always clears the nav bar (incl. the raised center button) regardless
+   of viewport size or the Safari bottom toolbar. Desktop/tablet (where .bottom-nav is
+   hidden via lg:hidden) keeps the original corner offset. */
+:root {
+  --gclb-bottom-nav-height: 5rem;
+  --gclb-chat-gap: 1rem;
+  --gclb-chat-trigger-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  --gclb-chat-panel-bottom: calc(1.25rem + 56px + 0.75rem + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 1023.98px) {
+  :root {
+    --gclb-chat-trigger-bottom: calc(var(--gclb-bottom-nav-height) + var(--gclb-chat-gap) + env(safe-area-inset-bottom));
+    --gclb-chat-panel-bottom: calc(var(--gclb-bottom-nav-height) + var(--gclb-chat-gap) + 56px + 0.75rem + env(safe-area-inset-bottom));
+  }
+}
+
+.floating-chat-trigger {
+  position: fixed;
+  bottom: var(--gclb-chat-trigger-bottom);
+  right: max(1.25rem, env(safe-area-inset-right));
+  z-index: 9999;
+}
+
+.floating-chat-panel {
+  position: fixed;
+  bottom: var(--gclb-chat-panel-bottom);
+  height: min(500px, calc(100dvh - var(--gclb-chat-panel-bottom) - 30px));
+  z-index: 9999;
+}
+
+@media (max-width: 1023.98px) {
+  .floating-chat-trigger {
+    right: max(1rem, env(safe-area-inset-right));
+  }
 }
 
 /* ── Chart line ─────────────────────── */

@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
         to: user.email,
         subject: "Reset your Grand Central Liberty Bank password",
         html: `<p>Use the secure link below to reset your password.</p><p><a href="${absoluteUrl(`/reset-password?token=${rawToken}`)}">Reset password</a></p>`
+      }).catch((err) => {
+        console.error("[auth] forgot-password email failed:", err);
       });
     }
 

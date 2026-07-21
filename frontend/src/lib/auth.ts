@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { jwtVerify, SignJWT } from "jose";
 import { Role, UserStatus } from "@prisma/client";
@@ -23,6 +23,7 @@ export type AuthenticatedUser = {
   role: Role;
   status: UserStatus;
   preferredLocale: string;
+  preferredCurrency: string;
   themePreference: string;
 };
 
@@ -90,27 +91,50 @@ export async function sha256(value: string) {
 
 export async function createSession(user: { id: string; role: Role }, options?: { ip?: string; userAgent?: string }) {
   const expiresAt = new Date(Date.now() + sessionTtlHours() * 60 * 60 * 1000);
-  const session = await prisma.session.create({
-    data: {
-      userId: user.id,
-      tokenHash: crypto.randomUUID(),
-      ip: options?.ip,
-      userAgent: options?.userAgent,
-      expiresAt
-    }
-  });
-  const token = await signSessionToken({
-    sessionId: session.id,
+  // Pre-generate a MongoDB-compatible ObjectId (12 random bytes → 24-char hex).
+  // Signing the JWT before the DB write lets us set the real tokenHash in one
+  // create call, eliminating the follow-up session.update that triggers P2031
+  // on standalone (non-replica-set) MongoDB.
+  const sessionId = randomBytes(12).toString("hex");
+  const token = await signSessionToken({ sessionId, userId: user.id, role: user.role });
+  const tokenHash = await sha256(token);
+
+  await createSessionRecord({
+    id: sessionId,
     userId: user.id,
-    role: user.role
+    tokenHash,
+    ip: options?.ip,
+    userAgent: options?.userAgent,
+    expiresAt
   });
 
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { tokenHash: await sha256(token) }
-  });
+  return { token, expiresAt, sessionId };
+}
 
-  return { token, expiresAt, sessionId: session.id };
+async function createSessionRecord(input: {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  ip?: string;
+  userAgent?: string;
+  expiresAt: Date;
+}) {
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "Session",
+    documents: [
+      {
+        _id: { $oid: input.id },
+        userId: { $oid: input.userId },
+        tokenHash: input.tokenHash,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        expiresAt: { $date: input.expiresAt.toISOString() },
+        createdAt: { $date: now.toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
 }
 
 export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
@@ -144,6 +168,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
             role: true,
             status: true,
             preferredLocale: true,
+            preferredCurrency: true,
             themePreference: true
           }
         }
@@ -187,9 +212,15 @@ export async function revokeCurrentSession() {
 
   const payload = await verifySessionToken(token).catch(() => null);
   if (payload) {
-    await prisma.session.updateMany({
-      where: { id: payload.sessionId },
-      data: { revokedAt: new Date() }
+    await prisma.$runCommandRaw({
+      update: "Session",
+      updates: [
+        {
+          q: { _id: { $oid: payload.sessionId } },
+          u: { $set: { revokedAt: { $date: new Date().toISOString() } } }
+        }
+      ],
+      writeConcern: { w: 1 }
     });
   }
 }

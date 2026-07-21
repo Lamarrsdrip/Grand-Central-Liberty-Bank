@@ -31,20 +31,53 @@ export async function jsonBody<T extends z.ZodTypeAny>(request: Request, schema:
 
 export function apiError(error: unknown) {
   if (error instanceof Response) {
-    return error;
+    const status = error.status || 500;
+    return error.text().then((message) =>
+      NextResponse.json(
+        { error: message || (status === 401 ? "Unauthorized" : "Request could not be completed.") },
+        { status }
+      )
+    );
   }
 
   if (error instanceof z.ZodError) {
     return NextResponse.json(
-      { error: "Validation failed", issues: error.issues.map((issue) => issue.message) },
+      {
+        error: "Validation failed",
+        issues: error.issues.map((issue) => ({
+          path: issue.path as string[],
+          message: issue.message
+        }))
+      },
       { status: 400 }
     );
   }
 
+  // Routes throw `Object.assign(new Error(message), { status })` to surface a
+  // specific client-facing status/message (e.g. "Insufficient balance.", 400)
+  // without needing a `Response` object. Only honor 4xx here — a deliberate
+  // validation/business-rule rejection, never a 5xx, which still gets the
+  // generic message below so internal failures don't leak details.
+  if (error instanceof Error && "status" in error) {
+    const status = (error as Error & { status?: unknown }).status;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      return NextResponse.json({ error: error.message }, { status });
+    }
+  }
+
   if (error instanceof Error) {
-    console.error("[api]", error);
+    const isDatabaseInit =
+      error.name === "PrismaClientInitializationError" ||
+      error.message.includes("DATABASE_URL") ||
+      error.message.includes("MONGO_URL") ||
+      error.message.includes("mongo");
+    console.error("[api]", error.name, error.message);
     return NextResponse.json(
-      { error: "Request could not be completed. Please try again or contact support." },
+      {
+        error: isDatabaseInit
+          ? "Database connection failed. Please check server configuration."
+          : "Request could not be completed. Please try again or contact support."
+      },
       { status: 500 }
     );
   }

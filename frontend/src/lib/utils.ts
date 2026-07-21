@@ -5,14 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(value: number | string, currency = "USD") {
-  const number = typeof value === "string" ? Number(value) : value;
-
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2
-  }).format(Number.isFinite(number) ? number : 0);
+export function formatCurrency(value: number | string | null | undefined, currency = "USD") {
+  const number = typeof value === "string" ? parseFloat(value) : Number(value ?? 0);
+  const safe = Number.isFinite(number) ? number : 0;
+  // Normalize currency to a valid ISO 4217 code; fall back to USD if unknown
+  const iso = (currency ?? "USD").trim().toUpperCase();
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: iso,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(safe);
+  } catch {
+    // Unknown currency code — fall back to plain number with currency prefix
+    return `${iso} ${safe.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
 }
 
 export function formatDate(value: Date | string) {

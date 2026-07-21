@@ -2,53 +2,39 @@ import Link from "next/link";
 import {
   BadgeDollarSign, Bell, Bitcoin, Building2, CreditCard,
   Headphones, Home, Landmark, LineChart,
-  QrCode, Search, Send, Settings2, ShieldCheck,
+  Search, Send, Settings2, ShieldCheck,
   UserCircle, WalletCards, ArrowLeftRight, MoreHorizontal
 } from "lucide-react";
 import { Role } from "@prisma/client";
 import { LogoutButton } from "@/components/layout/logout-button";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { TranslationProvider } from "@/components/layout/translation-provider";
+import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
+import { LiveChatNavButton } from "@/components/layout/live-chat-nav-button";
+import { getServerTranslations } from "@/lib/i18n/server-locale";
 import { initials } from "@/lib/utils";
+import { CurrencyProvider } from "@/lib/currency-context";
 
 type User = {
   id: string; firstName: string; lastName: string;
   email: string; role: Role;
-  preferredLocale: string; themePreference: string;
+  preferredLocale: string; preferredCurrency: string; themePreference: string;
 };
 
-const userNav = [
-  { href: "/dashboard", label: "Home",        icon: Home          },
-  { href: "/accounts",  label: "Accounts",    icon: Landmark      },
-  { href: "/wallet",    label: "Wallet",      icon: WalletCards   },
-  { href: "/transfers", label: "Payments",    icon: Send          },
-  { href: "/cards",     label: "Cards",       icon: CreditCard    },
-  { href: "/retirement",label: "Invest",      icon: LineChart     },
-  { href: "/crypto",    label: "Crypto",      icon: Bitcoin       },
-  { href: "/profile",   label: "Profile",     icon: UserCircle    },
-  { href: "/support",   label: "Support",     icon: Headphones    },
-] as const;
-
 const adminNav = [
-  { href: "/admin#overview",   label: "Dashboard", icon: Home          },
-  { href: "/admin#users",      label: "Users",     icon: UserCircle    },
-  { href: "/admin#accounts",   label: "Accounts",  icon: Landmark      },
-  { href: "/admin#kyc",        label: "KYC",       icon: ShieldCheck   },
-  { href: "/admin#wallets",    label: "Wallets",   icon: WalletCards   },
-  { href: "/admin#retirement", label: "401(k)",    icon: LineChart     },
-  { href: "/admin#transfers",  label: "Transfers", icon: BadgeDollarSign},
-  { href: "/admin#cards",      label: "Cards",     icon: CreditCard    },
-  { href: "/admin#support",    label: "Support",   icon: Headphones    },
-  { href: "/admin#settings",   label: "Settings",  icon: Settings2     },
+  { href: "/admin?tab=overview",        label: "Dashboard",   icon: Home          },
+  { href: "/admin?tab=users",           label: "Users",       icon: UserCircle    },
+  { href: "/admin?tab=accounts",        label: "Accounts",    icon: Landmark      },
+  { href: "/admin?tab=kyc",             label: "KYC",         icon: ShieldCheck   },
+  { href: "/admin?tab=crypto-balances", label: "Crypto Bal.", icon: Bitcoin       },
+  { href: "/admin?tab=wallets",         label: "Wallets",     icon: WalletCards   },
+  { href: "/admin?tab=retirement",      label: "401(k)",      icon: LineChart     },
+  { href: "/admin?tab=transfers",       label: "Transfers",   icon: BadgeDollarSign},
+  { href: "/admin?tab=cards",           label: "Cards",       icon: CreditCard    },
+  { href: "/admin?tab=support",         label: "Live Chat",   icon: Headphones    },
+  { href: "/admin?tab=settings",        label: "Settings",    icon: Settings2     },
 ] as const;
 
-// Bottom nav for mobile (5 items like screenshot)
-type MobileNavItem = { href: string; label: string; icon: typeof Home; center?: boolean };
-const mobileNav: MobileNavItem[] = [
-  { href: "/dashboard", label: "Home",     icon: Home       },
-  { href: "/accounts",  label: "Accounts", icon: Landmark   },
-  { href: "/transfers", label: "",         icon: ArrowLeftRight, center: true },
-  { href: "/wallet",    label: "Wallet",   icon: WalletCards },
-  { href: "/more",      label: "More",     icon: MoreHorizontal },
-];
 
 export function AppShell({
   user, announcements, children
@@ -57,10 +43,29 @@ export function AppShell({
   announcements: Array<{ id: string; title: string; body: string; tone: string; href: string | null }>;
   children: React.ReactNode;
 }) {
+  const { tx } = getServerTranslations(user.preferredLocale);
+
+  // Support is removed from userNav — it opens the floating chat widget instead
+  const userNav = [
+    { href: "/dashboard",  label: tx.nav_home,     icon: Home          },
+    { href: "/accounts",   label: tx.nav_accounts, icon: Landmark      },
+    { href: "/wallet",     label: tx.nav_wallet,   icon: WalletCards   },
+    { href: "/transfers",  label: tx.nav_payments, icon: Send          },
+    { href: "/cards",      label: tx.nav_cards,    icon: CreditCard    },
+    { href: "/retirement", label: tx.nav_invest,   icon: LineChart     },
+    { href: "/crypto",     label: tx.nav_crypto,   icon: Bitcoin       },
+    { href: "/profile",    label: tx.nav_profile,  icon: UserCircle    },
+  ];
   const nav = user.role === "ADMIN" ? adminNav : userNav;
 
   return (
+    <TranslationProvider key={user.preferredLocale} initialLocale={user.preferredLocale}>
+    <CurrencyProvider currency={user.preferredCurrency}>
     <div className="app-bg min-h-screen flex">
+      {/* ── Admin mobile nav (hamburger + slide-out) ── */}
+      {user.role === "ADMIN" && (
+        <AdminMobileNav userName={`${user.firstName} ${user.lastName}`} />
+      )}
       {/* ── Desktop Sidebar ───────────────────── */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col sidebar-glass z-30">
         {/* Brand */}
@@ -106,6 +111,10 @@ export function AppShell({
               </Link>
             );
           })}
+          {/* Live chat opens the floating widget — no page navigation */}
+          {user.role !== "ADMIN" && (
+            <LiveChatNavButton label={tx.nav_support} />
+          )}
         </nav>
 
         {/* Footer */}
@@ -118,21 +127,18 @@ export function AppShell({
       </aside>
 
       {/* ── Main content ─────────────────────── */}
-      <div className="flex-1 min-w-0 lg:pl-[15.5rem] flex flex-col min-h-screen">
+      <div className={`flex-1 min-w-0 lg:pl-[15.5rem] flex flex-col min-h-screen${user.role === "ADMIN" ? " pt-14 lg:pt-0" : ""}`}>
         {/* Desktop top bar */}
         <header className="hidden lg:flex sticky top-0 z-20 items-center justify-between px-8 py-4 bg-[#0b0f18]/90 backdrop-blur-xl border-b border-white/5">
           <div>
-            <p className="text-xs text-white/30 font-semibold">Welcome back</p>
+            <p className="text-xs text-white/30 font-semibold">{tx.dash_welcome}</p>
             <p className="text-lg font-black text-white">{user.firstName} {user.lastName}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/support" className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Search support">
-              <Search className="size-4" />
-            </Link>
-            <Link href="/wallet" className="size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Open wallet QR">
-              <QrCode className="size-4" />
-            </Link>
-            <Link href="/profile" className="relative size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Notifications">
+            <div className="w-36">
+              <LocaleSwitcher value={user.preferredLocale} />
+            </div>
+            <Link href="/notifications" className="relative size-9 flex items-center justify-center rounded-full bg-white/6 border border-white/8 text-white/50 hover:text-white transition" aria-label="Notifications">
               <Bell className="size-4" />
               {announcements.length > 0 ? (
                 <span className="absolute -top-0.5 -right-0.5 size-4 flex items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-black text-white">{announcements.length}</span>
@@ -166,7 +172,13 @@ export function AppShell({
       {/* ── Mobile bottom nav ─────────────────── */}
       {user.role !== "ADMIN" && (
         <nav className="bottom-nav lg:hidden">
-          {mobileNav.map((item) => {
+          {[
+            { href: "/dashboard", label: tx.nav_home,     icon: Home       },
+            { href: "/accounts",  label: tx.nav_accounts, icon: Landmark   },
+            { href: "/transfers", label: "",               icon: ArrowLeftRight, center: true },
+            { href: "/wallet",    label: tx.nav_wallet,   icon: WalletCards },
+            { href: "/more",      label: tx.nav_more,     icon: MoreHorizontal },
+          ].map((item) => {
             const Icon = item.icon;
             if (item.center) {
               return (
@@ -187,5 +199,7 @@ export function AppShell({
         </nav>
       )}
     </div>
+    </CurrencyProvider>
+    </TranslationProvider>
   );
 }

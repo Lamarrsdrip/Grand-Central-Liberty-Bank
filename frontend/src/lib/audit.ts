@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 
 export async function auditLog(input: {
@@ -10,26 +11,47 @@ export async function auditLog(input: {
   ip?: string | null;
   userAgent?: string | null;
 }) {
-  await prisma.auditLog.create({
-    data: {
-      actorId: input.actorId ?? null,
-      action: input.action,
-      entity: input.entity,
-      entityId: input.entityId ?? null,
-      metadata: input.metadata ?? undefined,
-      ip: input.ip ?? null,
-      userAgent: input.userAgent ?? null
-    }
-  });
+  try {
+    await prisma.$runCommandRaw({
+      insert: "AuditLog",
+      documents: [
+        {
+          _id: { $oid: randomBytes(12).toString("hex") },
+          actorId: input.actorId ? { $oid: input.actorId } : null,
+          action: input.action,
+          entity: input.entity,
+          entityId: input.entityId ?? null,
+          metadata: input.metadata ?? null,
+          ip: input.ip ?? null,
+          userAgent: input.userAgent ?? null,
+          createdAt: { $date: new Date().toISOString() }
+        }
+      ],
+      writeConcern: { w: 1 }
+    });
+  } catch (error) {
+    console.error("[audit] auditLog failed - action:", input.action, error);
+  }
 }
 
 export async function notifyUser(userId: string, input: { type: string; title: string; body: string }) {
-  await prisma.notification.create({
-    data: {
-      userId,
-      type: input.type as never,
-      title: input.title,
-      body: input.body
-    }
-  });
+  try {
+    await prisma.$runCommandRaw({
+      insert: "Notification",
+      documents: [
+        {
+          _id: { $oid: randomBytes(12).toString("hex") },
+          userId: { $oid: userId },
+          type: input.type,
+          title: input.title,
+          body: input.body,
+          readAt: null,
+          createdAt: { $date: new Date().toISOString() }
+        }
+      ],
+      writeConcern: { w: 1 }
+    });
+  } catch (error) {
+    console.error("[audit] notifyUser failed - userId:", userId, "type:", input.type, error);
+  }
 }

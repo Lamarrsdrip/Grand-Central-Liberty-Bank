@@ -1,16 +1,23 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import {
+  ArrowDownToLine,
+  ArrowLeftRight,
   ArrowRight,
+  ArrowUp,
+  ArrowUpRight,
   Banknote,
   Bell,
   Bitcoin,
   Building2,
   CreditCard,
+  FileText,
   Globe2,
   Landmark,
   LineChart,
   LockKeyhole,
+  MoreHorizontal,
   PiggyBank,
   QrCode,
   RefreshCcw,
@@ -21,7 +28,7 @@ import {
   TrendingUp,
   WalletCards
 } from "lucide-react";
-import { cn, formatCurrency, formatDate, initials } from "@/lib/utils";
+import { cn, formatDate, initials } from "@/lib/utils";
 import {
   cryptoAssets,
   marketSignals,
@@ -30,6 +37,9 @@ import {
   money,
   compactMoney
 } from "@/components/banking/finance";
+import { useTranslations } from "@/components/layout/translation-provider";
+import { formatInCurrency, compactInCurrency } from "@/lib/currency";
+import { useCurrency } from "@/lib/currency-context";
 
 /* ── Re-export pure helpers so existing client imports keep working ─ */
 export { cryptoAssets, marketSignals, accountLabel, statusText, money, compactMoney };
@@ -127,26 +137,31 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
 
 /* ── Total Assets Card (matches screenshot) ─ */
 export function TotalAssetsCard({
-  total, available, items, todayChange = "+$4,275.20 (1.73%)"
+  total, available, items, todayChange = null, currency = "USD"
 }: {
   total: number;
   available: number;
   items: Array<{ label: string; value: number; color: string }>;
-  todayChange?: string;
+  todayChange?: string | null;
+  currency?: string;
 }) {
+  const { t } = useTranslations();
   return (
     <div className="assets-hero p-5 sm:p-7 fade-up">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-white/50 uppercase tracking-wider">Total Assets</span>
+            <span className="text-xs font-bold text-white/50 uppercase tracking-wider">{t("dash_total_balance")}</span>
             <span className="text-xs text-white/30">◉</span>
+            {currency !== "USD" && (
+              <span className="text-[0.6rem] font-bold text-emerald-400/70 bg-emerald-400/10 px-1.5 py-0.5 rounded">{currency}</span>
+            )}
           </div>
           <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-none">
-            {money(total)}
+            {formatInCurrency(total, currency)}
           </h2>
-          <p className="mt-2 text-sm font-semibold text-green">{todayChange} today</p>
-          <p className="mt-1 text-xs font-bold text-white/35">Available now {money(available)}</p>
+          {todayChange && <p className="mt-2 text-sm font-semibold text-green">{todayChange} today</p>}
+          <p className="mt-1 text-xs font-bold text-white/35">{t("dash_available")} {formatInCurrency(available, currency)}</p>
         </div>
         <Link href="/accounts" className="text-xs font-bold text-white/40 hover:text-white/70 transition mt-1">
           Net Worth →
@@ -169,7 +184,7 @@ export function TotalAssetsCard({
             <div className={cn("size-2 rounded-full", item.color)} />
             <div>
               <p className="text-[0.65rem] font-semibold text-white/50 whitespace-nowrap">{item.label}</p>
-              <p className="text-xs font-black text-white whitespace-nowrap">{compactMoney(item.value)}</p>
+              <p className="text-xs font-black text-white whitespace-nowrap">{compactInCurrency(item.value, currency)}</p>
             </div>
           </div>
         ))}
@@ -179,16 +194,16 @@ export function TotalAssetsCard({
 }
 
 /* ── Quick Actions (matches screenshot exactly) ─ */
-const quickActions = [
-  { label: "Transfer",  href: "/transfers", bg: "#1a2a3a", icon: "↗" },
-  { label: "Pay Bills", href: "/transfers", bg: "#1a1a2a", icon: "📄" },
-  { label: "Deposit",   href: "/wallet",    bg: "#1a2a20", icon: "⬇" },
-  { label: "Send",      href: "/transfers", bg: "#2a1a1a", icon: "↑" },
-  { label: "Convert",   href: "/wallet",    bg: "#1a2520", icon: "⇄" },
-  { label: "More",      href: "/more",      bg: "#1a1a1a", icon: "⋯" },
-];
-
 export function QuickActions() {
+  const { t } = useTranslations();
+  const quickActions = [
+    { label: t("transfer_title") || "Transfer", href: "/transfers", bg: "#1a2a3a", Icon: ArrowUpRight },
+    { label: t("dash_pay_bills") || "Pay Bills", href: "/transfers", bg: "#1a1a2a", Icon: FileText },
+    { label: t("dash_add_money") || "Deposit",  href: "/wallet",    bg: "#1a2a20", Icon: ArrowDownToLine },
+    { label: t("dash_send_money") || "Send",    href: "/transfers", bg: "#2a1a1a", Icon: ArrowUp },
+    { label: t("nav_wallet") || "Wallet",       href: "/wallet",    bg: "#1a2520", Icon: ArrowLeftRight },
+    { label: t("nav_more") || "More",           href: "/more",      bg: "#1a1a1a", Icon: MoreHorizontal },
+  ];
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
       {quickActions.map((action) => (
@@ -197,7 +212,7 @@ export function QuickActions() {
             className="quick-action-icon mx-auto mb-1 group-hover:scale-110 transition-transform duration-200"
             style={{ background: action.bg }}
           >
-            <span className="text-xl">{action.icon}</span>
+            <action.Icon className="size-5 text-white" />
           </div>
           <span className="text-[0.7rem] font-bold text-white/60 group-hover:text-white/90 transition-colors">{action.label}</span>
         </Link>
@@ -229,6 +244,7 @@ export function TransactionRow({ tx }: { tx: FinanceTransaction }) {
   const amount = Number(tx.amount);
   const positive = amount >= 0;
   const m = getMerchantStyle(tx.description);
+  const displayCurrency = useCurrency();
   return (
     <div className="tx-item">
       <div className="tx-icon text-white text-sm font-black" style={{ background: m.bg }}>
@@ -240,7 +256,7 @@ export function TransactionRow({ tx }: { tx: FinanceTransaction }) {
       </div>
       <div className="text-right">
         <p className={cn("text-sm font-black", positive ? "text-green" : "text-white")}>
-          {positive ? "+" : ""}{formatCurrency(amount, tx.currency)}
+          {positive ? "+" : ""}{formatInCurrency(amount, displayCurrency)}
         </p>
       </div>
     </div>
@@ -269,9 +285,40 @@ const accountCardStyles: Record<string, string> = {
   CRYPTO: "account-card-business",
 };
 
+const GCLB_ROUTING = "026009593";
+const GCLB_SWIFT   = "GCLBUS33";
+const GCLB_BANK    = "Grand Central Liberty Bank";
+const GCLB_ADDRESS = "200 Liberty Plaza, New York, NY 10006";
+
+function CopyText({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      title={`Copy ${label}`}
+      className="group flex items-center gap-1 text-left"
+      onClick={async () => {
+        await navigator.clipboard.writeText(value).catch(() => null);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1400);
+      }}
+    >
+      <span className="font-mono text-xs text-white/70 group-hover:text-white transition">{value}</span>
+      <span className={`text-[0.6rem] font-bold ml-1 ${copied ? "text-green" : "text-white/20 group-hover:text-white/50"}`}>
+        {copied ? "✓" : "copy"}
+      </span>
+    </button>
+  );
+}
+
 export function AccountCard({ account }: { account: FinanceAccount; index?: number }) {
+  const { tx } = useTranslations();
+  const [showDetails, setShowDetails] = useState(false);
   const cardClass = accountCardStyles[account.type] ?? "account-card-checking";
   const typeLabel = accountLabel(account.type).toUpperCase();
+  const isCrypto = account.type === "CRYPTO";
+  const displayCurrency = useCurrency();
+
   return (
     <div className={cn("rounded-2xl p-5 border border-white/10 text-white", cardClass)}>
       <div className="flex items-start justify-between mb-6">
@@ -281,22 +328,77 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
         </div>
         <div className="flex items-center gap-1.5">
           {account.status === "FROZEN" && (
-            <span className="text-xs font-bold text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded-full">Frozen</span>
+            <span className="text-xs font-bold text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded-full">{tx.account_frozen}</span>
           )}
+          <span className="text-[0.6rem] font-bold uppercase text-white/30 border border-white/10 rounded px-1.5 py-0.5">{account.currency}</span>
         </div>
       </div>
-      <p className="text-2xl font-black tracking-tight">{money(account.balance, account.currency)}</p>
-      <p className="text-xs text-white/40 mt-0.5">Available Balance</p>
+
+      <p className="text-2xl font-black tracking-tight">{formatInCurrency(Number(account.balance), displayCurrency)}</p>
+      <p className="text-xs text-white/40 mt-0.5">{tx.account_available} {formatInCurrency(Number(account.availableBalance ?? account.balance), displayCurrency)}</p>
+
       <div className="mt-4 flex items-center gap-2">
-        <span className="text-xs text-white/30">•••• {account.accountNumber.slice(-4)}</span>
-        <span className="text-white/20">·</span>
-        <span className="text-xs text-white/30">IBAN US98 GCLB</span>
+        <span className="text-[0.65rem] text-white/30 font-semibold">{tx.account_acct}</span>
+        <CopyText value={account.accountNumber} label={tx.account_number_label} />
       </div>
+
+      <button
+        type="button"
+        className="mt-3 text-[0.65rem] font-bold text-white/40 hover:text-white/70 transition"
+        onClick={() => setShowDetails((v) => !v)}
+      >
+        {showDetails ? tx.account_hide_details : tx.account_show_details}
+      </button>
+
+      {showDetails && (
+        <div className="mt-3 rounded-xl bg-black/30 border border-white/8 p-3 space-y-2.5">
+          <p className="text-[0.6rem] font-black uppercase tracking-widest text-white/30 mb-2">{tx.account_details_title}</p>
+          <div className="grid gap-2 text-xs">
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-white/40 shrink-0">{tx.account_bank_label}</span>
+              <span className="font-semibold text-right text-white/80">{GCLB_BANK}</span>
+            </div>
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-white/40 shrink-0">{tx.account_address_label}</span>
+              <span className="font-semibold text-right text-white/70 text-[0.65rem]">{GCLB_ADDRESS}</span>
+            </div>
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-white/40 shrink-0">{tx.account_number_label}</span>
+              <CopyText value={account.accountNumber} label={tx.account_number_label} />
+            </div>
+            {!isCrypto && (
+              <>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-white/40 shrink-0">{tx.account_routing_label}</span>
+                  <CopyText value={GCLB_ROUTING} label={tx.account_routing_label} />
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-white/40 shrink-0">{tx.account_swift_label}</span>
+                  <CopyText value={GCLB_SWIFT} label={tx.account_swift_label} />
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-white/40 shrink-0">{tx.account_iban_label}</span>
+                  <CopyText value={`US98 GCLB ${account.accountNumber.slice(0,4)} ${account.accountNumber.slice(4)}`} label={tx.account_iban_label} />
+                </div>
+              </>
+            )}
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-white/40 shrink-0">{tx.account_currency_label}</span>
+              <span className="font-bold text-white/80">{account.currency}</span>
+            </div>
+            {isCrypto && (
+              <Link href="/crypto" className="mt-1 block text-center text-[0.65rem] font-bold text-green hover:text-green-dim border border-green/20 rounded-lg py-1.5 transition">
+                {tx.account_crypto_deposit} →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 flex gap-2">
-        <Link href="/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20account." className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Freeze</Link>
-        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Statements</Link>
-        <Link href="/profile" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Manage</Link>
-        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">Activity</Link>
+        <Link href="/support?message=I%20need%20help%20freezing%20or%20unfreezing%20my%20account." className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">{tx.account_freeze_btn}</Link>
+        <Link href="/accounts" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">{tx.account_statements_btn}</Link>
+        <Link href="/profile" className="text-[0.65rem] font-bold text-white/70 border border-white/10 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition">{tx.account_manage_btn}</Link>
       </div>
     </div>
   );
@@ -304,8 +406,10 @@ export function AccountCard({ account }: { account: FinanceAccount; index?: numb
 
 /* ── Insight Panel ─────────────────────── */
 export function InsightPanel({ total, retirement }: { total: number; retirement: number }) {
+  const { tx } = useTranslations();
   const spending = total * 0.042;
   const retirementShare = total > 0 ? Math.round((retirement / total) * 100) : 0;
+  const displayCurrency = useCurrency();
   const cats = [
     { label: "Shopping",       pct: 32, color: "#6366f1" },
     { label: "Food & Dining",  pct: 24, color: "#22c55e" },
@@ -328,16 +432,16 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
     <div className="card-dark p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-black text-white">Insights</h3>
-          <p className="text-xs text-white/40 mt-0.5">This Month</p>
+          <h3 className="font-black text-white">{tx.insight_panel_title}</h3>
+          <p className="text-xs text-white/40 mt-0.5">{tx.insight_this_month}</p>
         </div>
         <select className="text-xs bg-transparent text-white/50 border-0 outline-none">
-          <option>This Month</option>
+          <option>{tx.insight_filter_month}</option>
         </select>
       </div>
-      <p className="text-xs text-white/40 mb-1">Spending</p>
-      <p className="text-2xl font-black text-white">{money(spending)}</p>
-      <p className="text-xs text-white/30 mb-5">-8.6% vs last month · 401(k) {retirementShare}% of assets</p>
+      <p className="text-xs text-white/40 mb-1">{tx.insight_spending}</p>
+      <p className="text-2xl font-black text-white">{formatInCurrency(spending, displayCurrency)}</p>
+      <p className="text-xs text-white/30 mb-5">401(k) {retirementShare}% of assets</p>
 
       {/* Donut chart */}
       <div className="flex items-center gap-5">
@@ -369,17 +473,18 @@ export function InsightPanel({ total, retirement }: { total: number; retirement:
         </div>
       </div>
       <Link href="/accounts" className="mt-4 block text-xs font-bold text-green hover:text-green-dim transition">
-        View full insights →
+        {tx.insight_view_full} →
       </Link>
     </div>
   );
 }
 
 /* ── Customer Top Bar ─────────────────── */
-export function CustomerTopBar({ user, notifCount = 3 }: {
+export function CustomerTopBar({ user, notifCount = 0 }: {
   user: { firstName: string; lastName: string };
   notifCount?: number;
 }) {
+  const { t } = useTranslations();
   return (
     <div className="flex items-center justify-between fade-up">
       <div className="flex items-center gap-3">
@@ -387,7 +492,7 @@ export function CustomerTopBar({ user, notifCount = 3 }: {
           {initials(user.firstName, user.lastName)}
         </div>
         <div>
-          <p className="text-xs font-semibold text-white/40">Good morning</p>
+          <p className="text-xs font-semibold text-white/40">{t("dash_welcome")}</p>
           <div className="flex items-center gap-1.5">
             <p className="text-xl font-black text-white">{user.firstName}</p>
             <span className="size-2 rounded-full bg-green pulse-dot" />
@@ -395,11 +500,11 @@ export function CustomerTopBar({ user, notifCount = 3 }: {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Link href="/profile" className="relative size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition" aria-label="Notifications">
+        <Link href="/notifications" className="relative size-9 flex items-center justify-center rounded-full bg-white/8 border border-white/10 text-white/60 hover:text-white transition" aria-label="Notifications">
           <Bell className="size-4" />
           {notifCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 size-4 flex items-center justify-center rounded-full bg-red-500 text-[0.6rem] font-black text-white">
-              {notifCount}
+              {Math.min(notifCount, 9)}
             </span>
           )}
         </Link>
@@ -574,7 +679,7 @@ export function FeatureRail() {
       {[
         { title: "Market News",      body: "Tech stocks rise as AI optimism boosts global markets.", icon: TrendingUp },
         { title: "Interest Rates",   body: "Checking 0.50% APY · Savings 4.60% APY · CD 4.85%",    icon: LineChart  },
-        { title: "Credit Score",     body: "Your score is 782 — Excellent. Updated May 20, 2026.",  icon: ShieldCheck},
+        { title: "Credit Score",     body: "Track your credit health with real-time score monitoring, built into your account.", icon: ShieldCheck},
       ].map((f) => (
         <div key={f.title} className="bg-white/5 border border-white/8 rounded-2xl p-5">
           <f.icon className="size-5 text-green mb-3" />

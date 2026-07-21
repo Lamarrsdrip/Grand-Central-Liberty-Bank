@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { cookies, headers } from "next/headers";
-import { Role } from "@prisma/client";
+import { randomBytes } from "node:crypto";
 import { created, handleApi } from "@/lib/api";
 import { auditLog } from "@/lib/audit";
 import { createSession, hashPassword, requestIpAndAgent, sessionCookieName, sha256 } from "@/lib/auth";
@@ -20,40 +20,272 @@ function accountNumber(prefix: string) {
   return `${prefix}${Math.floor(1000000000 + Math.random() * 8999999999)}`;
 }
 
+async function createUserRecord(input: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  country: string;
+  address: string;
+  dateOfBirth: Date;
+  passwordHash: string;
+  preferredLocale: string;
+  preferredCurrency?: string;
+}) {
+  const userId = randomBytes(12).toString("hex");
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "User",
+    documents: [
+      {
+        _id: { $oid: userId },
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        phone: input.phone,
+        country: input.country,
+        address: input.address,
+        dateOfBirth: { $date: input.dateOfBirth.toISOString() },
+        passwordHash: input.passwordHash,
+        role: "USER",
+        status: "ACTIVE",
+        twoFactorEnabled: false,
+        preferredLocale: input.preferredLocale,
+        preferredCurrency: input.preferredCurrency ?? "USD",
+        themePreference: "system",
+        createdAt: { $date: now.toISOString() },
+        updatedAt: { $date: now.toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error("User creation failed.");
+  }
+  return user;
+}
+
+async function createAccountRecord(input: {
+  userId: string;
+  type: "CHECKING" | "SAVINGS";
+  accountNumber: string;
+  balance: number;
+  availableBalance: number;
+}) {
+  const id = randomBytes(12).toString("hex");
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "Account",
+    documents: [
+      {
+        _id: { $oid: id },
+        userId: { $oid: input.userId },
+        type: input.type,
+        currency: "USD",
+        accountNumber: input.accountNumber,
+        balance: input.balance,
+        availableBalance: input.availableBalance,
+        status: "ACTIVE",
+        createdAt: { $date: now.toISOString() },
+        updatedAt: { $date: now.toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+  return { id, ...input };
+}
+
+async function createRetirementAccountRecord(input: {
+  userId: string;
+  accountNumber: string;
+  balance: number;
+  vestedBalance: number;
+  contributionYtd: number;
+  employerMatchYtd: number;
+  investmentGrowthPlaceholder: string;
+  withdrawalEligibilityStatus: string;
+  status: "ACTIVE";
+}) {
+  const id = randomBytes(12).toString("hex");
+  const now = new Date();
+  await prisma.$runCommandRaw({
+    insert: "RetirementAccount",
+    documents: [
+      {
+        _id: { $oid: id },
+        userId: { $oid: input.userId },
+        accountNumber: input.accountNumber,
+        balance: input.balance,
+        vestedBalance: input.vestedBalance,
+        contributionYtd: input.contributionYtd,
+        employerMatchYtd: input.employerMatchYtd,
+        investmentGrowthPlaceholder: input.investmentGrowthPlaceholder,
+        withdrawalEligibilityStatus: input.withdrawalEligibilityStatus,
+        status: input.status,
+        createdAt: { $date: now.toISOString() },
+        updatedAt: { $date: now.toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+  return { id, ...input };
+}
+
+async function createRetirementContributionRecord(input: {
+  retirementAccountId: string;
+  source: string;
+  description: string;
+  amount: number;
+  growthAmount: number;
+  contributionDate: Date;
+}) {
+  await prisma.$runCommandRaw({
+    insert: "RetirementContribution",
+    documents: [
+      {
+        _id: { $oid: randomBytes(12).toString("hex") },
+        retirementAccountId: { $oid: input.retirementAccountId },
+        source: input.source,
+        description: input.description,
+        amount: input.amount,
+        growthAmount: input.growthAmount,
+        currency: "USD",
+        contributionDate: { $date: input.contributionDate.toISOString() },
+        createdAt: { $date: new Date().toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+}
+
+async function createEmailVerificationTokenRecord(input: { userId: string; tokenHash: string; expiresAt: Date }) {
+  await prisma.$runCommandRaw({
+    insert: "EmailVerificationToken",
+    documents: [
+      {
+        _id: { $oid: randomBytes(12).toString("hex") },
+        userId: { $oid: input.userId },
+        tokenHash: input.tokenHash,
+        expiresAt: { $date: input.expiresAt.toISOString() },
+        createdAt: { $date: new Date().toISOString() }
+      }
+    ],
+    writeConcern: { w: 1 }
+  });
+}
+
 async function createRetirementWelcomeAccount(userId: string) {
   const bankSettings = await prisma.bankSetting.findUnique({ where: { id: 1 } });
   const bonusEnabled = bankSettings?.welcomeBonusEnabled ?? true;
   const bonusAmount = bonusEnabled ? Number(bankSettings?.welcomeBonusAmount ?? 500) : 0;
   const welcomeBonus = Number.isFinite(bonusAmount) && bonusAmount > 0 ? bonusAmount : 0;
 
-  const retirementAccount = await prisma.retirementAccount.create({
-    data: {
-      userId,
-      accountNumber: accountNumber("401K"),
-      balance: welcomeBonus,
-      vestedBalance: welcomeBonus,
-      contributionYtd: welcomeBonus,
-      employerMatchYtd: 0,
-      investmentGrowthPlaceholder: "Investment growth begins after portfolio allocation review",
-      withdrawalEligibilityStatus: "Pending standard retirement compliance review",
-      status: "ACTIVE"
-    }
+  const retirementAccount = await createRetirementAccountRecord({
+    userId,
+    accountNumber: accountNumber("401K"),
+    balance: welcomeBonus,
+    vestedBalance: welcomeBonus,
+    contributionYtd: welcomeBonus,
+    employerMatchYtd: 0,
+    investmentGrowthPlaceholder: "Investment growth begins after portfolio allocation review",
+    withdrawalEligibilityStatus: "Pending standard retirement compliance review",
+    status: "ACTIVE"
   });
 
   if (welcomeBonus > 0) {
-    await prisma.retirementContribution.create({
-      data: {
-        retirementAccountId: retirementAccount.id,
-        source: "Grand Central Liberty Bank",
-        description: "New account 401(k) welcome bonus",
-        amount: welcomeBonus,
-        growthAmount: 0,
-        contributionDate: new Date()
-      }
+    await createRetirementContributionRecord({
+      retirementAccountId: retirementAccount.id,
+      source: "Grand Central Liberty Bank",
+      description: "New account 401(k) welcome bonus",
+      amount: welcomeBonus,
+      growthAmount: 0,
+      contributionDate: new Date()
     });
   }
 
   return { retirementAccount, welcomeBonus };
+}
+
+async function runPostRegistrationTasks(input: {
+  user: Awaited<ReturnType<typeof createUserRecord>>;
+  ip?: string;
+  userAgent?: string;
+}) {
+  const { user, ip, userAgent } = input;
+
+  try {
+    await createAccountRecord({
+      userId: user.id,
+      type: "CHECKING",
+      accountNumber: accountNumber("44"),
+      balance: 0,
+      availableBalance: 0
+    });
+    await createAccountRecord({
+      userId: user.id,
+      type: "SAVINGS",
+      accountNumber: accountNumber("55"),
+      balance: 0,
+      availableBalance: 0
+    });
+  } catch (error) {
+    console.error("[register] account creation failed:", error);
+  }
+
+  let retirementAccount: { id: string } | null = null;
+  let welcomeBonus = 0;
+  try {
+    const retirement = await createRetirementWelcomeAccount(user.id);
+    retirementAccount = retirement.retirementAccount;
+    welcomeBonus = retirement.welcomeBonus;
+  } catch (error) {
+    console.error("[register] createRetirementWelcomeAccount failed:", error);
+  }
+
+  try {
+    const rawToken = crypto.randomUUID();
+    await createEmailVerificationTokenRecord({
+      userId: user.id,
+      tokenHash: await sha256(rawToken),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
+    });
+    await sendEmail({
+      to: user.email,
+      subject: "Verify your Grand Central Liberty Bank email",
+      html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
+    }).catch((error) => {
+      console.error("[auth] verification email failed", error);
+    });
+  } catch (error) {
+    console.error("[register] email verification setup failed:", error);
+  }
+
+  await auditLog({
+    actorId: user.id,
+    action: "USER_REGISTERED",
+    entity: "User",
+    entityId: user.id,
+    metadata: {
+      retirementAccountId: retirementAccount?.id ?? null,
+      welcomeBonus401k: welcomeBonus
+    },
+    ip,
+    userAgent
+  });
+
+  if (welcomeBonus > 0) {
+    await auditLog({
+      actorId: user.id,
+      action: "WELCOME_BONUS_401K_CREDITED",
+      entity: "RetirementAccount",
+      entityId: retirementAccount?.id ?? null,
+      metadata: { amount: welcomeBonus, currency: "USD" },
+      ip,
+      userAgent
+    });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -68,87 +300,27 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     const headerStore = await headers();
     const cookieLocale = cookieStore.get(LOCALE_COOKIE)?.value;
-    const detectedLocale = isSupportedLocale(cookieLocale)
+    const detectedLocale = isSupportedLocale(input.preferredLocale)
+      ? input.preferredLocale
+      : isSupportedLocale(cookieLocale)
       ? cookieLocale
       : detectLocaleFromAcceptLanguage(headerStore.get("accept-language")) ?? DEFAULT_LOCALE;
 
-    const user = await prisma.user.create({
-      data: {
-        firstName: input.firstName,
-        lastName: input.lastName,
-        email: input.email.toLowerCase(),
-        phone: input.phone,
-        country: input.country,
-        address: input.address,
-        dateOfBirth: new Date(input.dateOfBirth),
-        passwordHash: await hashPassword(input.password),
-        role: Role.USER,
-        preferredLocale: detectedLocale,
-        accounts: {
-          create: [
-            {
-              type: "CHECKING",
-              accountNumber: accountNumber("44"),
-              balance: 0,
-              availableBalance: 0
-            },
-            {
-              type: "SAVINGS",
-              accountNumber: accountNumber("55"),
-              balance: 0,
-              availableBalance: 0
-            }
-          ]
-        }
-      }
-    });
-
-    const { retirementAccount, welcomeBonus } = await createRetirementWelcomeAccount(user.id);
-
-    const rawToken = crypto.randomUUID();
-    await prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: await sha256(rawToken),
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
-      }
-    });
-
-    await sendEmail({
-      to: user.email,
-      subject: "Verify your Grand Central Liberty Bank email",
-      html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
-    }).catch((error) => {
-      console.error("[auth] verification email failed", error);
-      return { skipped: true, message: "Verification email could not be sent." };
+    const user = await createUserRecord({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      email: input.email.toLowerCase(),
+      phone: input.phone,
+      country: input.country,
+      address: input.address,
+      dateOfBirth: new Date(input.dateOfBirth),
+      passwordHash: await hashPassword(input.password),
+      preferredLocale: detectedLocale,
+      preferredCurrency: input.preferredCurrency ?? "USD",
     });
 
     const { ip, userAgent } = await requestIpAndAgent();
     const session = await createSession(user, { ip, userAgent });
-    await auditLog({
-      actorId: user.id,
-      action: "USER_REGISTERED",
-      entity: "User",
-      entityId: user.id,
-      metadata: {
-        retirementAccountId: retirementAccount.id,
-        welcomeBonus401k: welcomeBonus
-      },
-      ip,
-      userAgent
-    });
-
-    if (welcomeBonus > 0) {
-      await auditLog({
-        actorId: user.id,
-        action: "WELCOME_BONUS_401K_CREDITED",
-        entity: "RetirementAccount",
-        entityId: retirementAccount.id,
-        metadata: { amount: welcomeBonus, currency: "USD" },
-        ip,
-        userAgent
-      });
-    }
 
     const response = created({
       user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }
@@ -160,6 +332,14 @@ export async function POST(request: NextRequest) {
       expires: session.expiresAt,
       path: "/"
     });
+    response.cookies.set("gclb_locale", detectedLocale, {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/"
+    });
+    void runPostRegistrationTasks({ user, ip, userAgent });
     return response;
   });
 }

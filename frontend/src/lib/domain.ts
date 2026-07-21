@@ -59,14 +59,29 @@ export function canSubmitTransfer(params: {
   if (account.status !== "ACTIVE") {
     return { ok: false, reason: "Source account is not active." };
   }
-  if (!Number.isFinite(amount) || amount <= 0) {
+  // Coerce to number defensively — Prisma Float should already be a number,
+  // but guard against serialization edge cases (e.g. Decimal128 from older drivers)
+  const safeAmount = Number(amount);
+  const safeBalance = Number(account.availableBalance);
+  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
     return { ok: false, reason: "Transfer amount must be greater than zero." };
   }
-  if (currency !== account.currency) {
-    return { ok: false, reason: "Transfer currency must match the source account currency." };
+  if (!Number.isFinite(safeBalance)) {
+    return { ok: false, reason: "Account balance is unavailable. Please contact support." };
   }
-  if (amount > account.availableBalance) {
-    return { ok: false, reason: "Insufficient available balance for this transfer." };
+  const normalizedCurrency = (currency ?? "").trim().toUpperCase();
+  const accountCurrency = (account.currency ?? "").trim().toUpperCase();
+  if (normalizedCurrency !== accountCurrency) {
+    return {
+      ok: false,
+      reason: `Transfer currency (${normalizedCurrency}) must match your account currency (${accountCurrency}).`,
+    };
+  }
+  // Use rounded cents comparison to avoid floating-point rounding errors
+  const amountCents = Math.round(safeAmount * 100);
+  const balanceCents = Math.round(safeBalance * 100);
+  if (amountCents > balanceCents) {
+    return { ok: false, reason: `Insufficient available balance. Available: ${safeBalance.toFixed(2)} ${accountCurrency}, requested: ${safeAmount.toFixed(2)} ${normalizedCurrency}.` };
   }
   return { ok: true };
 }
@@ -97,17 +112,24 @@ export function computeApprovalDebit(params: {
   if (account.status !== "ACTIVE") {
     return { ok: false, reason: "Source account is not active; cannot approve." };
   }
-  if (!Number.isFinite(amount) || amount <= 0) {
+  const safeAmount = Number(amount);
+  const safeAvailable = Number(account.availableBalance);
+  const safeBalance = Number(account.balance);
+  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
     return { ok: false, reason: "Invalid transfer amount." };
   }
-  if (amount > account.availableBalance) {
-    return { ok: false, reason: "Insufficient available balance to approve this transfer." };
+  if (!Number.isFinite(safeAvailable) || !Number.isFinite(safeBalance)) {
+    return { ok: false, reason: "Account balance data is invalid. Manual review required." };
+  }
+  // Cents-based comparison eliminates floating-point precision errors
+  if (Math.round(safeAmount * 100) > Math.round(safeAvailable * 100)) {
+    return { ok: false, reason: `Insufficient available balance to approve this transfer. Available: ${safeAvailable.toFixed(2)}, requested: ${safeAmount.toFixed(2)}.` };
   }
   return {
     ok: true,
-    debit: amount,
-    newAvailable: Math.round((account.availableBalance - amount) * 100) / 100,
-    newBalance: Math.round((account.balance - amount) * 100) / 100
+    debit: safeAmount,
+    newAvailable: Math.round((safeAvailable - safeAmount) * 100) / 100,
+    newBalance: Math.round((safeBalance - safeAmount) * 100) / 100,
   };
 }
 

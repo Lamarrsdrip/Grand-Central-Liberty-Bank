@@ -12,16 +12,60 @@ const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 let prisma;
 
-function buildDatabaseUrl() {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const base = process.env.MONGO_URL;
-  if (!base) return null;
-  const dbName = process.env.DB_NAME || "grand_central_liberty_bank";
-  const url = new URL(base);
-  url.pathname = `/${dbName}`;
+// Params that Prisma's MongoDB connector rejects.
+const MONGO_REJECTED_PARAMS = ["timeoutms", "timeout"];
+
+// Strip a query param by name, case-insensitively, via regex on the raw string.
+function stripParam(str, name) {
+  const re = new RegExp(`([?&])${name}=[^&]*`, "gi");
+  let s = str.replace(re, (_, sep) => (sep === "?" ? "?" : ""));
+  return s.replace(/\?&/g, "?").replace(/&&+/g, "&").replace(/[?&]$/, "");
+}
+
+function cleanMongoUrl(raw, dbName) {
+  let str = raw;
+  for (const p of MONGO_REJECTED_PARAMS) str = stripParam(str, p);
+  const url = new URL(str);
+  if (dbName) url.pathname = `/${dbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
   if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
+  if (!url.searchParams.has("serverSelectionTimeoutMS")) url.searchParams.set("serverSelectionTimeoutMS", "5000");
+  if (!url.searchParams.has("connectTimeoutMS")) url.searchParams.set("connectTimeoutMS", "10000");
   return url.toString();
+}
+
+function buildDatabaseUrl() {
+  // schema.prisma now reads PRISMA_DATABASE_URL, not DATABASE_URL.
+  // If instrumentation.ts already set it, use it directly.
+  const already = process.env.PRISMA_DATABASE_URL?.trim();
+  if (already) return already;
+
+  const explicit = process.env.DATABASE_URL?.trim();
+  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
+
+  let clean;
+  if (explicit && (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://"))) {
+    clean = cleanMongoUrl(explicit, dbName);
+    if (clean !== explicit) {
+      console.log("[server] Removed invalid params from DATABASE_URL (e.g. timeoutms).");
+    }
+  } else {
+    if (explicit) {
+      const proto = explicit.split("://")[0] || "(empty)";
+      console.error(
+        `[server] DATABASE_URL uses protocol "${proto}://" — ignoring. ` +
+          "Building from MONGO_URL instead."
+      );
+    }
+    const base = process.env.MONGO_URL?.trim();
+    if (!base) return null;
+    clean = cleanMongoUrl(base, dbName);
+    console.log("[server] MongoDB URL built from MONGO_URL.");
+  }
+
+  // Write to PRISMA_DATABASE_URL so schema.prisma and Prisma CLI both find it.
+  process.env.PRISMA_DATABASE_URL = clean;
+  return clean;
 }
 
 function getPrisma() {
@@ -30,9 +74,15 @@ function getPrisma() {
   if (!databaseUrl) {
     throw new Error("Database is not configured.");
   }
-  prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+  prisma = new PrismaClient({ datasourceUrl: databaseUrl });
   return prisma;
 }
+
+const BUILD_FINGERPRINT = "2026-06-18T-instrumentation-admin-seed";
+
+// Eagerly resolve the MongoDB URL before app.prepare() so that
+// instrumentation.ts can read PRISMA_DATABASE_URL when it runs inside prepare().
+buildDatabaseUrl();
 
 function sendHealth(res) {
   res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
@@ -40,6 +90,12 @@ function sendHealth(res) {
     JSON.stringify({
       ok: true,
       service: "Grand Central Liberty Bank",
+      build: BUILD_FINGERPRINT,
+      db: process.env.PRISMA_DATABASE_URL
+        ? process.env.PRISMA_DATABASE_URL.replace(/:\/\/[^@]+@/, "://***@").split("?")[0]
+        : process.env.MONGO_URL
+          ? process.env.MONGO_URL.replace(/:\/\/[^@]+@/, "://***@").split("?")[0]
+          : "not-set",
       timestamp: new Date().toISOString()
     })
   );
@@ -121,14 +177,18 @@ io.on("connection", async (socket) => {
   }
 
   socket.on("join_ticket", async (ticketId) => {
-    const ticket = await getPrisma().supportTicket.findFirst({
-      where:
-        user.role === "ADMIN"
-          ? { id: ticketId }
-          : { id: ticketId, userId: user.id }
-    });
-    if (ticket) {
-      socket.join(`ticket:${ticket.id}`);
+    try {
+      const ticket = await getPrisma().supportTicket.findFirst({
+        where:
+          user.role === "ADMIN"
+            ? { id: ticketId }
+            : { id: ticketId, userId: user.id }
+      });
+      if (ticket) {
+        socket.join(`ticket:${ticket.id}`);
+      }
+    } catch (error) {
+      console.error("[socket] join_ticket failed", error);
     }
   });
 
@@ -168,18 +228,25 @@ io.on("connection", async (socket) => {
         attachmentUrl: message.attachmentUrl,
         createdAt: message.createdAt.toISOString()
       };
+      // Deliver to room and ack sender first — side-effects must not block delivery.
+      socket.to(`ticket:${ticket.id}`).emit("support_message", {
+        ticketId: ticket.id,
+        message: payload
+      });
+      ack?.({ ok: true, message: payload });
+      // Best-effort side-effects — P2031 or network errors must not affect delivery.
       const recipientId = user.id === ticket.userId ? ticket.assignedAdminId : ticket.userId;
       if (recipientId) {
-        await getPrisma().notification.create({
+        getPrisma().notification.create({
           data: {
             userId: recipientId,
             type: "NEW_MESSAGE",
             title: "New support message",
             body: `${user.firstName} sent a new support message.`
           }
-        });
+        }).catch((error) => console.error("[socket] notification.create failed", error));
       }
-      await getPrisma().auditLog.create({
+      getPrisma().auditLog.create({
         data: {
           actorId: user.id,
           action: "SUPPORT_MESSAGE_SENT",
@@ -187,12 +254,7 @@ io.on("connection", async (socket) => {
           entityId: ticket.id,
           metadata: { via: "socket" }
         }
-      });
-      socket.to(`ticket:${ticket.id}`).emit("support_message", {
-        ticketId: ticket.id,
-        message: payload
-      });
-      ack?.({ ok: true, message: payload });
+      }).catch((error) => console.error("[socket] auditLog.create failed", error));
     } catch (error) {
       console.error("[socket] support message failed", error);
       ack?.({ error: "Message failed. Please try again." });
