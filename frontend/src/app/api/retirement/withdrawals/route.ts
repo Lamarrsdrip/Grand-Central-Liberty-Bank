@@ -9,6 +9,7 @@ import {
   defaultRetirementWithdrawalMessage
 } from "@/lib/domain";
 import { retirementWithdrawalSchema } from "@/lib/validators";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 export async function GET() {
   return handleApi(async () => {
@@ -93,6 +94,11 @@ export async function POST(request: NextRequest) {
       entity: "RetirementWithdrawalRequest",
       entityId: withdrawal.id,
       metadata: { amount: input.amount, feeAmount: fee.amount, paymentMethod: feeSettings.paymentMethod }
+    });
+    await sendTransactionalEmail({
+      event: "RETIREMENT_ACTION", to: user.email, idempotencyKey: `retirement-withdrawal-submitted:${withdrawal.id}`,
+      relatedUserId: user.id, relatedEntityType: "RetirementWithdrawalRequest", relatedEntityId: withdrawal.id,
+      data: { customerName: `${user.firstName} ${user.lastName}`, transactionType: "401(k) withdrawal request", amount: withdrawal.amount, currency: withdrawal.currency, status: withdrawal.status, maskedAccount: `•••• ${account.accountNumber.slice(-4)}`, transactionReference: `RET-${withdrawal.id.slice(-8).toUpperCase()}`, timestamp: withdrawal.createdAt, explanation: withdrawal.complianceMessage, nextStep: "Your request is pending compliance review." }
     });
 
     return created({ withdrawal, message: withdrawal.complianceMessage });

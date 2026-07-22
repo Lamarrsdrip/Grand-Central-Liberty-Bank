@@ -4,6 +4,7 @@ import { handleApi, ok } from "@/lib/api";
 import { auditLog } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 const schema = z.object({
   firstName: z.string().min(2).optional(),
@@ -54,10 +55,16 @@ export async function PATCH(request: NextRequest) {
         email: true,
         phone: true,
         country: true,
-        address: true
+        address: true,
+        updatedAt: true
       }
     });
     await auditLog({ actorId: user.id, action: "PROFILE_UPDATED", entity: "User", entityId: user.id });
+    await sendTransactionalEmail({
+      event: "PROFILE_CHANGED", to: profile.email, idempotencyKey: `profile-changed:${user.id}:${profile.updatedAt.toISOString()}`,
+      relatedUserId: user.id, relatedEntityType: "User", relatedEntityId: user.id,
+      data: { customerName: `${profile.firstName} ${profile.lastName}`, timestamp: new Date(), nextStep: "Review your profile and contact support if you did not make this change." }
+    });
 
     return ok({ profile });
   });

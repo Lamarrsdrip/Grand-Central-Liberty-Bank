@@ -1,15 +1,15 @@
 import Link from "next/link";
 import {
-  BadgeDollarSign, Bell, Bitcoin, Building2, CreditCard,
-  Headphones, Home, Landmark, LineChart,
-  Search, Send, Settings2, ShieldCheck,
+  Bell, Bitcoin, Building2, CreditCard,
+  Home, Landmark, LineChart,
+  Send, ShieldCheck,
   UserCircle, WalletCards, ArrowLeftRight, MoreHorizontal
 } from "lucide-react";
 import { Role } from "@prisma/client";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { TranslationProvider } from "@/components/layout/translation-provider";
-import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
+import { AdminShell } from "@/components/admin/admin-shell";
 import { LiveChatNavButton } from "@/components/layout/live-chat-nav-button";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
 import { initials } from "@/lib/utils";
@@ -21,21 +21,6 @@ type User = {
   preferredLocale: string; preferredCurrency: string; themePreference: string;
 };
 
-const adminNav = [
-  { href: "/admin?tab=overview",        label: "Dashboard",   icon: Home          },
-  { href: "/admin?tab=users",           label: "Users",       icon: UserCircle    },
-  { href: "/admin?tab=accounts",        label: "Accounts",    icon: Landmark      },
-  { href: "/admin?tab=kyc",             label: "KYC",         icon: ShieldCheck   },
-  { href: "/admin?tab=crypto-balances", label: "Crypto Bal.", icon: Bitcoin       },
-  { href: "/admin?tab=wallets",         label: "Wallets",     icon: WalletCards   },
-  { href: "/admin?tab=retirement",      label: "401(k)",      icon: LineChart     },
-  { href: "/admin?tab=transfers",       label: "Transfers",   icon: BadgeDollarSign},
-  { href: "/admin?tab=cards",           label: "Cards",       icon: CreditCard    },
-  { href: "/admin?tab=support",         label: "Live Chat",   icon: Headphones    },
-  { href: "/admin?tab=settings",        label: "Settings",    icon: Settings2     },
-] as const;
-
-
 export function AppShell({
   user, announcements, children
 }: {
@@ -44,6 +29,16 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const { tx } = getServerTranslations(user.preferredLocale);
+
+  if (user.role === "ADMIN") {
+    return (
+      <TranslationProvider key={user.preferredLocale} initialLocale={user.preferredLocale}>
+        <CurrencyProvider currency={user.preferredCurrency}>
+          <AdminShell user={user} announcements={announcements}>{children}</AdminShell>
+        </CurrencyProvider>
+      </TranslationProvider>
+    );
+  }
 
   // Support is removed from userNav — it opens the floating chat widget instead
   const userNav = [
@@ -56,21 +51,17 @@ export function AppShell({
     { href: "/crypto",     label: tx.nav_crypto,   icon: Bitcoin       },
     { href: "/profile",    label: tx.nav_profile,  icon: UserCircle    },
   ];
-  const nav = user.role === "ADMIN" ? adminNav : userNav;
+  const nav = userNav;
 
   return (
     <TranslationProvider key={user.preferredLocale} initialLocale={user.preferredLocale}>
     <CurrencyProvider currency={user.preferredCurrency}>
     <div className="app-bg min-h-screen flex">
-      {/* ── Admin mobile nav (hamburger + slide-out) ── */}
-      {user.role === "ADMIN" && (
-        <AdminMobileNav userName={`${user.firstName} ${user.lastName}`} />
-      )}
       {/* ── Desktop Sidebar ───────────────────── */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col sidebar-glass z-30">
         {/* Brand */}
         <div className="p-5 border-b border-white/6">
-          <Link href={user.role === "ADMIN" ? "/admin" : "/dashboard"} className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-3">
             <div className="size-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg">
               <Building2 className="size-5 text-white" />
             </div>
@@ -90,7 +81,7 @@ export function AppShell({
             <div className="min-w-0">
               <p className="text-sm font-black text-white truncate">{user.firstName} {user.lastName}</p>
               <p className="text-[0.65rem] text-white/35 font-semibold">
-                {user.role === "ADMIN" ? "Command Center" : "Private Client"}
+                Private Client
               </p>
             </div>
           </div>
@@ -112,22 +103,20 @@ export function AppShell({
             );
           })}
           {/* Live chat opens the floating widget — no page navigation */}
-          {user.role !== "ADMIN" && (
-            <LiveChatNavButton label={tx.nav_support} />
-          )}
+          <LiveChatNavButton label={tx.nav_support} />
         </nav>
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-white/6">
           <div className="text-xs font-bold text-white/25 uppercase tracking-wider mb-3 px-2">
-            {user.role === "ADMIN" ? "Admin Panel" : "Personal Banking"}
+            Personal Banking
           </div>
           <LogoutButton />
         </div>
       </aside>
 
       {/* ── Main content ─────────────────────── */}
-      <div className={`flex-1 min-w-0 lg:pl-[15.5rem] flex flex-col min-h-screen${user.role === "ADMIN" ? " pt-14 lg:pt-0" : ""}`}>
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-[15.5rem]">
         {/* Desktop top bar */}
         <header className="hidden lg:flex sticky top-0 z-20 items-center justify-between px-8 py-4 bg-[#0b0f18]/90 backdrop-blur-xl border-b border-white/5">
           <div>
@@ -170,8 +159,7 @@ export function AppShell({
       </div>
 
       {/* ── Mobile bottom nav ─────────────────── */}
-      {user.role !== "ADMIN" && (
-        <nav className="bottom-nav lg:hidden">
+      <nav className="bottom-nav lg:hidden">
           {[
             { href: "/dashboard", label: tx.nav_home,     icon: Home       },
             { href: "/accounts",  label: tx.nav_accounts, icon: Landmark   },
@@ -196,8 +184,7 @@ export function AppShell({
               </Link>
             );
           })}
-        </nav>
-      )}
+      </nav>
     </div>
     </CurrencyProvider>
     </TranslationProvider>

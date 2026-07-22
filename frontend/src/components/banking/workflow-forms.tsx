@@ -2,14 +2,12 @@
 
 import { Copy, Send, UploadCloud } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, Input, Label, Select, Textarea } from "@/components/ui/input";
 import { secureFetch } from "@/lib/client-api";
 import { calculateRetirementFee } from "@/lib/domain";
-import { formatCurrency } from "@/lib/utils";
 import { useTranslations } from "@/lib/i18n/use-translations";
 import { getTranslations } from "@/lib/i18n/translations";
 import { isSupportedLocale } from "@/lib/locales";
@@ -23,7 +21,7 @@ type Ticket = {
   subject: string;
   status: string;
   priority?: string;
-  assignedAdmin?: { id: string; name: string; email: string } | null;
+  assignedAdmin?: { id: string; name: string } | null;
   messages: Array<{
     id: string;
     body: string;
@@ -102,6 +100,7 @@ export function TransferForm({ accounts, settings }: { accounts: Account[]; sett
   const { tx } = useTranslations();
   const [message, setMessage] = useState("");
   const displayCurrency = useCurrency();
+  const clientRequestId = useRef(crypto.randomUUID());
 
   return (
     <Card>
@@ -118,8 +117,9 @@ export function TransferForm({ accounts, settings }: { accounts: Account[]; sett
             const form = new FormData(formElement);
             const data = await secureFetch("/api/transfers", {
               method: "POST",
-              body: JSON.stringify(Object.fromEntries(form))
+              body: JSON.stringify({ ...Object.fromEntries(form), clientRequestId: clientRequestId.current })
             });
+            clientRequestId.current = crypto.randomUUID();
             setMessage(data.message.reviewMessage);
             formElement.reset();
           }}
@@ -445,7 +445,6 @@ export function SupportCenter({
   const [draftFile, setDraftFile] = useState<File | null>(null);
   const [messageFile, setMessageFile] = useState<File | null>(null);
   const [seededSupportRequest, setSeededSupportRequest] = useState("");
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [busy, setBusy] = useState(false);
   const activeTicket = useMemo(() => tickets.find((ticket) => ticket.id === activeId), [tickets, activeId]);
 
@@ -474,19 +473,22 @@ export function SupportCenter({
   }, [activeTicket, seededSupportRequest, supportRequestMessage]);
 
   useEffect(() => {
-    let socket: Socket | null = null;
-    if (activeId) {
-      socket = io({ path: "/socket.io" });
-      setSocket(socket);
-      socket.emit("join_ticket", activeId);
-      socket.on("support_message", (incoming: { ticketId: string; message: Ticket["messages"][number] }) => {
-        setTickets((current) => appendTicketMessage(current, incoming.ticketId, incoming.message));
-      });
-    }
-    return () => {
-      socket?.disconnect();
-      setSocket(null);
+    if (!activeId) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`/api/support/messages?ticketId=${activeId}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && Array.isArray(data.messages)) {
+          setTickets((current) => current.map((ticket) => ticket.id === activeId ? { ...ticket, messages: data.messages } : ticket));
+          await secureFetch("/api/support/messages", { method: "PATCH", body: JSON.stringify({ ticketId: activeId }) });
+        }
+      } catch { /* the next poll retries */ }
     };
+    void refresh();
+    const interval = window.setInterval(refresh, 4000);
+    return () => { cancelled = true; window.clearInterval(interval); };
   }, [activeId]);
 
   return (
@@ -523,7 +525,7 @@ export function SupportCenter({
                 const attachmentUrl = draftFile ? await uploadFile(draftFile, "support-attachments") : undefined;
                 const data = await secureFetch("/api/support/tickets", {
                   method: "POST",
-                  body: JSON.stringify({ subject: draftSubject, body: draftBody, attachmentUrl })
+                  body: JSON.stringify({ subject: draftSubject, body: draftBody, attachmentUrl, clientMessageId: crypto.randomUUID() })
                 });
                 setTickets((current) => [data.ticket, ...current]);
                 setActiveId(data.ticket.id);
@@ -598,7 +600,7 @@ export function SupportCenter({
                   const subject = text.length > 60 ? text.slice(0, 57) + "..." : text;
                   const data = await secureFetch("/api/support/tickets", {
                     method: "POST",
-                    body: JSON.stringify({ subject, body: text })
+                    body: JSON.stringify({ subject, body: text, clientMessageId: crypto.randomUUID() })
                   });
                   setTickets((current) => [data.ticket, ...current]);
                   setActiveId(data.ticket.id);
@@ -609,27 +611,11 @@ export function SupportCenter({
                   return;
                 }
                 const attachmentUrl = messageFile ? await uploadFile(messageFile, "support-attachments") : undefined;
-                if (socket?.connected && !attachmentUrl) {
-                  await new Promise<void>((resolve, reject) => {
-                    socket!.emit(
-                      "send_support_message",
-                      { ticketId, body: text },
-                      (response: { error?: string; message?: Ticket["messages"][number] }) => {
-                        if (response?.error) { reject(new Error(response.error)); return; }
-                        if (response?.message) {
-                          setTickets((current) => appendTicketMessage(current, ticketId!, response.message!));
-                        }
-                        resolve();
-                      }
-                    );
-                  });
-                } else {
-                  const data = await secureFetch("/api/support/messages", {
-                    method: "POST",
-                    body: JSON.stringify({ ticketId, body: text, attachmentUrl })
-                  });
-                  setTickets((current) => appendTicketMessage(current, ticketId!, data.message));
-                }
+                const data = await secureFetch("/api/support/messages", {
+                  method: "POST",
+                  body: JSON.stringify({ ticketId, body: text, attachmentUrl, clientMessageId: crypto.randomUUID() })
+                });
+                setTickets((current) => appendTicketMessage(current, ticketId!, data.message));
                 setMessage("");
                 setMessageFile(null);
                 event.currentTarget.reset();

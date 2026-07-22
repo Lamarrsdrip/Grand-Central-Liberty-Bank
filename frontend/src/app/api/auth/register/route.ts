@@ -5,7 +5,7 @@ import { created, handleApi } from "@/lib/api";
 import { auditLog } from "@/lib/audit";
 import { createSession, hashPassword, requestIpAndAgent, sessionCookieName, sha256 } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { sendEmail } from "@/lib/email";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 import { absoluteUrl } from "@/lib/utils";
 import { assertRateLimit } from "@/lib/security";
 import { registrationSchema } from "@/lib/validators";
@@ -161,11 +161,12 @@ async function createRetirementContributionRecord(input: {
 }
 
 async function createEmailVerificationTokenRecord(input: { userId: string; tokenHash: string; expiresAt: Date }) {
+  const id = randomBytes(12).toString("hex");
   await prisma.$runCommandRaw({
     insert: "EmailVerificationToken",
     documents: [
       {
-        _id: { $oid: randomBytes(12).toString("hex") },
+        _id: { $oid: id },
         userId: { $oid: input.userId },
         tokenHash: input.tokenHash,
         expiresAt: { $date: input.expiresAt.toISOString() },
@@ -174,6 +175,7 @@ async function createEmailVerificationTokenRecord(input: { userId: string; token
     ],
     writeConcern: { w: 1 }
   });
+  return { id };
 }
 
 async function createRetirementWelcomeAccount(userId: string) {
@@ -246,17 +248,23 @@ async function runPostRegistrationTasks(input: {
 
   try {
     const rawToken = crypto.randomUUID();
-    await createEmailVerificationTokenRecord({
+    const verification = await createEmailVerificationTokenRecord({
       userId: user.id,
       tokenHash: await sha256(rawToken),
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
     });
-    await sendEmail({
+    await sendTransactionalEmail({
+      event: "EMAIL_VERIFICATION_REQUESTED",
       to: user.email,
-      subject: "Verify your Grand Central Liberty Bank email",
-      html: `<p>Welcome to Grand Central Liberty Bank.</p><p><a href="${absoluteUrl(`/verify-email?token=${rawToken}`)}">Verify your email address</a></p>`
-    }).catch((error) => {
-      console.error("[auth] verification email failed", error);
+      idempotencyKey: `email-verification:${verification.id}`,
+      relatedUserId: user.id,
+      relatedEntityType: "EmailVerificationToken",
+      relatedEntityId: verification.id,
+      data: {
+        customerName: `${user.firstName} ${user.lastName}`,
+        actionUrl: absoluteUrl(`/verify-email?token=${rawToken}`),
+        nextStep: "Use the secure link within 24 hours to verify your email address."
+      }
     });
   } catch (error) {
     console.error("[register] email verification setup failed:", error);
@@ -339,7 +347,7 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 365,
       path: "/"
     });
-    void runPostRegistrationTasks({ user, ip, userAgent });
+    await runPostRegistrationTasks({ user, ip, userAgent });
     return response;
   });
 }

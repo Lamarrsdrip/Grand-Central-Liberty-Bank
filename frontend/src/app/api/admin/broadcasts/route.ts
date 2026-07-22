@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { latestKycStatus, resolveBroadcastRecipients } from "@/lib/domain";
 import { sendEmail } from "@/lib/email";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { safeUserSelect } from "@/lib/user-select";
 
 const schema = z.object({
   subject: z.string().min(3),
@@ -20,7 +21,7 @@ export async function GET() {
     await requireAdmin();
     const broadcasts = await prisma.broadcastEmail.findMany({
       orderBy: { createdAt: "desc" },
-      include: { createdBy: true }
+      include: { createdBy: { select: safeUserSelect } }
     });
 
     return ok({ broadcasts });

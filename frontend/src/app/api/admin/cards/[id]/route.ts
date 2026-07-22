@@ -4,6 +4,7 @@ import { handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 const schema = z.object({
   status: z.enum(["UNDER_REVIEW", "APPROVED", "REJECTED", "INFO_REQUESTED"]),
@@ -18,7 +19,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const { ip, userAgent } = await requestIpAndAgent();
     const application = await prisma.cardApplication.update({
       where: { id },
-      data: { status: input.status, adminNote: input.adminNote, reviewedById: admin.id, reviewedAt: new Date() }
+      data: { status: input.status, adminNote: input.adminNote, reviewedById: admin.id, reviewedAt: new Date() },
+      include: { user: true }
     });
     await notifyUser(application.userId, {
       type: input.status === "APPROVED" ? "CARD_APPROVED" : "CARD_REJECTED",
@@ -33,6 +35,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       metadata: input,
       ip,
       userAgent
+    });
+    await sendTransactionalEmail({
+      event: "CARD_STATUS_CHANGED", to: application.user.email, idempotencyKey: `card-status:${id}:${input.status}`,
+      relatedUserId: application.userId, relatedEntityType: "CardApplication", relatedEntityId: id,
+      data: { customerName: `${application.user.firstName} ${application.user.lastName}`, status: input.status, transactionType: `${application.type} card`, explanation: input.adminNote, timestamp: new Date(), nextStep: input.status === "INFO_REQUESTED" ? "Sign in and contact support with the requested information." : "Review the status in your card center." }
     });
 
     return ok({ application });

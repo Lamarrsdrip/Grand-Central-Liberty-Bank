@@ -4,6 +4,7 @@ import { auditLog, notifyUser } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { cardApplicationSchema } from "@/lib/validators";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 export async function GET() {
   return handleApi(async () => {
@@ -38,6 +39,11 @@ export async function POST(request: NextRequest) {
       body: "Your card application is now awaiting manual admin review."
     });
     await auditLog({ actorId: user.id, action: "CARD_APPLICATION_SUBMITTED", entity: "CardApplication", entityId: application.id });
+    await sendTransactionalEmail({
+      event: "CARD_REQUESTED", to: user.email, idempotencyKey: `card-requested:${application.id}`,
+      relatedUserId: user.id, relatedEntityType: "CardApplication", relatedEntityId: application.id,
+      data: { customerName: `${user.firstName} ${user.lastName}`, status: application.status, transactionType: `${application.type} card`, timestamp: application.createdAt, nextStep: "Your application is awaiting manual review." }
+    });
 
     return created({ application });
   });

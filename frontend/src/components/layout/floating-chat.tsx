@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Building2, MessageCircle, Minimize2, Send, X } from "lucide-react";
+import { secureFetch } from "@/lib/client-api";
+import { normalizePublicChatMessage } from "@/lib/chat-message";
 
 type Msg = {
   id: string;
@@ -10,8 +12,8 @@ type Msg = {
   createdAt: string;
 };
 
-function normalizeGet(m: { id: string; body: string; createdAt: string; sender: { role: string } }): Msg {
-  return { id: m.id, body: m.body, senderRole: m.sender.role, createdAt: m.createdAt };
+function normalizeGet(m: { id: string; body: string; createdAt: string; senderRole: string }): Msg {
+  return normalizePublicChatMessage(m);
 }
 function normalizePost(m: { id: string; body: string; senderRole: string; createdAt: string }): Msg {
   return { id: m.id, body: m.body, senderRole: m.senderRole, createdAt: m.createdAt };
@@ -24,6 +26,7 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [unread, setUnread] = useState(0);
   const lastSeenAt = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -32,20 +35,22 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
 
   const scrollBottom = () => bottomRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  async function loadMessages(id: string): Promise<Msg[]> {
+  const loadMessages = useCallback(async (id: string): Promise<Msg[]> => {
     try {
-      const res = await fetch(`/api/support/messages?ticketId=${id}`);
+      const res = await fetch(`/api/support/messages?ticketId=${id}`, { cache: "no-store" });
       const data = await res.json();
       if (data.messages) {
         const msgs: Msg[] = data.messages.map(normalizeGet);
         setMessages(msgs);
         return msgs;
       }
-    } catch { /* ignore */ }
+    } catch {
+      setError("Messages could not be refreshed. We will keep trying.");
+    }
     return [];
-  }
+  }, []);
 
-  async function init() {
+  const init = useCallback(async () => {
     if (!signedIn) return;
     setLoading(true);
     try {
@@ -60,9 +65,9 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [signedIn, loadMessages]);
 
-  useEffect(() => { init(); }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { init(); }, [init]);
 
   useEffect(() => {
     if (!ticketId) return;
@@ -79,15 +84,21 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
       if (!open) lastSeenAt.current = msgs[msgs.length - 1].createdAt;
     }, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [ticketId, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ticketId, open, loadMessages]);
 
   useEffect(() => {
     if (open) {
       setUnread(0);
+      if (ticketId) {
+        secureFetch("/api/support/messages", {
+          method: "PATCH",
+          body: JSON.stringify({ ticketId })
+        }).catch(() => undefined);
+      }
       if (messages.length) lastSeenAt.current = messages[messages.length - 1].createdAt;
       setTimeout(() => { scrollBottom(); inputRef.current?.focus(); }, 120);
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, ticketId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (open) scrollBottom(); }, [messages.length, open]);
 
@@ -103,15 +114,14 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
     const body = input.trim();
     if (!body || sending) return;
     setSending(true);
+    setError("");
     setInput("");
     try {
       if (!ticketId) {
-        const res = await fetch("/api/support/tickets", {
+        const data = await secureFetch("/api/support/tickets", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subject: "Live Support Chat", body }),
+          body: JSON.stringify({ subject: "Live Support Chat", body, clientMessageId: crypto.randomUUID() }),
         });
-        const data = await res.json();
         if (data.ticket) {
           setTicketId(data.ticket.id);
           const msgs: Msg[] = data.ticket.messages.map(normalizePost);
@@ -119,12 +129,10 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
           if (msgs.length) lastSeenAt.current = msgs[msgs.length - 1].createdAt;
         }
       } else {
-        const res = await fetch("/api/support/messages", {
+        const data = await secureFetch("/api/support/messages", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticketId, body }),
+          body: JSON.stringify({ ticketId, body, clientMessageId: crypto.randomUUID() }),
         });
-        const data = await res.json();
         if (data.message) {
           const msg = normalizePost(data.message);
           setMessages(prev => [...prev, msg]);
@@ -132,6 +140,9 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
         }
       }
       setTimeout(scrollBottom, 60);
+    } catch (sendError) {
+      setInput(body);
+      setError(sendError instanceof Error ? sendError.message : "Message failed. Please retry.");
     } finally {
       setSending(false);
     }
@@ -298,6 +309,11 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
             <div ref={bottomRef} />
           </div>
 
+          {error ? (
+            <div role="alert" style={{ padding: "8px 14px", color: "#fca5a5", background: "rgba(239,68,68,.08)", fontSize: 12 }}>
+              {error}
+            </div>
+          ) : null}
           {/* Input */}
           <form onSubmit={send} style={{
             display: "flex", gap: 8, padding: "10px 11px", flexShrink: 0,
@@ -316,7 +332,7 @@ export function FloatingChat({ signedIn }: { signedIn: boolean }) {
                 borderRadius: 11, padding: "9px 13px", color: "#fff", outline: "none",
               }}
             />
-            <button type="submit" disabled={sending || !input.trim()} style={{
+            <button type="submit" aria-label="Send support message" disabled={sending || !input.trim()} style={{
               width: 40, height: 40, borderRadius: 11, flexShrink: 0, border: "none",
               background: sending || !input.trim()
                 ? "rgba(255,255,255,0.05)"

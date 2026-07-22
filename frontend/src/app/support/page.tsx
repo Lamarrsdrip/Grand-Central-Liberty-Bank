@@ -22,8 +22,7 @@ export default async function SupportPage() {
     assignedAdmin: ticket.assignedAdmin
       ? {
           id: ticket.assignedAdmin.id,
-          name: `${ticket.assignedAdmin.firstName} ${ticket.assignedAdmin.lastName}`,
-          email: ticket.assignedAdmin.email
+          name: `${ticket.assignedAdmin.firstName} ${ticket.assignedAdmin.lastName}`
         }
       : null,
     messages: ticket.messages.map((message) => ({

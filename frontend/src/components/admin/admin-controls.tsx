@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Send } from "lucide-react";
-import { io, Socket } from "socket.io-client";
+import { RefreshCw, Search, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CryptoIcon } from "@/components/banking/crypto-icons";
@@ -273,13 +272,16 @@ type AdminSupportTicket = {
   subject: string;
   status: string;
   priority: string;
-  user: { id: string; firstName: string; lastName: string; email: string };
+  unreadCount?: number;
+  updatedAt?: string;
+  user: { id: string; firstName: string; lastName: string; email: string; accountReference?: string | null };
   assignedAdmin?: { id: string; firstName: string; lastName: string; email: string } | null;
   messages: Array<{
     id: string;
     body: string;
     senderId: string;
     createdAt: string;
+    readAt?: string | null;
     attachmentUrl?: string | null;
     senderName?: string;
     senderRole?: string;
@@ -312,24 +314,42 @@ export function AdminSupportCenter({
   const [reply, setReply] = useState("");
   const [replyFile, setReplyFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [query, setQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
   const activeTicket = useMemo(() => tickets.find((ticket) => ticket.id === activeId), [activeId, tickets]);
 
   useEffect(() => setTickets(initialTickets), [initialTickets]);
 
   useEffect(() => {
-    if (!activeId) return;
-    const nextSocket = io({ path: "/socket.io" });
-    setSocket(nextSocket);
-    nextSocket.emit("join_ticket", activeId);
-    nextSocket.on("support_message", (incoming: { ticketId: string; message: AdminSupportTicket["messages"][number] }) => {
-      setTickets((current) => appendSupportMessage(current, incoming.ticketId, incoming.message));
-    });
-    return () => {
-      nextSocket.disconnect();
-      setSocket(null);
+    let cancelled = false;
+    const refresh = async () => {
+      setRefreshing(true);
+      try {
+        const response = await fetch(`/api/admin/support${query ? `?q=${encodeURIComponent(query)}` : ""}`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Live chat could not be refreshed.");
+        const data = await response.json();
+        if (!cancelled && Array.isArray(data.tickets)) {
+          setTickets(data.tickets);
+          setError("");
+        }
+      } catch (refreshError) {
+        if (!cancelled) setError(refreshError instanceof Error ? refreshError.message : "Live chat could not be refreshed.");
+      } finally {
+        if (!cancelled) setRefreshing(false);
+      }
     };
-  }, [activeId]);
+    const debounce = window.setTimeout(refresh, query ? 250 : 0);
+    const interval = window.setInterval(refresh, 4000);
+    return () => { cancelled = true; window.clearTimeout(debounce); window.clearInterval(interval); };
+  }, [query]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    secureFetch("/api/support/messages", { method: "PATCH", body: JSON.stringify({ ticketId: activeId }) })
+      .then(() => setTickets((current) => current.map((ticket) => ticket.id === activeId ? { ...ticket, unreadCount: 0 } : ticket)))
+      .catch(() => undefined);
+  }, [activeId, activeTicket?.messages.length]);
 
   return (
     <Card>
@@ -338,6 +358,17 @@ export function AdminSupportCenter({
         <CardDescription>Open chats, reply as an admin, assign tickets, and close or reopen conversations.</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <label className="relative block w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/35" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search customer, email, or subject" className="pl-9" />
+          </label>
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-white/40" aria-live="polite">
+            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing" : "Auto-refresh on"}
+          </span>
+        </div>
+        {error ? <p role="alert" className="mb-4 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p> : null}
         <div className="grid gap-4 xl:grid-cols-[20rem_minmax(0,1fr)]">
           <div className="grid max-h-[34rem] gap-2 overflow-y-auto pr-1">
             {tickets.map((ticket) => (
@@ -357,6 +388,7 @@ export function AdminSupportCenter({
                 <p className="mt-2 text-[0.65rem] font-bold uppercase tracking-wider text-white/35">
                   {ticket.messages.length} messages · {ticket.priority}
                 </p>
+                {ticket.unreadCount ? <span className="mt-2 inline-flex rounded-full bg-red-500 px-2 py-0.5 text-[0.65rem] font-black text-white">{ticket.unreadCount} unread</span> : null}
               </button>
             ))}
             {!tickets.length ? (
@@ -373,6 +405,7 @@ export function AdminSupportCenter({
                   <div className="min-w-0">
                     <p className="text-lg font-black text-white">{activeTicket.subject}</p>
                     <p className="text-sm text-muted-foreground">{activeTicket.user.email}</p>
+                    <p className="text-xs text-white/35">Account ref: {activeTicket.user.accountReference ? `•••• ${activeTicket.user.accountReference}` : "Unavailable"}</p>
                     <p className="mt-1 text-xs text-white/35">
                       Assigned: {activeTicket.assignedAdmin ? `${activeTicket.assignedAdmin.firstName} ${activeTicket.assignedAdmin.lastName}` : "Unassigned"}
                     </p>
@@ -414,34 +447,20 @@ export function AdminSupportCenter({
                     try {
                       const attachmentUrl = replyFile ? await uploadAdminFile(replyFile, "support-attachments") : undefined;
                       const finalBody = body || "Attachment uploaded";
-                      if (socket?.connected && !attachmentUrl) {
-                        await new Promise<void>((resolve, reject) => {
-                          socket.emit(
-                            "send_support_message",
-                            { ticketId: activeTicket.id, body: finalBody },
-                            (response: { error?: string; message?: AdminSupportTicket["messages"][number] }) => {
-                              if (response?.error) {
-                                reject(new Error(response.error));
-                                return;
-                              }
-                              if (response?.message) {
-                                setTickets((current) => appendSupportMessage(current, activeTicket.id, response.message!));
-                              }
-                              resolve();
-                            }
-                          );
-                        });
-                      } else {
-                        const data = await secureFetch("/api/support/messages", {
-                          method: "POST",
-                          body: JSON.stringify({ ticketId: activeTicket.id, body: finalBody, attachmentUrl })
-                        });
-                        setTickets((current) => appendSupportMessage(current, activeTicket.id, {
-                          ...data.message,
-                          senderName: "You",
-                          senderRole: "ADMIN"
-                        }));
-                      }
+                      const data = await secureFetch("/api/support/messages", {
+                        method: "POST",
+                        body: JSON.stringify({
+                          ticketId: activeTicket.id,
+                          body: finalBody,
+                          attachmentUrl,
+                          clientMessageId: crypto.randomUUID()
+                        })
+                      });
+                      setTickets((current) => appendSupportMessage(current, activeTicket.id, {
+                        ...data.message,
+                        senderName: "You",
+                        senderRole: "ADMIN"
+                      }));
                       setReply("");
                       setReplyFile(null);
                       event.currentTarget.reset();
@@ -659,13 +678,13 @@ export function EmailSettingsForm({ settings }: { settings: Record<string, unkno
     <Card>
       <CardHeader>
         <CardTitle>Email Settings</CardTitle>
-        <CardDescription>Gmail SMTP with Google App Password support.</CardDescription>
+        <CardDescription>Optional encrypted SMTP fallback. Environment-configured Resend is preferred in production.</CardDescription>
       </CardHeader>
       <CardContent>
         <AdminJsonForm endpoint="/api/admin/email-settings" method="PUT" buttonLabel="Save SMTP settings">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field><Label>Gmail address</Label><Input name="gmailAddress" type="email" defaultValue={String(settings?.gmailAddress ?? "")} /></Field>
-            <Field><Label>App password</Label><Input name="appPassword" type="password" placeholder={settings?.appPasswordEncrypted ? "Configured" : ""} /></Field>
+            <Field><Label>SMTP user/address</Label><Input name="gmailAddress" type="email" defaultValue={String(settings?.gmailAddress ?? "")} /></Field>
+            <Field><Label>SMTP password</Label><Input name="appPassword" type="password" placeholder={settings?.appPasswordEncrypted ? "Configured" : ""} /></Field>
             <Field><Label>SMTP host</Label><Input name="smtpHost" defaultValue={String(settings?.smtpHost ?? "smtp.gmail.com")} required /></Field>
             <Field><Label>SMTP port</Label><Input name="smtpPort" type="number" defaultValue={String(settings?.smtpPort ?? 465)} required /></Field>
             <Field><Label>Sender name</Label><Input name="senderName" defaultValue={String(settings?.senderName ?? "Grand Central Liberty Bank")} required /></Field>
@@ -679,7 +698,7 @@ export function EmailSettingsForm({ settings }: { settings: Record<string, unkno
 
 export function TestEmailForm() {
   return (
-    <AdminJsonForm title="Test Email" description="Send a live SMTP test." endpoint="/api/admin/email-test" method="POST" buttonLabel="Send test">
+    <AdminJsonForm title="Test Email" description="Send through the configured live provider and report only provider-accepted delivery." endpoint="/api/admin/email-test" method="POST" buttonLabel="Send test">
       <Input name="to" type="email" placeholder="recipient@example.com" required />
     </AdminJsonForm>
   );
@@ -1119,6 +1138,9 @@ function DocPanel({ label, url, isImage }: { label: string; url: string; isImage
       {error ? (
         <div className="rounded-md bg-secondary flex items-center justify-center h-32 text-sm text-muted-foreground">File unavailable</div>
       ) : isImage ? (
+        // Protected document routes require the current session cookie, so the
+        // browser must request this image directly instead of via an optimizer.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={url}
           alt={label}
@@ -1142,5 +1164,3 @@ function DocPanel({ label, url, isImage }: { label: string; url: string; isImage
     </div>
   );
 }
-
-

@@ -158,6 +158,13 @@ enum NotificationType {
   CRYPTO_BALANCE_ADJUSTED
 }
 
+enum EmailDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
 model User {
   id                 String            @id @default(auto()) @map("_id") @db.ObjectId
   firstName          String
@@ -546,6 +553,32 @@ model Notification {
   body      String
   readAt    DateTime?
   createdAt DateTime         @default(now())
+}
+
+model EmailDelivery {
+  id                 String              @id @default(auto()) @map("_id") @db.ObjectId
+  eventType          String
+  idempotencyKey     String              @unique
+  recipient          String
+  relatedUserId      String?             @db.ObjectId
+  relatedEntityType  String?
+  relatedEntityId    String?
+  subject            String
+  htmlBody           String
+  textBody           String
+  status             EmailDeliveryStatus @default(PENDING)
+  provider           String?
+  providerMessageId  String?
+  attemptCount       Int                 @default(0)
+  lastError          String?
+  nextAttemptAt      DateTime?
+  sentAt             DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([relatedUserId, createdAt])
+  @@index([relatedEntityType, relatedEntityId])
 }
 
 model AuditLog {

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, ArrowDownToLine, FileText, ShieldCheck, Briefcase, TrendingUp } from "lucide-react";
+import { Plus, ArrowDownToLine, FileText, ShieldCheck, Briefcase } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { ProgressRail } from "@/components/banking/premium-ui";
 import { RetirementWithdrawalForm } from "@/components/banking/workflow-forms";

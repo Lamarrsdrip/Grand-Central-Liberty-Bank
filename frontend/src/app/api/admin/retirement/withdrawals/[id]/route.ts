@@ -4,6 +4,7 @@ import { handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 const schema = z.object({
   status: z.enum(["UNDER_REVIEW", "APPROVED", "REJECTED", "INFO_REQUESTED"]),
@@ -17,6 +18,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const { id } = await context.params;
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
+    const existing = await prisma.retirementWithdrawalRequest.findUnique({ where: { id }, include: { user: true, retirementAccount: true } });
+    if (!existing) throw new Response("401(k) withdrawal request was not found.", { status: 404 });
+    if (["APPROVED", "REJECTED"].includes(existing.status)) throw new Response(`This request is already ${existing.status.toLowerCase()}.`, { status: 409 });
     const withdrawal = await prisma.retirementWithdrawalRequest.update({
       where: { id },
       data: {
@@ -66,6 +70,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       metadata: { status: input.status, internalNote: input.internalNote, userNote: input.userNote },
       ip,
       userAgent
+    });
+    await sendTransactionalEmail({
+      event: "RETIREMENT_ACTION", to: existing.user.email, idempotencyKey: `retirement-withdrawal-status:${id}:${input.status}`,
+      relatedUserId: existing.userId, relatedEntityType: "RetirementWithdrawalRequest", relatedEntityId: id,
+      data: { customerName: `${existing.user.firstName} ${existing.user.lastName}`, transactionType: "401(k) withdrawal request", amount: existing.amount, currency: existing.currency, status: input.status, maskedAccount: `•••• ${existing.retirementAccount.accountNumber.slice(-4)}`, transactionReference: `RET-${id.slice(-8).toUpperCase()}`, explanation: input.userNote ?? "Your withdrawal status was updated.", timestamp: withdrawal.updatedAt, nextStep: input.status === "APPROVED" ? "No further action is required." : "Review your secure 401(k) activity and contact support if needed." }
     });
 
     return ok({ withdrawal });

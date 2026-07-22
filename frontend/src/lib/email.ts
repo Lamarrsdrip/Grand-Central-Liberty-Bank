@@ -82,11 +82,32 @@ export async function getEmailConfig() {
 }
 
 export async function sendEmail(input: { to: string | string[]; subject: string; html: string; text?: string }) {
+  const recipients = (Array.isArray(input.to) ? input.to : [input.to]).map((value) => value.trim().toLowerCase());
+  if (!recipients.length || recipients.some((value) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
+    throw new Error("Email recipient address is invalid.");
+  }
+
+  const resendKey = process.env.RESEND_API_KEY?.trim();
+  const configuredFrom = process.env.EMAIL_FROM?.trim();
+  if (resendKey) {
+    if (!configuredFrom) {
+      return { skipped: true, provider: "resend", message: "EMAIL_FROM is required when RESEND_API_KEY is configured." };
+    }
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: configuredFrom, to: recipients, subject: input.subject, html: input.html, text: input.text })
+    });
+    const data = await response.json().catch(() => ({})) as { id?: string; message?: string };
+    if (!response.ok || !data.id) throw new Error(`Resend rejected the email: ${data.message ?? response.statusText}`);
+    return { skipped: false, provider: "resend", messageId: data.id };
+  }
+
   const config = await getEmailConfig();
   if (!config.user || !config.pass) {
-    console.warn("[email] SMTP credentials not configured — skipping email to", input.to);
     return {
       skipped: true,
+      provider: "smtp",
       message: "SMTP credentials are not configured."
     };
   }
@@ -97,14 +118,14 @@ export async function sendEmail(input: { to: string | string[]; subject: string;
     ? {
         service: "gmail",
         auth: { user: config.user, pass: config.pass },
-        tls: { rejectUnauthorized: false }
+        tls: { rejectUnauthorized: true }
       }
     : {
         host: config.host,
         port: config.port,
         secure: config.secure,
         auth: { user: config.user, pass: config.pass },
-        tls: { rejectUnauthorized: false }
+        tls: { rejectUnauthorized: true }
       };
 
   const transporter = nodemailer.createTransport(transportOptions);
@@ -112,13 +133,12 @@ export async function sendEmail(input: { to: string | string[]; subject: string;
   try {
     const result = await transporter.sendMail({
       from: `"${config.senderName}" <${config.user}>`,
-      to: Array.isArray(input.to) ? input.to.join(",") : input.to,
+      to: recipients.join(","),
       subject: input.subject,
       html: input.html,
       text: input.text
     });
-    console.log("[email] sent", result.messageId, "to", input.to);
-    return { skipped: false, messageId: result.messageId };
+    return { skipped: false, provider: "smtp", messageId: result.messageId };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[email] send failed:", msg);

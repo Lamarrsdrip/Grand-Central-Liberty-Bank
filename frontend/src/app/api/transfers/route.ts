@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { NextRequest } from "next/server";
 import { created, handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
@@ -8,6 +8,7 @@ import { defaultTransferSettings } from "@/lib/domain";
 import { canSubmitTransfer } from "@/lib/domain";
 import { formatTransferReference } from "@/lib/domain";
 import { transferSchema } from "@/lib/validators";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 export async function GET() {
   return handleApi(async () => {
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
   return handleApi(async () => {
     const user = await requireUser();
     const input = transferSchema.parse(await request.json());
+    const transferId = createHash("sha256").update(`${user.id}:${input.clientRequestId}`).digest("hex").slice(0, 24);
+    const prior = await prisma.transferRequest.findUnique({
+      where: { id: transferId }
+    });
+    if (prior) {
+      const policy = (await prisma.transferSetting.findUnique({ where: { id: 1 } })) ?? defaultTransferSettings;
+      return ok({ transfer: prior, duplicate: true, message: { ...policy, reference: formatTransferReference(policy.referencePrefix, prior.id), status: prior.status } });
+    }
     const account = await prisma.account.findFirst({
       where: { id: input.fromAccountId, userId: user.id, status: "ACTIVE" }
     });
@@ -52,6 +61,7 @@ export async function POST(request: NextRequest) {
 
     const transfer = await prisma.transferRequest.create({
       data: {
+        id: transferId,
         userId: user.id,
         fromAccountId: input.fromAccountId,
         type: input.type,
@@ -95,6 +105,25 @@ export async function POST(request: NextRequest) {
       body: policy.reviewMessage
     });
     await auditLog({ actorId: user.id, action: "TRANSFER_SUBMITTED", entity: "TransferRequest", entityId: transfer.id });
+    await sendTransactionalEmail({
+      event: "BANK_TRANSFER_CREATED",
+      to: user.email,
+      idempotencyKey: `transfer-created:${transfer.id}`,
+      relatedUserId: user.id,
+      relatedEntityType: "TransferRequest",
+      relatedEntityId: transfer.id,
+      data: {
+        customerName: `${user.firstName} ${user.lastName}`,
+        transactionType: transfer.type,
+        amount: transfer.amount,
+        currency: transfer.currency,
+        status: transfer.status,
+        maskedAccount: `•••• ${account.accountNumber.slice(-4)}`,
+        transactionReference: formatTransferReference(policy.referencePrefix, transfer.id),
+        timestamp: transfer.createdAt,
+        nextStep: policy.reviewMessage
+      }
+    });
 
     return created({
       transfer,

@@ -6,6 +6,7 @@ import { auditLog } from "@/lib/audit";
 import { createSession, requestIpAndAgent, sessionCookieName, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { assertRateLimit } from "@/lib/security";
+import { loginEmailEvent, sendTransactionalEmail } from "@/lib/transactional-email";
 import { loginSchema } from "@/lib/validators";
 import type { Role, UserStatus } from "@prisma/client";
 
@@ -118,7 +119,14 @@ export async function POST(request: NextRequest) {
       ? await verifyPassword(input.password, user.passwordHash)
       : false;
 
-    void recordLoginAttempt({
+    const knownDevice = user && passwordValid
+      ? await prisma.loginHistory.findFirst({
+          where: { userId: user.id, success: true, userAgent: userAgent ?? null },
+          select: { id: true }
+        })
+      : null;
+
+    await recordLoginAttempt({
       userId: user?.id,
       email: lookupEmail,
       ip,
@@ -152,7 +160,21 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await createSession(user, { ip, userAgent });
-    void auditLog({ actorId: user.id, action: "USER_LOGIN", entity: "Session", entityId: session.sessionId, ip, userAgent });
+    await auditLog({ actorId: user.id, action: "USER_LOGIN", entity: "Session", entityId: session.sessionId, ip, userAgent });
+    await sendTransactionalEmail({
+      event: loginEmailEvent(Boolean(knownDevice)),
+      to: user.email,
+      idempotencyKey: `login:${session.sessionId}`,
+      relatedUserId: user.id,
+      relatedEntityType: "Session",
+      relatedEntityId: session.sessionId,
+      data: {
+        customerName: `${user.firstName} ${user.lastName}`,
+        device: userAgent?.slice(0, 180) ?? "Unknown device",
+        timestamp: new Date(),
+        nextStep: "If this was not you, reset your password and contact support immediately."
+      }
+    });
 
     const response = ok({
       user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }

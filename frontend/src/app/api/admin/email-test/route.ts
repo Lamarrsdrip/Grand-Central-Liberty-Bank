@@ -25,6 +25,9 @@ export async function POST(request: NextRequest) {
           </div>
         `
       });
+      if (result.skipped) {
+        throw new Response(result.message ?? "Email provider is not configured.", { status: 503 });
+      }
       await auditLog({
         actorId: admin.id,
         action: "ADMIN_SENT_TEST_EMAIL",
@@ -33,13 +36,14 @@ export async function POST(request: NextRequest) {
         ip,
         userAgent
       });
-      return ok({ success: true, result, message: result.skipped ? "SMTP not configured — email was skipped." : `Test email delivered to ${input.to}` });
+      return ok({ success: true, result, message: `Provider accepted the test email for ${input.to}` });
     } catch (error) {
       // Surface the real SMTP error to the admin instead of the generic 500 message
+      if (error instanceof Response) throw error;
       const msg = error instanceof Error ? error.message : String(error);
       console.error("[email-test] SMTP failure:", msg);
       // Throw as Response so apiError puts the real message in { error: "..." }
-      throw new Response(`SMTP Error: ${msg}`, { status: 422 });
+      throw new Response(`Email provider error: ${msg}`, { status: 422 });
     }
   });
 }

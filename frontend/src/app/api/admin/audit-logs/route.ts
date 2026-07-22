@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { handleApi, ok } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { safeUserSelect } from "@/lib/user-select";
 
 export async function GET(request: NextRequest) {
   return handleApi(async () => {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
         : undefined,
       orderBy: { createdAt: "desc" },
       take: 200,
-      include: { actor: true }
+      include: { actor: { select: safeUserSelect } }
     });
 
     return ok({ logs });

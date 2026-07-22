@@ -8,8 +8,9 @@
  * By reading a separate var, Emergent's value never reaches Prisma.
  *
  * Priority:
- *  1. DATABASE_URL — honoured when it's already a valid MongoDB URL
- *  2. MONGO_URL + DB_NAME — the Emergent platform's native MongoDB secrets
+ *  1. PRISMA_DATABASE_URL — the canonical Prisma datasource variable
+ *  2. DATABASE_URL — honoured when it is a valid MongoDB URL
+ *  3. MONGO_URL + DB_NAME — compatibility for the previous hosting platform
  */
 
 // Query params that Prisma's MongoDB connector rejects.
@@ -36,7 +37,8 @@ function cleanMongoUrl(raw: string, dbName: string): string {
   for (const p of REJECTED_PARAMS) str = stripParam(str, p);
 
   const url = new URL(str);
-  if (dbName) url.pathname = `/${dbName}`;
+  const resolvedDbName = dbName || url.pathname.replace(/^\//, "") || "grand_central_liberty_bank";
+  url.pathname = `/${resolvedDbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
   if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
   if (!url.searchParams.has("serverSelectionTimeoutMS")) url.searchParams.set("serverSelectionTimeoutMS", "5000");
@@ -45,16 +47,18 @@ function cleanMongoUrl(raw: string, dbName: string): string {
 }
 
 export function buildMongoDatabaseUrl(): string {
-  const explicit = process.env.DATABASE_URL?.trim();
-  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
+  const prismaExplicit = process.env.PRISMA_DATABASE_URL?.trim();
+  const databaseExplicit = process.env.DATABASE_URL?.trim();
+  const explicit = isMongoDsn(prismaExplicit ?? "") ? prismaExplicit : databaseExplicit;
+  const dbName = process.env.DB_NAME?.trim() || "";
 
   let clean: string;
 
   if (explicit && isMongoDsn(explicit)) {
     clean = cleanMongoUrl(explicit, dbName);
   } else {
-    if (explicit) {
-      const proto = explicit.split("://")[0] || "(empty)";
+    if (databaseExplicit) {
+      const proto = databaseExplicit.split("://")[0] || "(empty)";
       console.error(
         `[db-url] DATABASE_URL uses protocol "${proto}://" — ignoring. ` +
           `Prisma now reads PRISMA_DATABASE_URL (built from MONGO_URL).`
@@ -64,10 +68,10 @@ export function buildMongoDatabaseUrl(): string {
     const base = process.env.MONGO_URL?.trim();
     if (!base) {
       throw new Error(
-        explicit
-          ? `DATABASE_URL is not a valid MongoDB URL (got "${explicit.split("://")[0]}://..."). ` +
-              `Set DATABASE_URL to a mongodb:// or mongodb+srv:// connection string, or set MONGO_URL.`
-          : "Neither DATABASE_URL (with mongodb:// protocol) nor MONGO_URL is configured."
+        databaseExplicit
+          ? `DATABASE_URL is not a valid MongoDB URL (got "${databaseExplicit.split("://")[0]}://..."). ` +
+              `Set PRISMA_DATABASE_URL or DATABASE_URL to a MongoDB connection string, or set MONGO_URL.`
+          : "Neither PRISMA_DATABASE_URL, DATABASE_URL (with MongoDB protocol), nor MONGO_URL is configured."
       );
     }
 

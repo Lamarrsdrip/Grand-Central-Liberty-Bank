@@ -4,6 +4,8 @@ import { handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
+import { safeUserSelect } from "@/lib/user-select";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("FREEZE"), reason: z.string().min(5) }),
@@ -28,7 +30,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
     const user = await prisma.user.findUnique({
       where: { id },
-      include: {
+      select: {
+        ...safeUserSelect,
         accounts: { include: { transactions: { orderBy: { createdAt: "desc" }, take: 20 }, freezeEvents: { orderBy: { createdAt: "desc" } } } },
         kycSubmissions: { orderBy: { createdAt: "desc" }, include: { notesHistory: { orderBy: { createdAt: "desc" } } } },
         cardApplications: { orderBy: { createdAt: "desc" } },
@@ -51,6 +54,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const { id } = await context.params;
     const input = schema.parse(await request.json());
     const { ip, userAgent } = await requestIpAndAgent();
+    const target = await prisma.user.findUnique({ where: { id }, select: { email: true, firstName: true, lastName: true } });
+    if (!target) throw new Response("User was not found.", { status: 404 });
 
     if (input.action === "EDIT_PROFILE") {
       await prisma.user.update({
@@ -125,6 +130,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       metadata: { reason: input.reason },
       ip,
       userAgent
+    });
+    const event = input.action === "SUSPEND" ? "ACCOUNT_SUSPENDED" : input.action === "ACTIVATE" ? "ACCOUNT_ACTIVATED" : input.action === "EDIT_PROFILE" ? "PROFILE_CHANGED" : "ACCOUNT_STATUS_CHANGED";
+    await sendTransactionalEmail({
+      event, to: input.action === "EDIT_PROFILE" ? input.email : target.email, idempotencyKey: `admin-user-action:${id}:${input.action}:${Date.now()}`,
+      relatedUserId: id, relatedEntityType: "User", relatedEntityId: id,
+      data: { customerName: input.action === "EDIT_PROFILE" ? `${input.firstName} ${input.lastName}` : `${target.firstName} ${target.lastName}`, status: input.action, explanation: input.reason, timestamp: new Date(), nextStep: "Review your account and contact support immediately if you do not recognize this change." }
     });
 
     return ok({ success: true });

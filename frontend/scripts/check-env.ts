@@ -1,15 +1,9 @@
-const required = ["DATABASE_URL", "JWT_SECRET", "CSRF_SECRET", "SETTINGS_MASTER_KEY"];
+import { validateServerConfig } from "../src/lib/config";
 
-const missing = required.filter((key) => !process.env[key]);
-
-if (missing.length > 0) {
-  console.error(`Missing required environment variables: ${missing.join(", ")}`);
-  process.exit(1);
+const issues = validateServerConfig();
+for (const issue of issues) {
+  const write = issue.severity === "error" ? console.error : console.warn;
+  write(`[${issue.severity}] ${issue.key}: ${issue.message}`);
 }
-
-if ((process.env.JWT_SECRET ?? "").length < 32) {
-  console.error("JWT_SECRET must be at least 32 characters.");
-  process.exit(1);
-}
-
-console.log("Environment looks ready for Grand Central Liberty Bank.");
+if (issues.some((issue) => issue.severity === "error")) process.exit(1);
+console.log(issues.length ? "Critical configuration is valid; review warnings before production deployment." : "Environment is ready for production.");

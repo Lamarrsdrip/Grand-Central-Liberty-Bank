@@ -4,6 +4,8 @@ import { handleApi, ok } from "@/lib/api";
 import { auditLog, notifyUser } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
+import { safeUserSelect } from "@/lib/user-select";
 
 const schema = z.object({
   status: z.enum(["UNDER_REVIEW", "APPROVED", "REJECTED", "INFO_REQUESTED"]),
@@ -25,7 +27,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         rejectionReason: input.status === "REJECTED" ? input.note : null,
         reviewedById: admin.id,
         reviewedAt: new Date()
-      }
+      }, include: { user: { select: safeUserSelect } }
     });
     try {
       await prisma.kycNote.create({
@@ -55,6 +57,12 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       metadata: { status: input.status, note: input.note },
       ip,
       userAgent
+    });
+    await sendTransactionalEmail({
+      event: input.status === "APPROVED" ? "KYC_APPROVED" : input.status === "REJECTED" ? "KYC_REJECTED" : input.status === "INFO_REQUESTED" ? "KYC_INFO_REQUESTED" : "COMPLIANCE_ACTION",
+      to: submission.user.email, idempotencyKey: `kyc-status:${id}:${input.status}`,
+      relatedUserId: submission.userId, relatedEntityType: "KycSubmission", relatedEntityId: id,
+      data: { customerName: `${submission.user.firstName} ${submission.user.lastName}`, status: input.status, explanation: input.note, timestamp: new Date(), nextStep: input.status === "INFO_REQUESTED" ? "Sign in to review the request and provide the additional information." : "No action is required unless the note above asks you to contact support." }
     });
 
     return ok({ submission });

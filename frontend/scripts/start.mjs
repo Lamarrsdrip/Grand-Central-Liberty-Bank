@@ -323,7 +323,8 @@ function cleanMongoUrl(raw, dbName) {
   let str = raw;
   for (const p of MONGO_REJECTED_PARAMS) str = stripParam(str, p);
   const url = new URL(str);
-  if (dbName) url.pathname = `/${dbName}`;
+  const resolvedDbName = dbName || url.pathname.replace(/^\//, "") || "grand_central_liberty_bank";
+  url.pathname = `/${resolvedDbName}`;
   if (!url.searchParams.has("retryWrites")) url.searchParams.set("retryWrites", "true");
   if (!url.searchParams.has("w")) url.searchParams.set("w", "majority");
   if (!url.searchParams.has("serverSelectionTimeoutMS")) url.searchParams.set("serverSelectionTimeoutMS", "5000");
@@ -333,7 +334,7 @@ function cleanMongoUrl(raw, dbName) {
 
 function buildDatabaseUrl() {
   const explicit = process.env.DATABASE_URL?.trim();
-  const dbName = process.env.DB_NAME?.trim() || "grand_central_liberty_bank";
+  const dbName = process.env.DB_NAME?.trim() || "";
 
   if (explicit) {
     if (explicit.startsWith("mongodb://") || explicit.startsWith("mongodb+srv://")) {

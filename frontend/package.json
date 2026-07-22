@@ -14,6 +14,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:dev": "prisma migrate dev",
+    "audit:data": "tsx scripts/audit-data-integrity.ts",
     "check-env": "tsx scripts/check-env.ts",
     "verify:ui": "node scripts/verify-ui.mjs"
   },
@@ -28,13 +29,11 @@
     "jose": "latest",
     "lucide-react": "latest",
     "next": "15.5.19",
-    "nodemailer": "latest",
+    "nodemailer": "^9.0.3",
     "prisma": "6.19.3",
     "qrcode": "latest",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "socket.io": "4.8.3",
-    "socket.io-client": "latest",
     "speakeasy": "latest",
     "tailwind-merge": "latest",
     "tailwindcss": "4.3.1",
@@ -56,6 +55,8 @@
     "vitest": "latest"
   },
   "overrides": {
-    "ws": "8.21.0"
+    "ws": "8.21.0",
+    "postcss": "8.5.10",
+    "sharp": "0.35.0"
   }
 }

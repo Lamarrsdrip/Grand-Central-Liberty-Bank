@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ChevronLeft, ChevronRight, Building2, ShieldCheck, Delete, Check,
   AlertTriangle, User, CreditCard, Globe, Bookmark, Clock, X, Send,
@@ -62,9 +62,6 @@ const COUNTRIES = [
 const AVATAR_PALETTE = [
   "#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#06b6d4","#f97316","#84cc16",
 ];
-const STEP_LABELS: Record<WizardStep, string> = {
-  1: "Type", 2: "Recipient", 3: "Options", 4: "Amount", 5: "Confirm",
-};
 const TOTAL_STEPS = 5;
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
@@ -270,6 +267,7 @@ export function TransferFlow({
 }) {
   const { tx } = useTranslations();
   const displayCurrency = useCurrency();
+  const clientRequestId = useRef(crypto.randomUUID());
 
   /* ── Wizard navigation ──────────────────────────────────────────────── */
   const [step, setStep] = useState<WizardStep>(1);
@@ -447,6 +445,7 @@ export function TransferFlow({
       const data = await secureFetch("/api/transfers", {
         method: "POST",
         body: JSON.stringify({
+          clientRequestId: clientRequestId.current,
           fromAccountId,
           type: transferType,
           beneficiaryName: recipientName.trim(),
@@ -462,6 +461,7 @@ export function TransferFlow({
           recipientAddress: recipientAddress.trim() || undefined,
         }),
       });
+      clientRequestId.current = crypto.randomUUID();
 
       if (saveBeneficiary) {
         const rs = isIntl ? (swiftBic.trim() || iban.trim()) : routingNumber.trim();
@@ -510,6 +510,7 @@ export function TransferFlow({
   }
 
   function resetFlow() {
+    clientRequestId.current = crypto.randomUUID();
     setRawAmount("0"); setRecipientName(""); setBankName(""); setAccountNumber("");
     setRoutingNumber(""); setSwiftBic(""); setIban(""); setRecipientAddress("");
     setRecipientCountry("United States");

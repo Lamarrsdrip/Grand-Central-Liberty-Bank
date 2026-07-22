@@ -45,6 +45,7 @@ export const cardApplicationSchema = z.object({
 });
 
 export const transferSchema = z.object({
+  clientRequestId: z.string().uuid(),
   fromAccountId: z.string().min(1),
   type: z.enum(["INTERNAL", "DOMESTIC", "INTERNATIONAL"]),
   beneficiaryName: z.string().trim().min(2, "Recipient full name is required"),
@@ -73,13 +74,15 @@ export const beneficiarySchema = z.object({
 export const ticketSchema = z.object({
   subject: z.string().min(3),
   body: z.string().min(1),
-  attachmentUrl: z.string().optional()
+  attachmentUrl: z.string().optional(),
+  clientMessageId: z.string().uuid()
 });
 
 export const messageSchema = z.object({
   ticketId: z.string().min(1),
   body: z.string().min(1),
-  attachmentUrl: z.string().optional()
+  attachmentUrl: z.string().optional(),
+  clientMessageId: z.string().uuid()
 });
 
 export const retirementWithdrawalSchema = z.object({

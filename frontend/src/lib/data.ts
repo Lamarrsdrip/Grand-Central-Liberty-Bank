@@ -7,6 +7,7 @@ import {
   latestKycStatus
 } from "@/lib/domain";
 import { SUPPORTED_LOCALES } from "@/lib/locales";
+import { safeUserSelect } from "@/lib/user-select";
 
 export async function getBankSettings() {
   return (
@@ -47,7 +48,8 @@ export async function getUserDashboardData(userId: string) {
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      include: {
+      select: {
+        ...safeUserSelect,
         kycSubmissions: { orderBy: { createdAt: "desc" }, include: { notesHistory: { orderBy: { createdAt: "desc" } } } },
         transferRequests: { orderBy: { createdAt: "desc" } },
         loginHistory: { orderBy: { createdAt: "desc" }, take: 5 }
@@ -66,7 +68,7 @@ export async function getUserDashboardData(userId: string) {
       where: { userId },
       orderBy: { updatedAt: "desc" },
       take: 3,
-      include: { messages: { orderBy: { createdAt: "asc" } }, assignedAdmin: true }
+      include: { messages: { orderBy: { createdAt: "asc" } }, assignedAdmin: { select: { id: true, firstName: true, lastName: true } } }
     }),
     prisma.transferSetting.findUnique({ where: { id: 1 } }),
     prisma.cryptoWallet.findMany({ where: { enabled: true }, orderBy: [{ symbol: "asc" }] }),
@@ -113,7 +115,7 @@ export async function getUserSupportTickets(userId: string) {
     orderBy: { updatedAt: "desc" },
     include: {
       assignedAdmin: {
-        select: { id: true, firstName: true, lastName: true, email: true }
+        select: { id: true, firstName: true, lastName: true }
       },
       messages: {
         orderBy: { createdAt: "asc" },
@@ -130,9 +132,9 @@ export async function getUserSupportTickets(userId: string) {
 export async function getUnreadSupportReplyCount(userId: string) {
   return prisma.supportMessage.count({
     where: {
-      readAt: null,
       senderId: { not: userId },
-      ticket: { userId }
+      ticket: { userId },
+      OR: [{ readAt: null }, { readAt: { isSet: false } }]
     }
   });
 }
@@ -148,17 +150,17 @@ export async function getAdminData() {
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
-      include: { accounts: true, kycSubmissions: { orderBy: { createdAt: "desc" }, take: 1 } }
+      select: { ...safeUserSelect, accounts: true, kycSubmissions: { orderBy: { createdAt: "desc" }, take: 1 } }
     }),
-    prisma.kycSubmission.findMany({ orderBy: { createdAt: "desc" }, include: { user: true, notesHistory: true }, take: 50 }),
-    prisma.transferRequest.findMany({ orderBy: { createdAt: "desc" }, include: { user: true, fromAccount: true }, take: 50 }),
-    prisma.cardApplication.findMany({ orderBy: { createdAt: "desc" }, include: { user: true }, take: 50 }),
+    prisma.kycSubmission.findMany({ orderBy: { createdAt: "desc" }, include: { user: { select: safeUserSelect }, notesHistory: true }, take: 50 }),
+    prisma.transferRequest.findMany({ orderBy: { createdAt: "desc" }, include: { user: { select: safeUserSelect }, fromAccount: true }, take: 50 }),
+    prisma.cardApplication.findMany({ orderBy: { createdAt: "desc" }, include: { user: { select: safeUserSelect } }, take: 50 }),
     prisma.cryptoWallet.findMany({ orderBy: [{ symbol: "asc" }] }),
     prisma.supportTicket.findMany({
       orderBy: { updatedAt: "desc" },
       include: {
-        user: true,
-        assignedAdmin: true,
+        user: { select: safeUserSelect },
+        assignedAdmin: { select: safeUserSelect },
         messages: {
           orderBy: { createdAt: "asc" },
           include: {
@@ -174,12 +176,12 @@ export async function getAdminData() {
     getBankSettings(),
     prisma.transferSetting.findUnique({ where: { id: 1 } }),
     prisma.announcementBanner.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
-    prisma.broadcastEmail.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { createdBy: true } }),
-    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { actor: true } }),
+    prisma.broadcastEmail.findMany({ orderBy: { createdAt: "desc" }, take: 20, include: { createdBy: { select: safeUserSelect } } }),
+    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { actor: { select: safeUserSelect } } }),
     prisma.retirementAccount.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        user: true,
+        user: { select: safeUserSelect },
         contributions: { orderBy: { contributionDate: "desc" } },
         withdrawalRequests: { orderBy: { createdAt: "desc" }, include: { notes: { orderBy: { createdAt: "desc" } } } }
       }
@@ -187,10 +189,10 @@ export async function getAdminData() {
     prisma.retirementWithdrawalRequest.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        user: true,
+        user: { select: safeUserSelect },
         retirementAccount: true,
-        reviewedBy: true,
-        notes: { orderBy: { createdAt: "desc" }, include: { author: true } }
+        reviewedBy: { select: safeUserSelect },
+        notes: { orderBy: { createdAt: "desc" }, include: { author: { select: safeUserSelect } } }
       }
     }),
     prisma.retirementFeeSetting.findUnique({ where: { id: 1 } }),
@@ -204,10 +206,11 @@ export async function getAdminData() {
       orderBy: { createdAt: "desc" },
       take: 100,
       include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
-    })
+    }),
+    prisma.emailDelivery.findMany({ orderBy: { createdAt: "desc" }, take: 100 })
   ]);
 
-  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17] = results;
+  const [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18] = results;
 
   const defaultBankSettings = {
     id: 1, bankName: "Grand Central Liberty Bank", bankAddress: "200 Liberty Plaza, New York, NY",
@@ -242,6 +245,7 @@ export async function getAdminData() {
       recipientAddress: string; notes: string | null; status: string;
       adminMessage: string | null; reference: string; createdAt: Date; updatedAt: Date;
       user: { id: string; firstName: string; lastName: string; email: string };
-    }>
+    }>,
+    emailDeliveries:       settled(r18, [], "emailDeliveries")
   };
 }

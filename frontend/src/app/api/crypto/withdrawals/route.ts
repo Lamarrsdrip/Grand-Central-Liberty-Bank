@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { plainText } from "@/lib/sanitize";
 import { getAdminCryptoPrices, resolveRateFromMap } from "@/lib/crypto-prices";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 const schema = z.object({
   asset: z.string().min(2).max(12),
@@ -95,6 +96,11 @@ export async function POST(request: NextRequest) {
       entity: "CryptoWithdrawalRequest",
       entityId: withdrawal.id,
       metadata: { asset, network: input.network, amount: input.amount, reference }
+    });
+    await sendTransactionalEmail({
+      event: "CRYPTO_WITHDRAWAL_REQUESTED", to: user.email, idempotencyKey: `crypto-withdrawal-requested:${withdrawal.id}`,
+      relatedUserId: user.id, relatedEntityType: "CryptoWithdrawalRequest", relatedEntityId: withdrawal.id,
+      data: { customerName: `${user.firstName} ${user.lastName}`, transactionType: `${asset} withdrawal on ${input.network}`, amount: input.amount, currency: asset, status: withdrawal.status, transactionReference: reference, timestamp: withdrawal.createdAt, nextStep: "Your request is pending review. No asset is debited until approval." }
     });
 
     return created({ withdrawalId: withdrawal.id, reference });

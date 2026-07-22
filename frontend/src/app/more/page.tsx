@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { CreditCard, Headphones, LineChart, Settings2, ShieldCheck, UserCircle } from "lucide-react";
+import { CreditCard, LineChart, Settings2, ShieldCheck, UserCircle } from "lucide-react";
 import { ProtectedShell } from "@/components/layout/protected-shell";
 import { ChatMoreCard } from "@/components/layout/chat-more-card";
 import { getCurrentUser } from "@/lib/auth";

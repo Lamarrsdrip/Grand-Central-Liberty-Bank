@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { getCurrentUser } from "@/lib/auth";
 import { getAdminData } from "@/lib/data";
 import { CRYPTO_RATES_USD } from "@/lib/swap-rates";
@@ -91,7 +92,15 @@ export default async function AdminPage({
     subject: ticket.subject,
     status: ticket.status,
     priority: ticket.priority,
-    user: { id: ticket.user.id, firstName: ticket.user.firstName, lastName: ticket.user.lastName, email: ticket.user.email },
+    user: {
+      id: ticket.user.id,
+      firstName: ticket.user.firstName,
+      lastName: ticket.user.lastName,
+      email: ticket.user.email,
+      accountReference: data.users.find((candidate) => candidate.id === ticket.user.id)?.accounts[0]?.accountNumber.slice(-4) ?? null
+    },
+    unreadCount: ticket.messages.filter((message) => message.sender.role === "USER" && !message.readAt).length,
+    updatedAt: ticket.updatedAt.toISOString(),
     assignedAdmin: ticket.assignedAdmin
       ? { id: ticket.assignedAdmin.id, firstName: ticket.assignedAdmin.firstName, lastName: ticket.assignedAdmin.lastName, email: ticket.assignedAdmin.email }
       : null,
@@ -100,6 +109,7 @@ export default async function AdminPage({
       body: message.body,
       senderId: message.senderId,
       attachmentUrl: message.attachmentUrl,
+      readAt: message.readAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
       senderName: `${message.sender.firstName} ${message.sender.lastName}`,
       senderRole: message.sender.role
@@ -127,33 +137,17 @@ export default async function AdminPage({
 
   return (
     <ProtectedShell adminOnly>
-      <div className="grid gap-6">
+      <div className="grid min-w-0 gap-4">
         {/* Header */}
-        <section className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#111827] via-[#0d1713] to-[#101827] p-5 shadow-2xl lg:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.3em] text-emerald-300/70">Banking Operations</p>
-              <h1 className="mt-2 text-3xl font-black text-white lg:text-4xl">Admin Command Center</h1>
-              <p className="mt-1 text-sm text-white/45">Grand Central Liberty Bank · full platform control</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[34rem]">
-              {([
-                ["KYC", pendingKyc],
-                ["Transfers", pendingTransfers],
-                ["401(k)", pendingRetirement],
-                ["Support", openTickets]
-              ] as [string, number][]).map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/10 bg-white/7 p-4">
-                  <p className="text-2xl font-black text-white">{value}</p>
-                  <p className="text-xs font-bold uppercase tracking-wider text-white/40">{label} pending</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <PageHeader
+          eyebrow="Banking operations"
+          title="Admin Command Center"
+          description="Review priority queues, customer records, transactions, communications, and platform controls."
+          actions={<div className="grid grid-cols-4 gap-1.5 rounded-xl border border-white/8 bg-white/4 p-1.5">{[["KYC", pendingKyc], ["Transfers", pendingTransfers], ["401(k)", pendingRetirement], ["Chat", openTickets]].map(([label, value]) => <div key={label} className="min-w-14 rounded-lg px-2 py-1.5 text-center"><strong className="block text-base text-white">{value}</strong><span className="text-[0.6rem] font-bold uppercase text-white/35">{label}</span></div>)}</div>}
+        />
 
         {/* Tab Navigation */}
-        <nav className="sticky top-0 z-10 -mx-4 border-y border-white/8 bg-[#0b0f18]/90 px-4 py-2.5 backdrop-blur-xl lg:top-[4.5rem] lg:mx-0 lg:rounded-2xl lg:border">
+        <nav className="sticky top-[3.5rem] z-20 -mx-3 border-y border-white/8 bg-[#0b0f18]/94 px-3 py-2 backdrop-blur-xl sm:top-[3.8rem] lg:mx-0 lg:rounded-xl lg:border">
           <div className="flex gap-1 overflow-x-auto scrollbar-none">
             {tabLinks.map(([tab, label, badge]) => (
               <a
@@ -175,7 +169,7 @@ export default async function AdminPage({
         </nav>
 
         {/* Overview */}
-        {activeTab === "overview" && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        {activeTab === "overview" && <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {([
             ["Total Users", data.users.length, "Registered profiles"],
             ["KYC Pending", pendingKyc, "Awaiting review"],
@@ -184,13 +178,7 @@ export default async function AdminPage({
             ["Open Support", openTickets, "Active tickets"],
             ["Live Banners", activeAnnouncements, "Published announcements"]
           ] as [string, number, string][]).map(([title, value, description]) => (
-            <Card key={title} className="border-white/10 bg-white/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">{title}</CardTitle>
-                <CardDescription className="text-xs">{description}</CardDescription>
-              </CardHeader>
-              <CardContent><p className="text-3xl font-black text-white">{value}</p></CardContent>
-            </Card>
+            <StatCard key={title} label={title} value={value} description={description} />
           ))}
         </section>}
 
@@ -703,6 +691,27 @@ export default async function AdminPage({
                 {!data.broadcasts.length && (
                   <p className="text-sm text-muted-foreground">No broadcasts sent yet.</p>
                 )}
+              </div>
+              <div className="min-w-0">
+                <h3 className="mb-2 text-sm font-black text-white">Transactional delivery log</h3>
+                <div className="max-w-full overflow-x-auto rounded-xl border border-white/10">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Event</TableHead><TableHead>Recipient</TableHead><TableHead>Status</TableHead><TableHead>Sent</TableHead><TableHead>Retries</TableHead><TableHead>Failure</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {data.emailDeliveries.map((delivery) => (
+                        <TableRow key={delivery.id}>
+                          <TableCell className="whitespace-nowrap text-xs font-bold">{delivery.eventType.replaceAll("_", " ")}</TableCell>
+                          <TableCell className="max-w-48 truncate text-xs" title={delivery.recipient}>{delivery.recipient}</TableCell>
+                          <TableCell><StatusBadge status={delivery.status} /></TableCell>
+                          <TableCell className="whitespace-nowrap text-xs">{delivery.sentAt ? formatDate(delivery.sentAt) : "—"}</TableCell>
+                          <TableCell>{delivery.attemptCount}</TableCell>
+                          <TableCell className="max-w-56 truncate text-xs text-red-200" title={delivery.lastError ?? undefined}>{delivery.lastError ?? "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                      {!data.emailDeliveries.length ? <TableRow><TableCell colSpan={6} className="py-6 text-center text-muted-foreground">No transactional email attempts recorded yet.</TableCell></TableRow> : null}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </CardContent>
           </Card>

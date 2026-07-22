@@ -2,6 +2,7 @@ import { handleApi, ok } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { defaultRetirementFeeSettings } from "@/lib/domain";
+import { safeUserSelect } from "@/lib/user-select";
 
 export async function GET() {
   return handleApi(async () => {
@@ -10,7 +11,7 @@ export async function GET() {
       prisma.retirementAccount.findMany({
         orderBy: { createdAt: "desc" },
         include: {
-          user: true,
+          user: { select: safeUserSelect },
           contributions: { orderBy: { contributionDate: "desc" } },
           withdrawalRequests: { orderBy: { createdAt: "desc" }, include: { notes: { orderBy: { createdAt: "desc" } } } }
         }
@@ -18,10 +19,10 @@ export async function GET() {
       prisma.retirementWithdrawalRequest.findMany({
         orderBy: { createdAt: "desc" },
         include: {
-          user: true,
+          user: { select: safeUserSelect },
           retirementAccount: true,
-          reviewedBy: true,
-          notes: { orderBy: { createdAt: "desc" }, include: { author: true } }
+          reviewedBy: { select: safeUserSelect },
+          notes: { orderBy: { createdAt: "desc" }, include: { author: { select: safeUserSelect } } }
         }
       }),
       prisma.retirementFeeSetting.findUnique({ where: { id: 1 } })

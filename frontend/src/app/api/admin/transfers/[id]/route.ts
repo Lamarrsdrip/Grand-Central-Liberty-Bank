@@ -5,6 +5,7 @@ import { auditLog, notifyUser } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { computeApprovalDebit } from "@/lib/domain";
+import { sendTransactionalEmail, transferStatusEmailEvent } from "@/lib/transactional-email";
 
 const schema = z.object({
   status: z.enum(["UNDER_REVIEW", "APPROVED", "REJECTED", "CANCELLED"]),
@@ -23,7 +24,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 
     const existing = await prisma.transferRequest.findUnique({
       where: { id },
-      include: { fromAccount: true }
+      include: { fromAccount: true, user: true }
     });
     if (!existing) {
       throw new Response("Transfer request not found.", { status: 404 });
@@ -49,68 +50,44 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         throw new Response(outcome.reason, { status: 400 });
       }
 
-      const claim = await prisma.transferRequest.updateMany({
-        where: {
-          id,
-          status: { notIn: ["APPROVED", "REJECTED", "CANCELLED"] }
-        },
-        data: { status: "UNDER_REVIEW" }
-      });
-      if (claim.count === 0) {
-        throw new Response("Transfer was already finalized by another reviewer.", { status: 409 });
-      }
-
-      // Conditional decrement (not an absolute write of a pre-read balance) —
-      // this is what actually closes the race: if a second transfer on the
-      // same account was approved in between our read and this write, the
-      // availableBalance floor here re-checks against the row's current
-      // value at write time instead of trusting our stale snapshot.
-      const debited = await prisma.account.updateMany({
-        where: {
-          id: existing.fromAccount.id,
-          status: "ACTIVE",
-          availableBalance: { gte: outcome.debit }
-        },
-        data: {
-          availableBalance: { decrement: outcome.debit },
-          balance: { decrement: outcome.debit }
-        }
-      });
-      if (debited.count === 0) {
-        await prisma.transferRequest.update({
-          where: { id },
-          data: { status: existing.status }
-        }).catch(() => undefined);
-        throw new Response(
-          "Insufficient available balance at approval time — a concurrent approval on this account may have used the funds. Please review and retry.",
-          { status: 409 }
-        );
-      }
-
       try {
-        await prisma.transaction.create({
-          data: {
-            accountId: existing.fromAccount.id,
-            type: "TRANSFER_DEBIT",
-            amount: -outcome.debit,
-            currency: existing.currency,
-            description: `Transfer to ${existing.beneficiaryName}`,
-            reference: `TRF-${existing.id}`,
-            status: "POSTED"
+        await prisma.$transaction(async (tx) => {
+          const claim = await tx.transferRequest.updateMany({
+            where: { id, status: { notIn: ["APPROVED", "REJECTED", "CANCELLED"] } },
+            data: { status: "UNDER_REVIEW" }
+          });
+          if (claim.count !== 1) {
+            throw new Response("Transfer was already finalized by another reviewer.", { status: 409 });
           }
-        });
-        await prisma.transferRequest.update({
-          where: { id },
-          data: { status: "APPROVED", adminNote: input.adminNote }
+
+          const debited = await tx.account.updateMany({
+            where: {
+              id: existing.fromAccount.id,
+              status: "ACTIVE",
+              balance: { gte: outcome.debit },
+              availableBalance: { gte: outcome.debit }
+            },
+            data: { availableBalance: { decrement: outcome.debit }, balance: { decrement: outcome.debit } }
+          });
+          if (debited.count !== 1) {
+            throw new Response("Insufficient available balance at approval time. Refresh and review the account before retrying.", { status: 409 });
+          }
+
+          await tx.transaction.create({
+            data: {
+              accountId: existing.fromAccount.id,
+              type: "TRANSFER_DEBIT",
+              amount: -outcome.debit,
+              currency: existing.currency,
+              description: `Transfer to ${existing.beneficiaryName}`,
+              reference: `TRF-${existing.id}`,
+              status: "POSTED"
+            }
+          });
+          await tx.transferRequest.update({ where: { id }, data: { status: "APPROVED", adminNote: input.adminNote } });
         });
       } catch (error) {
-        await prisma.transferRequest.update({
-          where: { id },
-          data: {
-            status: existing.status,
-            adminNote: `Approval failed during ledger update: ${input.adminNote}`
-          }
-        }).catch(() => undefined);
+        if (error instanceof Response) throw error;
         await auditLog({
           actorId: admin.id,
           action: "ADMIN_TRANSFER_APPROVAL_FAILED",
@@ -120,7 +97,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
           ip,
           userAgent
         });
-        throw new Response("Transfer approval could not be completed. Please retry or contact technical operations.", { status: 500 });
+        throw new Response("Transfer approval could not be committed atomically. Confirm the production MongoDB deployment supports transactions, then retry.", { status: 503 });
       }
     } else {
       await prisma.transferRequest.update({
@@ -144,6 +121,26 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       metadata: input,
       ip,
       userAgent
+    });
+    await sendTransactionalEmail({
+      event: transferStatusEmailEvent(input.status),
+      to: existing.user.email,
+      idempotencyKey: `transfer-status:${id}:${input.status}`,
+      relatedUserId: existing.userId,
+      relatedEntityType: "TransferRequest",
+      relatedEntityId: id,
+      data: {
+        customerName: `${existing.user.firstName} ${existing.user.lastName}`,
+        transactionType: existing.type,
+        amount: existing.amount,
+        currency: existing.currency,
+        status: input.status,
+        maskedAccount: `•••• ${existing.fromAccount.accountNumber.slice(-4)}`,
+        transactionReference: `GCLB-${id.slice(-8).toUpperCase()}`,
+        explanation: input.adminNote,
+        timestamp: new Date(),
+        nextStep: input.status === "APPROVED" ? "No further action is required." : "Review the note above or contact support for help."
+      }
     });
 
     return ok({ transfer });

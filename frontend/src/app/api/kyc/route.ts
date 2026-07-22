@@ -4,6 +4,7 @@ import { auditLog, notifyUser } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { kycSchema } from "@/lib/validators";
+import { sendTransactionalEmail } from "@/lib/transactional-email";
 
 export async function GET() {
   return handleApi(async () => {
@@ -48,6 +49,11 @@ export async function POST(request: NextRequest) {
       body: "Your verification documents were received and are pending manual review."
     });
     await auditLog({ actorId: user.id, action: "KYC_SUBMITTED", entity: "KycSubmission", entityId: submission.id });
+    await sendTransactionalEmail({
+      event: "KYC_SUBMITTED", to: user.email, idempotencyKey: `kyc-submitted:${submission.id}`,
+      relatedUserId: user.id, relatedEntityType: "KycSubmission", relatedEntityId: submission.id,
+      data: { customerName: `${user.firstName} ${user.lastName}`, status: submission.status, timestamp: submission.createdAt, nextStep: "Your documents are queued for manual verification. We will notify you when the review changes." }
+    });
 
     return created({ submission });
   });

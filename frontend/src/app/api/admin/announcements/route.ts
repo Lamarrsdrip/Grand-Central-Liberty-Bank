@@ -4,6 +4,7 @@ import { created, handleApi, ok } from "@/lib/api";
 import { auditLog } from "@/lib/audit";
 import { requireAdmin, requestIpAndAgent } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { safeUserSelect } from "@/lib/user-select";
 
 const schema = z.object({
   title: z.string().min(2),
@@ -20,7 +21,7 @@ const schema = z.object({
 export async function GET() {
   return handleApi(async () => {
     await requireAdmin();
-    const announcements = await prisma.announcementBanner.findMany({ orderBy: { createdAt: "desc" }, include: { createdBy: true } });
+    const announcements = await prisma.announcementBanner.findMany({ orderBy: { createdAt: "desc" }, include: { createdBy: { select: safeUserSelect } } });
     return ok({ announcements });
   });
 }
