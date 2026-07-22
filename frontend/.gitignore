@@ -6,3 +6,5 @@ coverage
 uploads
 *.log
 prisma/dev.db
+.vercel
+.env*

@@ -19,10 +19,10 @@
     "verify:ui": "node scripts/verify-ui.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "latest",
     "@prisma/client": "6.19.3",
     "@radix-ui/react-slot": "latest",
     "@tailwindcss/postcss": "latest",
+    "@vercel/blob": "^2.6.1",
     "bcryptjs": "latest",
     "class-variance-authority": "latest",
     "clsx": "latest",

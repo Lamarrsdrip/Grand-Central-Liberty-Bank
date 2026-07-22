@@ -1,23 +1,7 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { get } from "@vercel/blob";
 import { handleApi } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-
-// Minimal content-type resolver (avoids shipping a mime dependency).
-function contentTypeFor(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const map: Record<string, string> = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".pdf": "application/pdf",
-    ".svg": "image/svg+xml"
-  };
-  return map[ext] ?? "application/octet-stream";
-}
 
 export async function GET(request: Request, context: { params: Promise<{ key: string[] }> }) {
   return handleApi(async () => {
@@ -32,15 +16,10 @@ export async function GET(request: Request, context: { params: Promise<{ key: st
       throw new Response("Invalid file path.", { status: 400 });
     }
 
-    const uploadsRoot = path.resolve(process.cwd(), "uploads");
-    const filePath = path.resolve(uploadsRoot, ...key);
+    // The blob's pathname (its storage key) is just the key segments rejoined.
+    const blobPathname = key.join("/");
 
-    // Ensure the resolved path stays inside the uploads directory.
-    if (filePath !== uploadsRoot && !filePath.startsWith(uploadsRoot + path.sep)) {
-      throw new Response("Invalid file path.", { status: 400 });
-    }
-
-    // Build the URL representation used in the DB (relative to uploads root).
+    // Build the URL representation used in the DB.
     // Stored URLs may be absolute paths like /api/files/kyc/... or just the key segments.
     const relPath = "/" + key.join("/");
     const apiFilePath = `/api/files/${key.join("/")}`;
@@ -88,19 +67,17 @@ export async function GET(request: Request, context: { params: Promise<{ key: st
       }
     }
 
-    let data: Buffer;
-    try {
-      data = await readFile(filePath);
-    } catch {
+    const result = await get(blobPathname, { access: "private" });
+    if (!result || result.statusCode !== 200) {
       throw new Response("File not found.", { status: 404 });
     }
 
     const url = new URL(request.url);
     const isDownload = url.searchParams.has("dl");
 
-    return new Response(new Uint8Array(data), {
+    return new Response(result.stream, {
       headers: {
-        "Content-Type": contentTypeFor(filePath),
+        "Content-Type": result.blob.contentType,
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
         "Content-Disposition": isDownload ? `attachment; filename="${key[key.length - 1]}"` : "inline"
