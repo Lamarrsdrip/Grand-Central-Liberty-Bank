@@ -58,7 +58,7 @@ npm audit
 npm run build
 ```
 
-`vercel.json` registers `GET /api/internal/email-outbox/process` every ten minutes. The endpoint rejects requests unless the Vercel-supplied bearer value exactly matches `CRON_SECRET`. Failed deliveries use capped exponential retries and successful idempotency keys are never resent.
+`vercel.json` registers `GET /api/internal/email-outbox/process` once daily at 02:00 UTC, which is compatible with Vercel Hobby plan scheduling. The endpoint rejects requests unless the Vercel-supplied bearer value exactly matches `CRON_SECRET`. Failed deliveries use capped exponential retries and successful idempotency keys are never resent.
 
 ## 4. Deploy and verify
 
