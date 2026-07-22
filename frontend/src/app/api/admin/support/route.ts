@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { handleApi, ok } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { resolveSupportSender } from "@/lib/chat-message";
 
 export async function GET(request: NextRequest) {
   return handleApi(async () => {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
         status: ticket.status,
         priority: ticket.priority,
         updatedAt: ticket.updatedAt,
-        unreadCount: ticket.messages.filter((message) => message.sender.role === "USER" && !message.readAt).length,
+        unreadCount: ticket.messages.filter((message) => resolveSupportSender(message, ticket.user.id).senderRole === "USER" && !message.readAt).length,
         user: {
           id: ticket.user.id,
           firstName: ticket.user.firstName,
@@ -58,8 +59,7 @@ export async function GET(request: NextRequest) {
           attachmentUrl: message.attachmentUrl,
           readAt: message.readAt,
           createdAt: message.createdAt,
-          senderName: `${message.sender.firstName} ${message.sender.lastName}`,
-          senderRole: message.sender.role
+          ...resolveSupportSender(message, ticket.user.id)
         }))
       }))
     }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });

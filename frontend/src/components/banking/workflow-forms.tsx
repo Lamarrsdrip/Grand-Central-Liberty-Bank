@@ -25,7 +25,7 @@ type Ticket = {
   messages: Array<{
     id: string;
     body: string;
-    senderId: string;
+    senderId: string | null;
     createdAt: string;
     attachmentUrl?: string | null;
     senderName?: string;

@@ -166,78 +166,78 @@ enum EmailDeliveryStatus {
 }
 
 model User {
-  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
-  firstName          String
-  lastName           String
-  email              String            @unique
-  phone              String
-  country            String
-  address            String
-  dateOfBirth        DateTime
-  passwordHash       String
-  role               Role              @default(USER)
-  status             UserStatus        @default(ACTIVE)
-  emailVerifiedAt    DateTime?
-  twoFactorSecret    String?
-  twoFactorEnabled   Boolean           @default(false)
-  preferredLocale    String            @default("en")
-  preferredCurrency  String            @default("USD")
-  themePreference    String            @default("system")
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  accounts           Account[]
-  sessions           Session[]
-  kycSubmissions     KycSubmission[]   @relation("UserKyc")
-  kycReviews         KycSubmission[]   @relation("KycReviewer")
-  cardApplications   CardApplication[] @relation("UserCards")
-  cardReviews        CardApplication[] @relation("CardReviewer")
-  supportTickets     SupportTicket[]   @relation("TicketOwner")
-  assignedTickets    SupportTicket[]   @relation("TicketAssignee")
-  supportMessages    SupportMessage[]
-  transferRequests   TransferRequest[]
-  savedBeneficiaries SavedBeneficiary[]
-  notifications      Notification[]
-  broadcastEmails    BroadcastEmail[]
-  auditLogs          AuditLog[]
-  loginHistory       LoginHistory[]
-  kycNotes           KycNote[]         @relation("KycNoteAuthor")
-  freezeEvents       AccountFreezeEvent[] @relation("FreezeActor")
-  announcementBanners AnnouncementBanner[]
-  retirementAccounts RetirementAccount[]
+  id                           String                        @id @default(auto()) @map("_id") @db.ObjectId
+  firstName                    String
+  lastName                     String
+  email                        String                        @unique
+  phone                        String
+  country                      String
+  address                      String
+  dateOfBirth                  DateTime
+  passwordHash                 String
+  role                         Role                          @default(USER)
+  status                       UserStatus                    @default(ACTIVE)
+  emailVerifiedAt              DateTime?
+  twoFactorSecret              String?
+  twoFactorEnabled             Boolean                       @default(false)
+  preferredLocale              String                        @default("en")
+  preferredCurrency            String                        @default("USD")
+  themePreference              String                        @default("system")
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  accounts                     Account[]
+  sessions                     Session[]
+  kycSubmissions               KycSubmission[]               @relation("UserKyc")
+  kycReviews                   KycSubmission[]               @relation("KycReviewer")
+  cardApplications             CardApplication[]             @relation("UserCards")
+  cardReviews                  CardApplication[]             @relation("CardReviewer")
+  supportTickets               SupportTicket[]               @relation("TicketOwner")
+  assignedTickets              SupportTicket[]               @relation("TicketAssignee")
+  supportMessages              SupportMessage[]
+  transferRequests             TransferRequest[]
+  savedBeneficiaries           SavedBeneficiary[]
+  notifications                Notification[]
+  broadcastEmails              BroadcastEmail[]
+  auditLogs                    AuditLog[]
+  loginHistory                 LoginHistory[]
+  kycNotes                     KycNote[]                     @relation("KycNoteAuthor")
+  freezeEvents                 AccountFreezeEvent[]          @relation("FreezeActor")
+  announcementBanners          AnnouncementBanner[]
+  retirementAccounts           RetirementAccount[]
   retirementWithdrawalRequests RetirementWithdrawalRequest[] @relation("RetirementWithdrawalUser")
-  retirementWithdrawalReviews RetirementWithdrawalRequest[] @relation("RetirementWithdrawalReviewer")
-  retirementNotes RetirementWithdrawalNote[] @relation("RetirementNoteAuthor")
-  cryptoBalances      UserCryptoBalance[]
-  swapTransactions    SwapTransaction[]
-  cryptoWithdrawals   CryptoWithdrawalRequest[]
+  retirementWithdrawalReviews  RetirementWithdrawalRequest[] @relation("RetirementWithdrawalReviewer")
+  retirementNotes              RetirementWithdrawalNote[]    @relation("RetirementNoteAuthor")
+  cryptoBalances               UserCryptoBalance[]
+  swapTransactions             SwapTransaction[]
+  cryptoWithdrawals            CryptoWithdrawalRequest[]
 }
 
 model Session {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String    @db.ObjectId
-  user        User      @relation(fields: [userId], references: [id])
-  tokenHash   String    @unique
-  ip          String?
-  userAgent   String?
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  ip        String?
+  userAgent String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 }
 
 model Account {
-  id               String              @id @default(auto()) @map("_id") @db.ObjectId
-  userId           String              @db.ObjectId
-  user             User                @relation(fields: [userId], references: [id])
+  id               String               @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String               @db.ObjectId
+  user             User                 @relation(fields: [userId], references: [id])
   type             AccountType
-  currency         String              @default("USD")
-  accountNumber    String              @unique
+  currency         String               @default("USD")
+  accountNumber    String               @unique
   balance          Float
   availableBalance Float
-  status           AccountStatus       @default(ACTIVE)
+  status           AccountStatus        @default(ACTIVE)
   freezeReason     String?
   frozenAt         DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   transactions     Transaction[]
   transferRequests TransferRequest[]
   freezeEvents     AccountFreezeEvent[]
@@ -297,19 +297,19 @@ model AccountFreezeEvent {
 }
 
 model RetirementAccount {
-  id                          String                  @id @default(auto()) @map("_id") @db.ObjectId
-  userId                      String                  @db.ObjectId
-  user                        User                    @relation(fields: [userId], references: [id])
-  accountNumber               String                  @unique
+  id                          String                        @id @default(auto()) @map("_id") @db.ObjectId
+  userId                      String                        @db.ObjectId
+  user                        User                          @relation(fields: [userId], references: [id])
+  accountNumber               String                        @unique
   balance                     Float
   vestedBalance               Float
   contributionYtd             Float
   employerMatchYtd            Float
   investmentGrowthPlaceholder String
   withdrawalEligibilityStatus String
-  status                      RetirementAccountStatus @default(ACTIVE)
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
+  status                      RetirementAccountStatus       @default(ACTIVE)
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
   contributions               RetirementContribution[]
   withdrawalRequests          RetirementWithdrawalRequest[]
 }
@@ -328,7 +328,7 @@ model RetirementContribution {
 }
 
 model RetirementFeeSetting {
-  id                Int      @id @map("_id") @default(1)
+  id                Int      @id @default(1) @map("_id")
   feeName           String
   feePercentage     Float
   feeReason         String
@@ -417,10 +417,10 @@ model SupportTicket {
   assignedAdminId String?          @db.ObjectId
   assignedAdmin   User?            @relation("TicketAssignee", fields: [assignedAdminId], references: [id])
   subject         String
-  status          TicketStatus      @default(OPEN)
-  priority        Priority          @default(NORMAL)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  status          TicketStatus     @default(OPEN)
+  priority        Priority         @default(NORMAL)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   messages        SupportMessage[]
 }
 
@@ -428,8 +428,10 @@ model SupportMessage {
   id            String        @id @default(auto()) @map("_id") @db.ObjectId
   ticketId      String        @db.ObjectId
   ticket        SupportTicket @relation(fields: [ticketId], references: [id])
-  senderId      String        @db.ObjectId
-  sender        User          @relation(fields: [senderId], references: [id])
+  // Legacy imports can reference users that no longer exist. Keep the
+  // message readable instead of failing the entire conversation query.
+  senderId      String?       @db.ObjectId
+  sender        User?         @relation(fields: [senderId], references: [id])
   body          String
   attachmentUrl String?
   readAt        DateTime?
@@ -473,7 +475,7 @@ model SavedBeneficiary {
 }
 
 model TransferSetting {
-  id                  Int      @id @map("_id") @default(1)
+  id                  Int      @id @default(1) @map("_id")
   successMessage      String   @default("Transfer submitted successfully.")
   reviewMessage       String
   failedMessage       String   @default("Transfer could not be submitted. Additional verification is required before this transaction can be completed.")
@@ -486,7 +488,7 @@ model TransferSetting {
 }
 
 model EmailSetting {
-  id                   Int      @id @map("_id") @default(1)
+  id                   Int      @id @default(1) @map("_id")
   gmailAddress         String?
   appPasswordEncrypted String?
   smtpHost             String   @default("smtp.gmail.com")
@@ -497,19 +499,19 @@ model EmailSetting {
 }
 
 model BankSetting {
-  id            Int      @id @map("_id") @default(1)
-  bankName      String
-  bankAddress   String
-  supportEmail  String
-  supportPhone  String
-  websiteUrl    String
-  defaultLocale  String   @default("en")
-  supportedLocales String[]
-  terms         String
-  privacyPolicy String
+  id                  Int      @id @default(1) @map("_id")
+  bankName            String
+  bankAddress         String
+  supportEmail        String
+  supportPhone        String
+  websiteUrl          String
+  defaultLocale       String   @default("en")
+  supportedLocales    String[]
+  terms               String
+  privacyPolicy       String
   welcomeBonusEnabled Boolean?
-  welcomeBonusAmount Float?
-  updatedAt     DateTime @updatedAt
+  welcomeBonusAmount  Float?
+  updatedAt           DateTime @updatedAt
 }
 
 model AnnouncementBanner {
@@ -530,18 +532,18 @@ model AnnouncementBanner {
 }
 
 model BroadcastEmail {
-  id           String          @id @default(auto()) @map("_id") @db.ObjectId
-  createdById  String          @db.ObjectId
-  createdBy    User            @relation(fields: [createdById], references: [id])
-  subject      String
-  bodyHtml     String
-  target       BroadcastTarget
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  createdById     String          @db.ObjectId
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  subject         String
+  bodyHtml        String
+  target          BroadcastTarget
   selectedUserIds String[]
-  status       BroadcastStatus @default(DRAFT)
-  sentCount    Int             @default(0)
-  failedCount  Int             @default(0)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  status          BroadcastStatus @default(DRAFT)
+  sentCount       Int             @default(0)
+  failedCount     Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }
 
 model Notification {
@@ -556,25 +558,25 @@ model Notification {
 }
 
 model EmailDelivery {
-  id                 String              @id @default(auto()) @map("_id") @db.ObjectId
-  eventType          String
-  idempotencyKey     String              @unique
-  recipient          String
-  relatedUserId      String?             @db.ObjectId
-  relatedEntityType  String?
-  relatedEntityId    String?
-  subject            String
-  htmlBody           String
-  textBody           String
-  status             EmailDeliveryStatus @default(PENDING)
-  provider           String?
-  providerMessageId  String?
-  attemptCount       Int                 @default(0)
-  lastError          String?
-  nextAttemptAt      DateTime?
-  sentAt             DateTime?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                String              @id @default(auto()) @map("_id") @db.ObjectId
+  eventType         String
+  idempotencyKey    String              @unique
+  recipient         String
+  relatedUserId     String?             @db.ObjectId
+  relatedEntityType String?
+  relatedEntityId   String?
+  subject           String
+  htmlBody          String
+  textBody          String
+  status            EmailDeliveryStatus @default(PENDING)
+  provider          String?
+  providerMessageId String?
+  attemptCount      Int                 @default(0)
+  lastError         String?
+  nextAttemptAt     DateTime?
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@index([status, nextAttemptAt])
   @@index([relatedUserId, createdAt])
@@ -606,21 +608,21 @@ model LoginHistory {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
   email     String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 model EmailVerificationToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
-  tokenHash String   @unique
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 model UserCryptoBalance {
@@ -636,19 +638,19 @@ model UserCryptoBalance {
 }
 
 model SwapTransaction {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String   @db.ObjectId
-  user         User     @relation(fields: [userId], references: [id])
-  fromAsset    String
-  toAsset      String
-  fromAmount   Float
-  toAmount     Float
-  rate         Float
-  feeAmount    Float
-  feeCurrency  String
-  status       String   @default("COMPLETED")
-  reference    String   @unique
-  createdAt    DateTime @default(now())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  fromAsset   String
+  toAsset     String
+  fromAmount  Float
+  toAmount    Float
+  rate        Float
+  feeAmount   Float
+  feeCurrency String
+  status      String   @default("COMPLETED")
+  reference   String   @unique
+  createdAt   DateTime @default(now())
 }
 
 model CryptoAssetPrice {

@@ -9,6 +9,7 @@ import { ticketSchema } from "@/lib/validators";
 import { log } from "@/lib/logger";
 import { sendTransactionalEmail } from "@/lib/transactional-email";
 import { deterministicChatObjectId } from "@/lib/chat";
+import { resolveSupportSender } from "@/lib/chat-message";
 
 function objectIdFor(value: string) {
   return createHash("sha256").update(value).digest("hex").slice(0, 24);
@@ -82,8 +83,7 @@ export async function POST(request: NextRequest) {
             senderId: message.senderId,
             attachmentUrl: message.attachmentUrl,
             createdAt: message.createdAt,
-            senderName: `${message.sender.firstName} ${message.sender.lastName}`,
-            senderRole: message.sender.role
+            ...resolveSupportSender(message, user.id)
           }]
         }
       });
@@ -152,8 +152,7 @@ export async function POST(request: NextRequest) {
           senderId: message.senderId,
           attachmentUrl: message.attachmentUrl,
           createdAt: message.createdAt,
-          senderName: `${message.sender.firstName} ${message.sender.lastName}`,
-          senderRole: message.sender.role
+          ...resolveSupportSender(message, user.id)
         }]
       }
     });

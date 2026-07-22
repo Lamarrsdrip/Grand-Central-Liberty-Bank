@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deterministicChatObjectId, parseIncrementalChatDate } from "@/lib/chat";
-import { normalizePublicChatMessage } from "@/lib/chat-message";
+import { normalizePublicChatMessage, resolveSupportSender } from "@/lib/chat-message";
 
 describe("chat request integrity", () => {
   it("deduplicates a repeated client submission within one conversation", () => {
@@ -28,6 +28,20 @@ describe("chat request integrity", () => {
   it("renders the flattened safe API shape used by both customer and admin messages", () => {
     expect(normalizePublicChatMessage({ id: "message-1", body: "Admin reply", createdAt: "2026-07-22T09:46:00.000Z", senderRole: "ADMIN" })).toEqual({
       id: "message-1", body: "Admin reply", createdAt: "2026-07-22T09:46:00.000Z", senderRole: "ADMIN"
+    });
+  });
+
+  it("preserves legacy messages whose customer relation no longer resolves", () => {
+    expect(resolveSupportSender({ senderId: "customer-1", sender: null }, "customer-1")).toEqual({
+      senderName: "Former customer",
+      senderRole: "USER"
+    });
+  });
+
+  it("preserves legacy messages whose support-agent relation no longer resolves", () => {
+    expect(resolveSupportSender({ senderId: "former-admin", sender: null }, "customer-1")).toEqual({
+      senderName: "Former support agent",
+      senderRole: "ADMIN"
     });
   });
 });

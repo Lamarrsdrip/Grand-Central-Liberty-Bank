@@ -35,6 +35,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader, StatCard } from "@/components/admin/admin-ui";
 import { getCurrentUser } from "@/lib/auth";
 import { getAdminData } from "@/lib/data";
+import { resolveSupportSender } from "@/lib/chat-message";
 import { CRYPTO_RATES_USD } from "@/lib/swap-rates";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -99,7 +100,7 @@ export default async function AdminPage({
       email: ticket.user.email,
       accountReference: data.users.find((candidate) => candidate.id === ticket.user.id)?.accounts[0]?.accountNumber.slice(-4) ?? null
     },
-    unreadCount: ticket.messages.filter((message) => message.sender.role === "USER" && !message.readAt).length,
+    unreadCount: ticket.messages.filter((message) => resolveSupportSender(message, ticket.user.id).senderRole === "USER" && !message.readAt).length,
     updatedAt: ticket.updatedAt.toISOString(),
     assignedAdmin: ticket.assignedAdmin
       ? { id: ticket.assignedAdmin.id, firstName: ticket.assignedAdmin.firstName, lastName: ticket.assignedAdmin.lastName, email: ticket.assignedAdmin.email }
@@ -111,8 +112,7 @@ export default async function AdminPage({
       attachmentUrl: message.attachmentUrl,
       readAt: message.readAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
-      senderName: `${message.sender.firstName} ${message.sender.lastName}`,
-      senderRole: message.sender.role
+      ...resolveSupportSender(message, ticket.user.id)
     }))
   }));
 

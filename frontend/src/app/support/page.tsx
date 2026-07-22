@@ -5,6 +5,7 @@ import { ProtectedShell } from "@/components/layout/protected-shell";
 import { PageHeader } from "@/components/banking/premium-ui";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserSupportTickets } from "@/lib/data";
+import { resolveSupportSender } from "@/lib/chat-message";
 import { getServerTranslations } from "@/lib/i18n/server-locale";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +32,7 @@ export default async function SupportPage() {
       senderId: message.senderId,
       createdAt: message.createdAt.toISOString(),
       attachmentUrl: message.attachmentUrl,
-      senderName: `${message.sender.firstName} ${message.sender.lastName}`,
-      senderRole: message.sender.role
+      ...resolveSupportSender(message, ticket.userId)
     }))
   }));
 

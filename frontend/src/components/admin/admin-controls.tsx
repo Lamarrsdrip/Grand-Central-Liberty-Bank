@@ -279,7 +279,7 @@ type AdminSupportTicket = {
   messages: Array<{
     id: string;
     body: string;
-    senderId: string;
+    senderId: string | null;
     createdAt: string;
     readAt?: string | null;
     attachmentUrl?: string | null;

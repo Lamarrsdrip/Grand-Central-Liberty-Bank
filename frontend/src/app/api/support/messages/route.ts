@@ -8,16 +8,17 @@ import { messageSchema } from "@/lib/validators";
 import { log } from "@/lib/logger";
 import { sendTransactionalEmail } from "@/lib/transactional-email";
 import { deterministicChatObjectId, parseIncrementalChatDate } from "@/lib/chat";
+import { resolveSupportSender } from "@/lib/chat-message";
 
 function publicMessage(message: {
   id: string;
   body: string;
-  senderId: string;
+  senderId: string | null;
   attachmentUrl: string | null;
   createdAt: Date;
   readAt: Date | null;
-  sender: { firstName: string; lastName: string; role: string };
-}) {
+  sender: { firstName: string; lastName: string; role: string } | null;
+}, ticketUserId: string) {
   return {
     id: message.id,
     body: message.body,
@@ -25,8 +26,7 @@ function publicMessage(message: {
     attachmentUrl: message.attachmentUrl,
     createdAt: message.createdAt,
     readAt: message.readAt,
-    senderName: `${message.sender.firstName} ${message.sender.lastName}`,
-    senderRole: message.sender.role
+    ...resolveSupportSender(message, ticketUserId)
   };
 }
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       incremental: Boolean(afterRaw)
     });
     return ok(
-      { messages: ticket.messages.map(publicMessage) },
+      { messages: ticket.messages.map((message) => publicMessage(message, ticket.userId)) },
       { headers: { "Cache-Control": "private, no-store, max-age=0" } }
     );
   });
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return created({ message: publicMessage(message) });
+    return created({ message: publicMessage(message, ticket.userId) });
   });
 }
 
